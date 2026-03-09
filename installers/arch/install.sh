@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────
-#  ¢entient¢ — Arch Linux Installer
+#  ¢entien¢ — Arch Linux Installer
 #  Usage: sudo bash install.sh [--tray]
 # ──────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -23,7 +23,7 @@ for arg in "$@"; do case "$arg" in --tray) MODE="tray";; --service) MODE="servic
 [[ $EUID -ne 0 ]] && err "Run as root: sudo bash $0"
 
 echo ""
-echo -e "${GREEN}¢entient¢${NC} — Arch Linux Installer v${VERSION}"
+echo -e "${GREEN}¢entien¢${NC} — Arch Linux Installer v${VERSION}"
 echo ""
 
 # ── Dependencies ──────────────────────────────────────────────
@@ -60,12 +60,12 @@ fi
 deactivate
 
 chown -R "${SERVICE_USER}:${SERVICE_USER}" "$INSTALL_DIR" "$DATA_DIR"
-ok "¢entient¢ installed to ${INSTALL_DIR}"
+ok "¢entien¢ installed to ${INSTALL_DIR}"
 
 # ── Systemd ───────────────────────────────────────────────────
 cat > /etc/systemd/system/centient.service << EOF
 [Unit]
-Description=¢entient¢
+Description=¢entien¢
 After=network.target
 
 [Service]

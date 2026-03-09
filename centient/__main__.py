@@ -1,4 +1,4 @@
-"""¢entient¢ — CLI entry point.
+"""¢entien¢ — CLI entry point.
 
 Modes:
   --tray      Run with a system tray icon (desktop use, binds 127.0.0.1)
@@ -21,7 +21,7 @@ logger = logging.getLogger("centient")
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="centient",
-        description="¢entient¢ — Lightweight server monitoring",
+        description="¢entien¢ — Lightweight server monitoring",
     )
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument(
@@ -41,7 +41,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--version", action="version",
-        version=f"¢entient¢ {__import__('centient').__version__}",
+        version=f"¢entien¢ {__import__('centient').__version__}",
     )
     args = parser.parse_args()
 
@@ -91,7 +91,7 @@ def _run_service_mode(host: str, port: int) -> None:
 def _run_tray_mode(host: str, port: int, auto_open: bool = False) -> None:
     """Desktop tray mode — uvicorn in a thread, tray icon on the main thread."""
     import uvicorn
-    from .tray import CentientTray
+    from .tray import CentiencTray
 
     logger.info("Starting in tray mode on %s:%d", host, port)
 
@@ -117,7 +117,7 @@ def _run_tray_mode(host: str, port: int, auto_open: bool = False) -> None:
         ).start()
 
     # Run tray on main thread (required by macOS)
-    tray = CentientTray(port=port, host=host)
+    tray = CentiencTray(port=port, host=host)
 
     def on_tray_quit():
         server.should_exit = True
@@ -126,7 +126,7 @@ def _run_tray_mode(host: str, port: int, auto_open: bool = False) -> None:
 
     # Wait for server to finish
     server_thread.join(timeout=5)
-    logger.info("¢entient¢ shut down")
+    logger.info("¢entien¢ shut down")
 
 
 if __name__ == "__main__":

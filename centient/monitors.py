@@ -1,4 +1,4 @@
-"""¢entient¢ — Background monitoring workers.
+"""¢entien¢ — Background monitoring workers.
 
 Runs async checks against servers (ICMP ping), services (TCP port),
 and websites (HTTP request) at configurable intervals.

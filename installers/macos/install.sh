@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entient¢ — macOS Installer
+#  ¢entien¢ — macOS Installer
 #
-#  Installs ¢entient¢ as a lightweight background service using
+#  Installs ¢entien¢ as a lightweight background service using
 #  launchd, or as a tray app for desktop use.
 #
 #  Usage:
@@ -33,7 +33,7 @@ for arg in "$@"; do
 done
 
 echo ""
-echo -e "${GREEN}¢entient¢${NC} — macOS Installer v${VERSION} (${MODE} mode)"
+echo -e "${GREEN}¢entien¢${NC} — macOS Installer v${VERSION} (${MODE} mode)"
 echo ""
 
 # ── Check Python ─────────────────────────────────────────────
@@ -65,7 +65,7 @@ else
     pip install "centient[tray]" -q
 fi
 deactivate
-ok "¢entient¢ installed"
+ok "¢entien¢ installed"
 
 # ── Create launchd plist ─────────────────────────────────────
 info "Creating launchd agent..."

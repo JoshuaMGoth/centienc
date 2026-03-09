@@ -1,4 +1,4 @@
-"""¢entient¢ — Main FastAPI application."""
+"""¢entien¢ — Main FastAPI application."""
 
 from __future__ import annotations
 
@@ -57,13 +57,13 @@ async def lifespan(application: FastAPI):
 
     engine = MonitorEngine(db)
     await engine.start()
-    logger.info("¢entient¢ v%s started", __version__)
+    logger.info("¢entien¢ v%s started", __version__)
     yield
     await engine.stop()
-    logger.info("¢entient¢ shut down")
+    logger.info("¢entien¢ shut down")
 
 
-app = FastAPI(title="¢entient¢", version=__version__, lifespan=lifespan)
+app = FastAPI(title="¢entien¢", version=__version__, lifespan=lifespan)
 
 # Static files
 if STATIC_DIR.exists():
@@ -177,7 +177,7 @@ async def do_setup(request: Request):
         await db.set_setting("auth_enabled", "false")
 
     # Apply optional settings from wizard
-    title = body.get("title", "¢entient¢")
+    title = body.get("title", "¢entien¢")
     theme = body.get("theme", "dark")
     interval = str(body.get("check_interval", 60))
 
@@ -247,7 +247,7 @@ async def api_overview(request: Request):
         "ok": True,
         **overview,
         "settings": {
-            "app_title": settings.get("app_title", "¢entient¢"),
+            "app_title": settings.get("app_title", "¢entien¢"),
             "theme": settings.get("theme", "dark"),
             "auth_enabled": settings.get("auth_enabled", "false"),
             "check_interval": settings.get("check_interval", "60"),
@@ -611,5 +611,5 @@ async def health():
     return {
         "ok": True,
         "version": __version__,
-        "product": "¢entient¢",
+        "product": "¢entien¢",
     }

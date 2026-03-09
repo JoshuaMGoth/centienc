@@ -1,4 +1,4 @@
-"""¢entient¢ — Authentication helpers (bcrypt + JWT)."""
+"""¢entien¢ — Authentication helpers (bcrypt + JWT)."""
 
 from __future__ import annotations
 

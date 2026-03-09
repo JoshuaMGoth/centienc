@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────
-#  ¢entient¢ — Windows Installer (PowerShell)
+#  ¢entien¢ — Windows Installer (PowerShell)
 #  Usage:
 #    powershell -ExecutionPolicy Bypass -File install.ps1           # Tray mode (default)
 #    powershell -ExecutionPolicy Bypass -File install.ps1 --service # Headless service
@@ -12,11 +12,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Version = "1.0.0"
-$InstallDir = "$env:ProgramFiles\Centient"
-$DataDir = "$env:ProgramData\Centient"
+$InstallDir = "$env:ProgramFiles\Centienc"
+$DataDir = "$env:ProgramData\Centienc"
 $VenvDir = "$InstallDir\venv"
 $Port = 9090
-$ServiceName = "Centient"
+$ServiceName = "Centienc"
 $Mode = if ($Service) { "service" } elseif ($Tray) { "tray" } else { "tray" }  # Default: tray on Windows
 
 function Write-Info  { Write-Host "[INFO]  $args" -ForegroundColor Cyan }
@@ -29,7 +29,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 }
 
 Write-Host ""
-Write-Host "  ¢entient¢ — Windows Installer v$Version ($Mode mode)" -ForegroundColor Green
+Write-Host "  ¢entien¢ — Windows Installer v$Version ($Mode mode)" -ForegroundColor Green
 Write-Host ""
 
 # ── Check Python ─────────────────────────────────────────────
@@ -74,36 +74,36 @@ if (Test-Path $PyprojectPath) {
         & "$VenvDir\Scripts\pip.exe" install centient -q
     }
 }
-Write-Ok "¢entient¢ installed"
+Write-Ok "¢entien¢ installed"
 
 # ── Create Windows service using NSSM or Task Scheduler ──────
 Write-Info "Creating scheduled task..."
 
-$CentientArgs = if ($Mode -eq "tray") { "--tray --port $Port --open" } else { "--service --host 0.0.0.0 --port $Port" }
+$CentiencArgs = if ($Mode -eq "tray") { "--tray --port $Port --open" } else { "--service --host 0.0.0.0 --port $Port" }
 
 $Action = New-ScheduledTaskAction `
     -Execute "$VenvDir\Scripts\python.exe" `
-    -Argument "-m centient $CentientArgs --data-dir `"$DataDir`""
+    -Argument "-m centient $CentiencArgs --data-dir `"$DataDir`""
 
 $Trigger = New-ScheduledTaskTrigger -AtStartup
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 $Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
-Register-ScheduledTask -TaskName $ServiceName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal -Description "¢entient¢ Server" -Force | Out-Null
+Register-ScheduledTask -TaskName $ServiceName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal -Description "¢entien¢ Server" -Force | Out-Null
 
 Start-ScheduledTask -TaskName $ServiceName
 Write-Ok "Scheduled task created and started"
 
 # ── Firewall rule ────────────────────────────────────────────
 Write-Info "Adding firewall rule..."
-New-NetFirewallRule -DisplayName "¢entient¢" -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -ErrorAction SilentlyContinue | Out-Null
+New-NetFirewallRule -DisplayName "¢entien¢" -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -ErrorAction SilentlyContinue | Out-Null
 Write-Ok "Firewall rule added"
 
 # ── Summary ──────────────────────────────────────────────────
 $IP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch "Loopback" } | Select-Object -First 1).IPAddress
 
 Write-Host ""
-Write-Host "  ✓ ¢entient¢ Installed!" -ForegroundColor Green
+Write-Host "  ✓ ¢entien¢ Installed!" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Dashboard:   http://${IP}:${Port}" -ForegroundColor Cyan
 Write-Host "  Data Dir:    $DataDir"

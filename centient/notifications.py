@@ -1,4 +1,4 @@
-"""¢entient¢ — Notification dispatcher (email, webhook, Discord)."""
+"""¢entien¢ — Notification dispatcher (email, webhook, Discord)."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ async def _send_email(
         return
 
     emoji = {"up": "✅", "down": "🔴", "warning": "⚠️"}.get(status, "ℹ️")
-    subject = f"[¢entient¢] {emoji} {target_type.title()} {status.upper()}: {target_name}"
+    subject = f"[¢entien¢] {emoji} {target_type.title()} {status.upper()}: {target_name}"
 
     body = (
         f"Target: {target_name}\n"
@@ -121,7 +121,7 @@ async def _send_webhook(
         "target_name": target_name,
         "status": status,
         "details": details,
-        "source": "¢entient¢",
+        "source": "¢entien¢",
     }
 
     async with httpx.AsyncClient(timeout=10) as client:
@@ -153,7 +153,7 @@ async def _send_discord(
             "title": f"{emoji} {target_type.title()} {status.upper()}",
             "description": f"**{target_name}**\n{details or 'No additional details.'}",
             "color": color,
-            "footer": {"text": "¢entient¢"},
+            "footer": {"text": "¢entien¢"},
         }],
     }
 
@@ -168,11 +168,11 @@ async def test_channel(channel: dict[str, Any]) -> dict[str, Any]:
     try:
         ch_type = channel["type"]
         if ch_type == "email":
-            await _send_email(channel, "test", "Test Target", "up", "This is a test notification from ¢entient¢.")
+            await _send_email(channel, "test", "Test Target", "up", "This is a test notification from ¢entien¢.")
         elif ch_type == "webhook":
-            await _send_webhook(channel, "test", "Test Target", "up", "This is a test notification from ¢entient¢.")
+            await _send_webhook(channel, "test", "Test Target", "up", "This is a test notification from ¢entien¢.")
         elif ch_type == "discord":
-            await _send_discord(channel, "test", "Test Target", "up", "This is a test notification from ¢entient¢.")
+            await _send_discord(channel, "test", "Test Target", "up", "This is a test notification from ¢entien¢.")
         return {"ok": True, "message": "Test notification sent successfully"}
     except Exception as e:
         return {"ok": False, "error": str(e)}

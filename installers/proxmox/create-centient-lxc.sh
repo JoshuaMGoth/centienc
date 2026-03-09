@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entient¢ — Proxmox LXC Container Installer
+#  ¢entien¢ — Proxmox LXC Container Installer
 #
 #  Creates a lightweight LXC container on a Proxmox VE host,
-#  installs ¢entient¢ inside it, and starts the service.
+#  installs ¢entien¢ inside it, and starts the service.
 #
 #  Usage (run on the Proxmox host):
 #    bash create-centient-lxc.sh [OPTIONS]
@@ -18,7 +18,7 @@
 #    --bridge  STR    Network bridge      (default: vmbr0)
 #    --ip      CIDR   Static IP/CIDR      (default: dhcp)
 #    --gw      IP     Gateway IP          (default: auto from bridge)
-#    --port    NUM    ¢entient¢ port      (default: 9090)
+#    --port    NUM    ¢entien¢ port      (default: 9090)
 #    --vlan    NUM    VLAN tag            (optional)
 #    --template STR   OS template         (default: auto-download debian-12)
 #    --start         Start after creation (default: yes)
@@ -96,7 +96,7 @@ command -v pvesm &>/dev/null || err "pvesm not found — are you on a Proxmox VE
 
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║${NC}  ${BOLD}¢entient¢${NC} — Proxmox LXC Container Creator   ${BOLD}${GREEN}║${NC}"
+echo -e "${BOLD}${GREEN}║${NC}  ${BOLD}¢entien¢${NC} — Proxmox LXC Container Creator   ${BOLD}${GREEN}║${NC}"
 echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 
 # ── Determine next available CTID ────────────────────────────
@@ -200,8 +200,8 @@ for i in $(seq 1 30); do
 done
 ok "Container is running"
 
-# ── Install ¢entient¢ inside the container ────────────────────────
-header "Installing ¢entient¢"
+# ── Install ¢entien¢ inside the container ────────────────────────
+header "Installing ¢entien¢"
 
 # Update packages and install Python
 info "Installing system packages inside container..."
@@ -212,8 +212,8 @@ pct exec "$CTID" -- bash -c "
 " 2>&1 | tail -3
 ok "System packages installed"
 
-# Create venv and install ¢entient¢
-info "Setting up ¢entient¢..."
+# Create venv and install ¢entien¢
+info "Setting up ¢entien¢..."
 pct exec "$CTID" -- bash -c "
     set -e
 
@@ -241,7 +241,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." 2>/dev/null && pwd || echo "")"
 
 if [[ -n "$PROJECT_ROOT" && -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
-    info "Copying ¢entient¢ source into container..."
+    info "Copying ¢entien¢ source into container..."
 
     # Push the centient package
     pct push "$CTID" "${PROJECT_ROOT}/pyproject.toml" /tmp/centient-pkg/pyproject.toml --mkdir
@@ -274,7 +274,7 @@ if [[ -n "$PROJECT_ROOT" && -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
         rm -rf /tmp/centient-pkg
         deactivate
     "
-    ok "¢entient¢ installed from local source"
+    ok "¢entien¢ installed from local source"
 else
     info "No local source found — installing centient from pip inside the container..."
     if pct exec "$CTID" -- bash -c "
@@ -282,7 +282,7 @@ else
         pip install centient -q
         deactivate
     "; then
-        ok "¢entient¢ installed from pip"
+        ok "¢entien¢ installed from pip"
     else
         err "Failed to install centient from pip inside container. Verify internet/PyPI access or run from local source checkout."
     fi
@@ -294,7 +294,7 @@ header "Configuring Service"
 pct exec "$CTID" -- bash -c "
 cat > /etc/systemd/system/centient.service << 'SVCEOF'
 [Unit]
-Description=¢entient¢ — Server Monitoring Dashboard
+Description=¢entien¢ — Server Monitoring Dashboard
 After=network.target
 
 [Service]
@@ -318,13 +318,13 @@ systemctl daemon-reload
 systemctl enable centient
 systemctl start centient
 "
-ok "¢entient¢ service started"
+ok "¢entien¢ service started"
 
 # ── Wait for service to be ready ─────────────────────────────
-info "Waiting for ¢entient¢ to be ready..."
+info "Waiting for ¢entien¢ to be ready..."
 for i in $(seq 1 15); do
     if pct exec "$CTID" -- curl -s -o /dev/null -w '%{http_code}' "http://localhost:${PORT}/api/health" 2>/dev/null | grep -q 200; then
-        ok "¢entient¢ is responding"
+        ok "¢entien¢ is responding"
         break
     fi
     sleep 1
@@ -336,7 +336,7 @@ CT_IP=$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "
 # ── Summary ──────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║${NC}    ${BOLD}${GREEN}✓ ¢entient¢ LXC Container Ready!${NC}                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}    ${BOLD}${GREEN}✓ ¢entien¢ LXC Container Ready!${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Container:${NC}"
@@ -346,7 +346,7 @@ echo -e "    IP Address:   ${CYAN}${CT_IP}${NC}"
 echo -e "    Cores/RAM:    ${CORES} core(s) / ${MEMORY} MB"
 echo -e "    Disk:         ${DISK_SIZE} GB (${STORAGE})"
 echo ""
-echo -e "  ${BOLD}¢entient¢:${NC}"
+echo -e "  ${BOLD}¢entien¢:${NC}"
 echo -e "    Dashboard:    ${BLUE}http://${CT_IP}:${PORT}${NC}"
 echo -e "    Data Dir:     /var/lib/centient"
 echo -e "    Root Pass:    ${YELLOW}${ROOT_PASS}${NC}"

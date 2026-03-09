@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "centient"
 version = "1.0.0"
-description = "¢entient¢ — Professional server, service & website monitoring dashboard"
+description = "¢entien¢ — Professional server, service & website monitoring dashboard"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
 requires-python = ">=3.10"

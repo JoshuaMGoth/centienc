@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────
-#  ¢entient¢ — Universal Installer (Linux / macOS)
+#  ¢entien¢ — Universal Installer (Linux / macOS)
 #  Works on Debian, Ubuntu, Arch, Fedora, macOS, and most POSIX
 #
 #  Usage:
@@ -37,7 +37,7 @@ done
 
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}   ${GREEN}¢entient¢${NC} — Installer v${VERSION} (${MODE})     ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}   ${GREEN}¢entien¢${NC} — Installer v${VERSION} (${MODE})     ${BLUE}║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -90,9 +90,9 @@ create_user() {
     fi
 }
 
-# ── Install ¢entient¢ ─────────────────────────────────────────────────
+# ── Install ¢entien¢ ─────────────────────────────────────────────────
 install_centient() {
-    info "Installing ¢entient¢ to ${INSTALL_DIR}..."
+    info "Installing ¢entien¢ to ${INSTALL_DIR}..."
 
     mkdir -p "$INSTALL_DIR" "$DATA_DIR"
 
@@ -126,7 +126,7 @@ install_centient() {
     # Set ownership
     chown -R "${SERVICE_USER}:${SERVICE_USER}" "$INSTALL_DIR" "$DATA_DIR"
 
-    ok "¢entient¢ installed"
+    ok "¢entien¢ installed"
 }
 
 # ── Create systemd service ───────────────────────────────────
@@ -141,7 +141,7 @@ install_service() {
 
     cat > /etc/systemd/system/centient.service << EOF
 [Unit]
-Description=¢entient¢ — Server Monitoring Dashboard
+Description=¢entien¢ — Server Monitoring Dashboard
 After=network.target
 Wants=network-online.target
 
@@ -177,7 +177,7 @@ EOF
 # ── Configure firewall ───────────────────────────────────────
 configure_firewall() {
     if command -v ufw &>/dev/null; then
-        ufw allow "$PORT"/tcp comment "¢entient¢" 2>/dev/null || true
+        ufw allow "$PORT"/tcp comment "¢entien¢" 2>/dev/null || true
         info "UFW rule added for port ${PORT}"
     elif command -v firewall-cmd &>/dev/null; then
         firewall-cmd --permanent --add-port="${PORT}/tcp" 2>/dev/null || true
@@ -193,7 +193,7 @@ print_summary() {
 
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║${NC}       ${GREEN}✓ ¢entient¢ Installed!${NC}              ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}       ${GREEN}✓ ¢entien¢ Installed!${NC}              ${GREEN}║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "  Dashboard:    ${BLUE}http://${ip}:${PORT}${NC}"

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Setup — ¢entient¢</title>
+<title>Setup — ¢entien¢</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2333;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#388bfd;--green:#3fb950;--red:#f85149;--radius:10px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
@@ -50,7 +50,7 @@ input:focus,select:focus{border-color:var(--accent)}
 <body>
 <div class="wizard">
   <div class="logo">¢</div>
-  <h1>Welcome to ¢entient¢</h1>
+  <h1>Welcome to ¢entien¢</h1>
   <div class="sub">Let's get your monitoring dashboard set up in under a minute.</div>
 
   <div class="progress">
@@ -88,7 +88,7 @@ input:focus,select:focus{border-color:var(--accent)}
   <div class="step" id="step2">
     <h2>Step 2 — Customize</h2>
     <label>Dashboard Title</label>
-    <input id="sTitle" value="¢entient¢" placeholder="My Monitoring">
+    <input id="sTitle" value="¢entien¢" placeholder="My Monitoring">
     <label>Theme</label>
     <select id="sTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
     <label>Default Check Interval (seconds)</label>
@@ -107,7 +107,7 @@ input:focus,select:focus{border-color:var(--accent)}
     <div class="err" id="setupErr"></div>
     <div class="actions">
       <button class="btn" onclick="goStep(2)">← Back</button>
-      <button class="btn btn-primary" id="finishBtn" onclick="finishSetup()">🚀 Launch ¢entient¢</button>
+      <button class="btn btn-primary" id="finishBtn" onclick="finishSetup()">🚀 Launch ¢entien¢</button>
     </div>
   </div>
 </div>
@@ -140,7 +140,7 @@ function goStep(n){
 }
 
 function buildReview(){
-  const title=document.getElementById('sTitle').value||'¢entient¢';
+  const title=document.getElementById('sTitle').value||'¢entien¢';
   const theme=document.getElementById('sTheme').value;
   const interval=document.getElementById('sCheckInterval').value||'60';
   let html=`<strong>Mode:</strong> ${mode==='secured'?'🔒 Secured (admin account)':'🌐 Open Access'}<br>`;
@@ -156,7 +156,7 @@ async function finishSetup(){
   btn.disabled=true;btn.textContent='Setting up…';
   const body={
     mode,
-    title:document.getElementById('sTitle').value||'¢entient¢',
+    title:document.getElementById('sTitle').value||'¢entien¢',
     theme:document.getElementById('sTheme').value,
     check_interval:parseInt(document.getElementById('sCheckInterval').value)||60,
   };
@@ -171,7 +171,7 @@ async function finishSetup(){
     location.href='/';
   }catch(e){
     document.getElementById('setupErr').textContent=e.message;
-    btn.disabled=false;btn.textContent='🚀 Launch ¢entient¢';
+    btn.disabled=false;btn.textContent='🚀 Launch ¢entien¢';
   }
 }
 </script>

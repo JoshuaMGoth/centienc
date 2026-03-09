@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>¢entient¢</title>
+<title>¢entien¢</title>
 <style>
 /* ── Reset & Variables ─────────────────────────────────────── */
 *{margin:0;padding:0;box-sizing:border-box}
@@ -109,7 +109,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 </head>
 <body>
 <div class="top-bar">
-  <h1><div class="logo">¢</div> <span id="appTitle">¢entient¢</span></h1>
+  <h1><div class="logo">¢</div> <span id="appTitle">¢entien¢</span></h1>
   <div class="actions">
     <a href="/admin">⚙ Admin</a>
     <button onclick="toggleTheme()" id="themeBtn">☀ Light</button>
@@ -215,8 +215,8 @@ async function loadDashboard(){
     if(!d)return;
 
     // Settings
-    document.getElementById('appTitle').textContent=d.settings?.app_title||'¢entient¢';
-    document.title=d.settings?.app_title||'¢entient¢';
+    document.getElementById('appTitle').textContent=d.settings?.app_title||'¢entien¢';
+    document.title=d.settings?.app_title||'¢entien¢';
     loadTheme(localStorage.getItem('centient_theme')||d.settings?.theme||'dark');
     document.getElementById('logoutBtn').style.display=d.settings?.auth_enabled==='true'?'':'none';
 

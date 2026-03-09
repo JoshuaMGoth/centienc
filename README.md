@@ -1,4 +1,4 @@
-# ¢entient¢
+# ¢entien¢
 
 Lightweight server, service, and website monitoring that runs as a desktop tray app or headless background service. ~30 MB RAM footprint.
 
@@ -64,7 +64,7 @@ bash installers/proxmox/create-centient-lxc.sh \
     --memory 512
 ```
 
-This creates and configures a Debian 12 LXC container with ¢entient¢ pre-installed.
+This creates and configures a Debian 12 LXC container with ¢entien¢ pre-installed.
 
 ## Platform Installers
 
@@ -74,18 +74,35 @@ This creates and configures a Debian 12 LXC container with ¢entient¢ pre-insta
 | **Arch Linux** | `installers/arch/install.sh` | pacman + systemd, `--tray` flag |
 | **Universal Linux** | `installers/universal/install.sh` | Auto-detects distro |
 | **macOS** | `installers/macos/install.command` | Double-clickable wrapper for `install.sh` |
-| **Windows** | `installers/windows/install.cmd` | Double-clickable launcher for `install.ps1` |
+| **Windows** | `installers/windows/Centienc-Installer-Setup.exe` | Standard installer `.exe` (build from Inno Setup) |
 | **Proxmox LXC** | `installers/proxmox/create-centient-lxc.sh` | Full container provisioning |
 
 ### Double-Click Installers
 
 - **Linux (`.sh`)**: Ensure the script is executable (`chmod +x`) and choose “Run in Terminal” when prompted.
 - **macOS (`.command`)**: Double-click `installers/macos/install.command` in Finder.
-- **Windows (`.cmd`)**: Double-click `installers/windows/install.cmd`; it auto-elevates and runs PowerShell with execution-policy bypass.
+- **Windows (`.exe`, recommended)**: Run `Centienc-Installer-Setup.exe`.
+- **Windows script fallback (`.bat`)**: Double-click `installers/windows/Centienc-Installer.bat`.
+
+### Build Windows `.exe` Installer
+
+The current industry standard for direct Windows installs is a signed `.exe` installer.
+
+1. Install **Inno Setup 6** on Windows.
+2. Open PowerShell in `installers/windows/`.
+3. Build:
+
+```powershell
+./build-exe.ps1 -Version 1.0.0
+```
+
+Output file:
+
+- `installers/windows/dist/Centienc-Installer-Setup.exe`
 
 ## Configuration
 
-¢entient¢ stores its data in `~/.centient` (user mode) or `/var/lib/centient` (system install).
+¢entien¢ stores its data in `~/.centient` (user mode) or `/var/lib/centient` (system install).
 
 The database (`centient.db`) and all settings are managed through the web UI. See `config/centient.example.yml` for an overview of available settings.
 
@@ -169,7 +186,7 @@ centient/
 
 ## License
 
-¢entient¢ is free software distributed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
+¢entien¢ is free software distributed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html).
 
 A JoshuaGoth Software · Powered by Project CloudStrap
 
