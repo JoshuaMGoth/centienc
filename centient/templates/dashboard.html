@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>¢entient¢</title>
+<style>
+/* ── Reset & Variables ─────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c2333;--border:#30363d;
+  --text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#388bfd;
+  --green:#3fb950;--red:#f85149;--yellow:#d29922;--orange:#db6d28;
+  --radius:10px;--shadow:0 2px 8px rgba(0,0,0,.3);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+[data-theme="light"]{
+  --bg:#f6f8fa;--surface:#ffffff;--surface2:#f0f3f6;--border:#d0d7de;
+  --text:#1f2328;--text2:#656d76;--accent:#0969da;--accent2:#0550ae;
+  --shadow:0 2px 8px rgba(0,0,0,.08);
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text)}
+
+/* ── Layout ────────────────────────────────────────────────── */
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.top-bar h1{font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
+.top-bar .logo{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--green));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+.top-bar .actions{display:flex;gap:10px;align-items:center}
+.top-bar .actions a,.top-bar .actions button{background:none;border:1px solid var(--border);color:var(--text2);padding:6px 14px;border-radius:6px;cursor:pointer;text-decoration:none;font-size:13px;transition:.2s}
+.top-bar .actions a:hover,.top-bar .actions button:hover{border-color:var(--accent);color:var(--accent)}
+.main{padding:24px;max-width:1400px;margin:0 auto}
+
+/* ── Stats Row ─────────────────────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;box-shadow:var(--shadow)}
+.stat-card .value{font-size:32px;font-weight:700;margin-bottom:4px}
+.stat-card .label{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.stat-card.up .value{color:var(--green)}
+.stat-card.down .value{color:var(--red)}
+.stat-card.warn .value{color:var(--yellow)}
+.stat-card.total .value{color:var(--accent)}
+
+/* ── Section ───────────────────────────────────────────────── */
+.section{margin-bottom:28px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-head h2{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.section-head h2 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.section-head .count{font-size:12px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:12px;margin-left:6px}
+.add-btn{background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:.2s}
+.add-btn:hover{background:var(--accent2)}
+
+/* ── Cards Grid ────────────────────────────────────────────── */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);transition:.2s;position:relative}
+.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.card .status-dot{width:10px;height:10px;border-radius:50%;position:absolute;top:16px;right:16px}
+.card .status-dot.up{background:var(--green);box-shadow:0 0 6px var(--green)}
+.card .status-dot.down{background:var(--red);box-shadow:0 0 6px var(--red)}
+.card .status-dot.warning{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+.card .status-dot.unknown{background:var(--text2)}
+.card .card-name{font-size:14px;font-weight:600;margin-bottom:4px;padding-right:24px}
+.card .card-sub{font-size:12px;color:var(--text2);margin-bottom:10px}
+.card .card-meta{display:flex;gap:16px;font-size:12px;color:var(--text2)}
+.card .card-meta span{display:flex;align-items:center;gap:4px}
+.card .card-actions{display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+.card .card-actions button{background:none;border:1px solid var(--border);color:var(--text2);padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;transition:.15s}
+.card .card-actions button:hover{border-color:var(--accent);color:var(--accent)}
+.card .card-actions button.del:hover{border-color:var(--red);color:var(--red)}
+
+/* ── Incidents ─────────────────────────────────────────────── */
+.incident-list{display:flex;flex-direction:column;gap:8px}
+.incident{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:13px}
+.incident .i-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.incident .i-dot.open{background:var(--red)}
+.incident .i-dot.resolved{background:var(--green)}
+.incident .i-info{flex:1}
+.incident .i-time{color:var(--text2);font-size:11px}
+
+/* ── Modal ─────────────────────────────────────────────────── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:400px;max-width:500px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.4)}
+.modal h3{font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.modal label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;margin-top:12px}
+.modal input,.modal select{width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none}
+.modal input:focus,.modal select:focus{border-color:var(--accent)}
+.modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.modal .modal-actions button{padding:8px 18px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;transition:.2s}
+.modal .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.modal .btn-primary:hover{background:var(--accent2)}
+.modal .btn-cancel{background:none;color:var(--text2)}
+.modal .btn-cancel:hover{color:var(--text)}
+
+/* ── Toast ─────────────────────────────────────────────────── */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:8px;font-size:13px;color:#fff;box-shadow:var(--shadow);animation:slideIn .3s ease}
+.toast.success{background:var(--green)}
+.toast.error{background:var(--red)}
+.toast.info{background:var(--accent)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── Empty state ───────────────────────────────────────────── */
+.empty{text-align:center;padding:40px 20px;color:var(--text2);font-size:14px}
+.empty .empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media(max-width:640px){.main{padding:16px}.stats{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:1fr}.modal{min-width:auto}}
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <h1><div class="logo">¢</div> <span id="appTitle">¢entient¢</span></h1>
+  <div class="actions">
+    <a href="/admin">⚙ Admin</a>
+    <button onclick="toggleTheme()" id="themeBtn">☀ Light</button>
+    <button onclick="logout()" id="logoutBtn" style="display:none">Logout</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card total"><div class="value" id="statTotal">—</div><div class="label">Total Monitors</div></div>
+    <div class="stat-card up"><div class="value" id="statUp">—</div><div class="label">Healthy</div></div>
+    <div class="stat-card down"><div class="value" id="statDown">—</div><div class="label">Down</div></div>
+    <div class="stat-card warn"><div class="value" id="statUptime">—</div><div class="label">Uptime %</div></div>
+  </div>
+
+  <!-- Servers -->
+  <div class="section">
+    <div class="section-head">
+      <h2><span class="dot" style="background:var(--accent)"></span> Servers <span class="count" id="serverCount">0</span></h2>
+      <button class="add-btn" onclick="openModal('server')">+ Add Server</button>
+    </div>
+    <div class="cards" id="serverCards"></div>
+  </div>
+
+  <!-- Services -->
+  <div class="section">
+    <div class="section-head">
+      <h2><span class="dot" style="background:var(--green)"></span> Services <span class="count" id="serviceCount">0</span></h2>
+      <button class="add-btn" onclick="openModal('service')">+ Add Service</button>
+    </div>
+    <div class="cards" id="serviceCards"></div>
+  </div>
+
+  <!-- Websites -->
+  <div class="section">
+    <div class="section-head">
+      <h2><span class="dot" style="background:var(--yellow)"></span> Websites <span class="count" id="websiteCount">0</span></h2>
+      <button class="add-btn" onclick="openModal('website')">+ Add Website</button>
+    </div>
+    <div class="cards" id="websiteCards"></div>
+  </div>
+
+  <!-- Incidents -->
+  <div class="section">
+    <div class="section-head">
+      <h2><span class="dot" style="background:var(--red)"></span> Recent Incidents</h2>
+    </div>
+    <div class="incident-list" id="incidentList"></div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal">
+    <h3 id="modalTitle">Add Server</h3>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" id="modalSave" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+/* ── State ──────────────────────────────────────────────────── */
+let currentTheme='dark', modalType='', modalEditId=null;
+
+/* ── API helpers ───────────────────────────────────────────── */
+async function api(path,opts={}){
+  const r=await fetch(path,{headers:{'Content-Type':'application/json'},...opts});
+  if(r.status===401){location.href='/login';return null}
+  const d=await r.json();
+  if(!r.ok)throw new Error(d.detail||'Request failed');
+  return d;
+}
+
+/* ── Toast ──────────────────────────────────────────────────── */
+function toast(msg,type='info'){
+  const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+
+/* ── Theme ─────────────────────────────────────────────────── */
+function toggleTheme(){
+  currentTheme=currentTheme==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',currentTheme);
+  document.getElementById('themeBtn').textContent=currentTheme==='dark'?'☀ Light':'🌙 Dark';
+  localStorage.setItem('centient_theme',currentTheme);
+}
+function loadTheme(t){currentTheme=t||'dark';document.documentElement.setAttribute('data-theme',currentTheme);document.getElementById('themeBtn').textContent=currentTheme==='dark'?'☀ Light':'🌙 Dark'}
+
+/* ── Auth ──────────────────────────────────────────────────── */
+async function logout(){await api('/api/auth/logout',{method:'POST'}).catch(()=>{});location.href='/login'}
+
+/* ── Load data ─────────────────────────────────────────────── */
+async function loadDashboard(){
+  try{
+    const d=await api('/api/overview');
+    if(!d)return;
+
+    // Settings
+    document.getElementById('appTitle').textContent=d.settings?.app_title||'¢entient¢';
+    document.title=d.settings?.app_title||'¢entient¢';
+    loadTheme(localStorage.getItem('centient_theme')||d.settings?.theme||'dark');
+    document.getElementById('logoutBtn').style.display=d.settings?.auth_enabled==='true'?'':'none';
+
+    // Stats
+    const s=d.stats||{};
+    document.getElementById('statTotal').textContent=s.total||0;
+    document.getElementById('statUp').textContent=s.up||0;
+    document.getElementById('statDown').textContent=s.down||0;
+    document.getElementById('statUptime').textContent=(s.uptime_pct??100)+'%';
+
+    // Servers
+    renderCards('serverCards','serverCount',d.servers||[],'server');
+    renderCards('serviceCards','serviceCount',d.services||[],'service');
+    renderCards('websiteCards','websiteCount',d.websites||[],'website');
+
+    // Incidents
+    renderIncidents(d.incidents||[]);
+  }catch(e){console.error('Dashboard load error:',e)}
+}
+
+function renderCards(containerId,countId,items,type){
+  document.getElementById(countId).textContent=items.length;
+  const c=document.getElementById(containerId);
+  if(!items.length){c.innerHTML='<div class="empty"><div class="empty-icon">📡</div>No '+type+'s configured yet</div>';return}
+  c.innerHTML=items.map(i=>{
+    const st=i.status||'unknown';
+    const rt=i.response_time!=null?i.response_time.toFixed(1)+'ms':'—';
+    let sub='';
+    if(type==='server')sub=(i.ip_address||i.hostname||'')+(i.type?' · '+i.type:'');
+    if(type==='service')sub=(i.host||'')+':'+(i.port||'')+(i.type?' · '+i.type:'');
+    if(type==='website')sub=i.url||'';
+    return `<div class="card">
+      <div class="status-dot ${st}"></div>
+      <div class="card-name">${esc(i.name)}</div>
+      <div class="card-sub">${esc(sub)}</div>
+      <div class="card-meta">
+        <span>⏱ ${rt}</span>
+        <span>● ${st.toUpperCase()}</span>
+      </div>
+      <div class="card-actions">
+        <button onclick="checkNow('${type}',${i.id})">↻ Check</button>
+        <button onclick="openModal('${type}',${i.id})">✎ Edit</button>
+        <button class="del" onclick="deleteTarget('${type}',${i.id})">✕ Delete</button>
+      </div>
+    </div>`
+  }).join('');
+}
+
+function renderIncidents(items){
+  const c=document.getElementById('incidentList');
+  if(!items.length){c.innerHTML='<div class="empty"><div class="empty-icon">✓</div>No recent incidents</div>';return}
+  c.innerHTML=items.map(i=>{
+    const st=i.status||'open';
+    const dur=i.duration?formatDuration(i.duration):'ongoing';
+    return `<div class="incident">
+      <div class="i-dot ${st}"></div>
+      <div class="i-info">${esc(i.target_type)} #${i.target_id} — ${st} (${dur})</div>
+      <div class="i-time">${i.started_at||''}</div>
+    </div>`
+  }).join('');
+}
+
+function formatDuration(s){if(s<60)return s+'s';if(s<3600)return Math.round(s/60)+'m';return Math.round(s/3600)+'h '+Math.round((s%3600)/60)+'m'}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+
+/* ── Check now ─────────────────────────────────────────────── */
+async function checkNow(type,id){
+  try{
+    const d=await api(`/api/${type}s/${id}/check`,{method:'POST'});
+    toast(`${type} check: ${d.status||'done'}`,'success');
+    loadDashboard();
+  }catch(e){toast(e.message,'error')}
+}
+
+/* ── Delete ─────────────────────────────────────────────────── */
+async function deleteTarget(type,id){
+  if(!confirm(`Delete this ${type}?`))return;
+  try{
+    await api(`/api/${type}s/${id}`,{method:'DELETE'});
+    toast(`${type} deleted`,'success');
+    loadDashboard();
+  }catch(e){toast(e.message,'error')}
+}
+
+/* ── Modal ─────────────────────────────────────────────────── */
+function openModal(type,editId=null){
+  modalType=type;modalEditId=editId;
+  document.getElementById('modalTitle').textContent=(editId?'Edit ':'Add ')+type.charAt(0).toUpperCase()+type.slice(1);
+  let html='';
+  if(type==='server'){
+    html=`<label>Name</label><input id="fName" placeholder="Production Server">
+          <label>Hostname</label><input id="fHostname" placeholder="srv1.example.com">
+          <label>IP Address</label><input id="fIP" placeholder="10.0.0.1">
+          <label>Type</label><select id="fType"><option value="linux">Linux</option><option value="windows">Windows</option><option value="proxmox">Proxmox</option><option value="other">Other</option></select>
+          <label>SSH Port</label><input id="fPort" type="number" value="22">
+          <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
+  }else if(type==='service'){
+    html=`<label>Name</label><input id="fName" placeholder="SSH,Nginx,etc.">
+          <label>Type</label><select id="fType"><option value="ssh">SSH</option><option value="http">HTTP</option><option value="https">HTTPS</option><option value="database">Database</option><option value="smtp">SMTP</option><option value="custom">Custom</option></select>
+          <label>Host</label><input id="fHost" placeholder="10.0.0.1">
+          <label>Port</label><input id="fPort" type="number" placeholder="22">
+          <label>Timeout (s)</label><input id="fTimeout" type="number" value="10">
+          <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
+  }else if(type==='website'){
+    html=`<label>Name</label><input id="fName" placeholder="Company Website">
+          <label>URL</label><input id="fURL" placeholder="https://example.com">
+          <label>Method</label><select id="fMethod"><option>GET</option><option>HEAD</option><option>POST</option></select>
+          <label>Expected Status</label><input id="fExpected" type="number" value="200">
+          <label>Timeout (s)</label><input id="fTimeout" type="number" value="15">
+          <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
+  }
+  document.getElementById('modalBody').innerHTML=html;
+  document.getElementById('modalOverlay').classList.add('active');
+
+  // If editing, load current values
+  if(editId)loadEditValues(type,editId);
+}
+
+async function loadEditValues(type,id){
+  try{
+    const d=await api(`/api/${type}s`);
+    const items=d[type+'s']||[];
+    const item=items.find(i=>i.id===id);
+    if(!item)return;
+    if(type==='server'){
+      el('fName').value=item.name||'';el('fHostname').value=item.hostname||'';
+      el('fIP').value=item.ip_address||'';el('fType').value=item.type||'linux';
+      el('fPort').value=item.port||22;el('fInterval').value=item.check_interval||60;
+    }else if(type==='service'){
+      el('fName').value=item.name||'';el('fType').value=item.type||'custom';
+      el('fHost').value=item.host||'';el('fPort').value=item.port||'';
+      el('fTimeout').value=item.timeout||10;el('fInterval').value=item.check_interval||60;
+    }else if(type==='website'){
+      el('fName').value=item.name||'';el('fURL').value=item.url||'';
+      el('fMethod').value=item.method||'GET';el('fExpected').value=item.expected_status||200;
+      el('fTimeout').value=item.timeout||15;el('fInterval').value=item.check_interval||60;
+    }
+  }catch(e){}
+}
+
+function el(id){return document.getElementById(id)}
+
+function closeModal(){document.getElementById('modalOverlay').classList.remove('active');modalEditId=null}
+
+async function saveModal(){
+  let body={},endpoint='';
+  if(modalType==='server'){
+    body={name:el('fName').value,hostname:el('fHostname').value,ip_address:el('fIP').value,type:el('fType').value,port:parseInt(el('fPort').value)||22,check_interval:parseInt(el('fInterval').value)||60};
+    endpoint='/api/servers';
+  }else if(modalType==='service'){
+    body={name:el('fName').value,type:el('fType').value,host:el('fHost').value,port:parseInt(el('fPort').value),timeout:parseInt(el('fTimeout').value)||10,check_interval:parseInt(el('fInterval').value)||60};
+    endpoint='/api/services';
+  }else if(modalType==='website'){
+    body={name:el('fName').value,url:el('fURL').value,method:el('fMethod').value,expected_status:parseInt(el('fExpected').value)||200,timeout:parseInt(el('fTimeout').value)||15,check_interval:parseInt(el('fInterval').value)||60};
+    endpoint='/api/websites';
+  }
+  try{
+    if(modalEditId){
+      await api(endpoint+'/'+modalEditId,{method:'PUT',body:JSON.stringify(body)});
+      toast(modalType+' updated','success');
+    }else{
+      await api(endpoint,{method:'POST',body:JSON.stringify(body)});
+      toast(modalType+' added','success');
+    }
+    closeModal();loadDashboard();
+  }catch(e){toast(e.message,'error')}
+}
+
+/* ── Init ──────────────────────────────────────────────────── */
+loadDashboard();
+setInterval(loadDashboard,15000);
+</script>
+</body>
+</html>

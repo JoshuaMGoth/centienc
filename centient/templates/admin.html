@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — ¢entient¢</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2333;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#388bfd;--green:#3fb950;--red:#f85149;--yellow:#d29922;--radius:10px;--shadow:0 2px 8px rgba(0,0,0,.3);--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+[data-theme="light"]{--bg:#f6f8fa;--surface:#fff;--surface2:#f0f3f6;--border:#d0d7de;--text:#1f2328;--text2:#656d76;--accent:#0969da;--accent2:#0550ae;--shadow:0 2px 8px rgba(0,0,0,.08)}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text)}
+
+/* Layout */
+.shell{display:flex;height:100vh}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar .brand{padding:18px 16px;font-weight:700;font-size:15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sidebar .brand .logo{width:24px;height:24px;border-radius:5px;background:linear-gradient(135deg,var(--accent),var(--green));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff}
+.sidebar nav{flex:1;padding:12px 0}
+.sidebar nav a{display:flex;align-items:center;gap:10px;padding:10px 16px;color:var(--text2);text-decoration:none;font-size:13px;border-left:3px solid transparent;transition:.15s}
+.sidebar nav a:hover,.sidebar nav a.active{color:var(--text);background:var(--surface2);border-left-color:var(--accent)}
+.sidebar .bottom{padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)}
+.sidebar .bottom a{color:var(--accent);text-decoration:none}
+
+.content{flex:1;overflow-y:auto;padding:28px 32px}
+.content h2{font-size:18px;margin-bottom:20px;font-weight:600}
+
+/* Panels */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)}
+.panel h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel .row{display:flex;gap:16px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.panel label{font-size:12px;color:var(--text2);min-width:130px;flex-shrink:0}
+.panel input,.panel select{padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none;flex:1;min-width:180px}
+.panel input:focus,.panel select:focus{border-color:var(--accent)}
+.panel .hint{font-size:11px;color:var(--text2);margin-top:2px}
+.btn{padding:8px 18px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;transition:.2s;background:none;color:var(--text2)}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent2)}
+.btn-danger{color:var(--red);border-color:var(--red)}
+.btn-danger:hover{background:var(--red);color:#fff}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:8px 12px;font-weight:600;font-size:11px;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border)}
+.tbl td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl .actions{display:flex;gap:6px}
+.tbl .actions button{background:none;border:1px solid var(--border);color:var(--text2);border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;transition:.15s}
+.tbl .actions button:hover{border-color:var(--accent);color:var(--accent)}
+.tbl .actions button.del:hover{border-color:var(--red);color:var(--red)}
+
+/* Toggle */
+.toggle{position:relative;width:36px;height:20px;background:var(--border);border-radius:10px;cursor:pointer;transition:.2s}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.toggle.on::after{left:18px}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:400px;max-width:500px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.4)}
+.modal h3{font-size:16px;margin-bottom:16px}
+.modal label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;margin-top:12px}
+.modal input,.modal select{width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none}
+.modal input:focus,.modal select:focus{border-color:var(--accent)}
+.modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:8px;font-size:13px;color:#fff;box-shadow:var(--shadow);animation:slideIn .3s ease}
+.toast.success{background:var(--green)}.toast.error{background:var(--red)}.toast.info{background:var(--accent)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+.page{display:none}.page.active{display:block}
+@media(max-width:768px){.sidebar{width:180px}.content{padding:20px 16px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="sidebar">
+    <div class="brand"><div class="logo">¢</div> Admin</div>
+    <nav>
+      <a href="#" onclick="showPage('general')" class="active" data-page="general">🔧 General</a>
+      <a href="#" onclick="showPage('users')" data-page="users">👤 Users</a>
+      <a href="#" onclick="showPage('notifications')" data-page="notifications">🔔 Notifications</a>
+      <a href="#" onclick="showPage('data')" data-page="data">🗄 Data</a>
+    </nav>
+    <div class="bottom"><a href="/">← Back to Dashboard</a></div>
+  </div>
+  <div class="content">
+    <!-- GENERAL -->
+    <div class="page active" id="page-general">
+      <h2>General Settings</h2>
+      <div class="panel">
+        <h3>🏷 Application</h3>
+        <div class="row"><label>App Title</label><input id="sTitle" placeholder="¢entient¢"></div>
+        <div class="row"><label>Theme</label><select id="sTheme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+        <div class="row"><label>Check Interval (s)</label><input id="sInterval" type="number" value="60"></div>
+        <div class="row"><label>Data Retention (days)</label><input id="sRetention" type="number" value="30"></div>
+      </div>
+      <div class="panel">
+        <h3>🔒 Authentication</h3>
+        <div class="row"><label>Require Login</label><div class="toggle" id="sAuthToggle" onclick="toggleAuth()"></div></div>
+        <div class="hint" style="margin-left:146px">When disabled, the dashboard is open to anyone with the URL.</div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+
+    <!-- USERS -->
+    <div class="page" id="page-users">
+      <h2>User Management</h2>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">👤 Admin Users</h3>
+          <button class="btn btn-primary" onclick="openUserModal()">+ Add User</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="page" id="page-notifications">
+      <h2>Notification Channels</h2>
+      <div class="panel">
+        <div class="row"><label>Notifications Enabled</label><div class="toggle" id="sNotifyToggle" onclick="toggleNotify()"></div></div>
+      </div>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">📡 Channels</h3>
+          <button class="btn btn-primary" onclick="openChannelModal()">+ Add Channel</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Type</th><th>Enabled</th><th>Actions</th></tr></thead>
+          <tbody id="channelTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DATA -->
+    <div class="page" id="page-data">
+      <h2>Data Management</h2>
+      <div class="panel">
+        <h3>📊 Database Info</h3>
+        <div class="row"><label>Database Path</label><span id="dbPath" style="font-size:13px;color:var(--text2)">—</span></div>
+      </div>
+      <div class="panel">
+        <h3>🔄 Export / Import</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Export your monitoring configuration and history.</p>
+        <button class="btn" onclick="toast('Feature coming soon','info')">Export Configuration</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal-overlay" id="userModalOverlay" onclick="if(event.target===this)closeUserModal()">
+  <div class="modal">
+    <h3 id="userModalTitle">Add User</h3>
+    <label>Username</label><input id="fuUsername">
+    <label>Password</label><input id="fuPassword" type="password">
+    <label>Role</label><select id="fuRole"><option value="admin">Admin</option><option value="viewer">Viewer</option></select>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeUserModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveUser()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Channel Modal -->
+<div class="modal-overlay" id="channelModalOverlay" onclick="if(event.target===this)closeChannelModal()">
+  <div class="modal">
+    <h3 id="channelModalTitle">Add Channel</h3>
+    <label>Name</label><input id="fcName" placeholder="My Email Alert">
+    <label>Type</label><select id="fcType" onchange="updateChannelFields()"><option value="email">Email</option><option value="webhook">Webhook</option><option value="discord">Discord</option></select>
+    <div id="channelFields"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeChannelModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveChannel()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+let settings={},editUserId=null,editChannelId=null;
+
+async function api(p,o={}){const r=await fetch(p,{headers:{'Content-Type':'application/json'},...o});if(r.status===401){location.href='/login';return null}const d=await r.json();if(!r.ok)throw new Error(d.detail||'Failed');return d}
+function toast(m,t='info'){const e=document.createElement('div');e.className='toast '+t;e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(()=>e.remove(),3500)}
+
+/* Pages */
+function showPage(p){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.querySelectorAll('.sidebar nav a').forEach(a=>a.classList.remove('active'));
+  document.querySelector(`[data-page="${p}"]`).classList.add('active');
+  if(p==='users')loadUsers();
+  if(p==='notifications')loadChannels();
+}
+
+/* Settings */
+async function loadSettings(){
+  try{
+    const d=await api('/api/settings');if(!d)return;
+    settings=d.settings||{};
+    document.getElementById('sTitle').value=settings.app_title||'¢entient¢';
+    document.getElementById('sTheme').value=settings.theme||'dark';
+    document.getElementById('sInterval').value=settings.check_interval||60;
+    document.getElementById('sRetention').value=settings.retention_days||30;
+    const at=document.getElementById('sAuthToggle');
+    if(settings.auth_enabled==='true')at.classList.add('on');else at.classList.remove('on');
+    const nt=document.getElementById('sNotifyToggle');
+    if(settings.notifications_enabled==='true')nt.classList.add('on');else nt.classList.remove('on');
+    document.documentElement.setAttribute('data-theme',localStorage.getItem('centient_theme')||settings.theme||'dark');
+  }catch(e){toast(e.message,'error')}
+}
+function toggleAuth(){document.getElementById('sAuthToggle').classList.toggle('on')}
+function toggleNotify(){document.getElementById('sNotifyToggle').classList.toggle('on')}
+async function saveSettings(){
+  const body={
+    app_title:document.getElementById('sTitle').value,
+    theme:document.getElementById('sTheme').value,
+    check_interval:document.getElementById('sInterval').value,
+    retention_days:document.getElementById('sRetention').value,
+    auth_enabled:document.getElementById('sAuthToggle').classList.contains('on')?'true':'false',
+    notifications_enabled:document.getElementById('sNotifyToggle').classList.contains('on')?'true':'false',
+  };
+  try{await api('/api/settings',{method:'PUT',body:JSON.stringify(body)});toast('Settings saved','success');localStorage.setItem('centient_theme',body.theme)}catch(e){toast(e.message,'error')}
+}
+
+/* Users */
+async function loadUsers(){
+  try{
+    const d=await api('/api/users');if(!d)return;
+    const tb=document.getElementById('userTableBody');
+    tb.innerHTML=(d.users||[]).map(u=>`<tr><td>${u.username}</td><td>${u.role}</td><td>${u.created_at||''}</td><td class="actions"><button onclick="deleteUser(${u.id})">Delete</button></td></tr>`).join('');
+  }catch(e){toast(e.message,'error')}
+}
+function openUserModal(){editUserId=null;document.getElementById('userModalTitle').textContent='Add User';document.getElementById('fuUsername').value='';document.getElementById('fuPassword').value='';document.getElementById('userModalOverlay').classList.add('active')}
+function closeUserModal(){document.getElementById('userModalOverlay').classList.remove('active')}
+async function saveUser(){
+  const body={username:document.getElementById('fuUsername').value,password:document.getElementById('fuPassword').value,role:document.getElementById('fuRole').value};
+  try{await api('/api/users',{method:'POST',body:JSON.stringify(body)});toast('User created','success');closeUserModal();loadUsers()}catch(e){toast(e.message,'error')}
+}
+async function deleteUser(id){if(!confirm('Delete this user?'))return;try{await api('/api/users/'+id,{method:'DELETE'});toast('User deleted','success');loadUsers()}catch(e){toast(e.message,'error')}}
+
+/* Channels */
+async function loadChannels(){
+  try{
+    const d=await api('/api/notifications');if(!d)return;
+    const tb=document.getElementById('channelTableBody');
+    tb.innerHTML=(d.channels||[]).map(c=>`<tr><td>${c.name}</td><td>${c.type}</td><td>${c.enabled?'✅':'❌'}</td><td class="actions"><button onclick="testChannel(${c.id})">Test</button><button class="del" onclick="deleteChannel(${c.id})">Delete</button></td></tr>`).join('');
+  }catch(e){toast(e.message,'error')}
+}
+function openChannelModal(){editChannelId=null;document.getElementById('channelModalTitle').textContent='Add Channel';document.getElementById('fcName').value='';document.getElementById('fcType').value='email';updateChannelFields();document.getElementById('channelModalOverlay').classList.add('active')}
+function closeChannelModal(){document.getElementById('channelModalOverlay').classList.remove('active')}
+function updateChannelFields(){
+  const t=document.getElementById('fcType').value;let h='';
+  if(t==='email')h=`<label>SMTP Host</label><input id="cfHost" placeholder="smtp.gmail.com"><label>SMTP Port</label><input id="cfPort" type="number" value="587"><label>From</label><input id="cfFrom" placeholder="alerts@example.com"><label>To</label><input id="cfTo" placeholder="admin@example.com"><label>Username</label><input id="cfUser"><label>Password</label><input id="cfPass" type="password"><label>Use TLS</label><select id="cfTLS"><option value="true">Yes</option><option value="false">No</option></select>`;
+  else if(t==='webhook')h=`<label>Webhook URL</label><input id="cfURL" placeholder="https://hooks.example.com/...">`;
+  else if(t==='discord')h=`<label>Discord Webhook URL</label><input id="cfDiscord" placeholder="https://discord.com/api/webhooks/...">`;
+  document.getElementById('channelFields').innerHTML=h;
+}
+async function saveChannel(){
+  const type=document.getElementById('fcType').value;let config={};
+  if(type==='email')config={smtp_host:document.getElementById('cfHost').value,smtp_port:parseInt(document.getElementById('cfPort').value)||587,from_address:document.getElementById('cfFrom').value,to_address:document.getElementById('cfTo').value,username:document.getElementById('cfUser').value,password:document.getElementById('cfPass').value,use_tls:document.getElementById('cfTLS').value==='true'};
+  else if(type==='webhook')config={url:document.getElementById('cfURL').value};
+  else if(type==='discord')config={webhook_url:document.getElementById('cfDiscord').value};
+  const body={name:document.getElementById('fcName').value,type,config,enabled:1};
+  try{await api('/api/notifications',{method:'POST',body:JSON.stringify(body)});toast('Channel added','success');closeChannelModal();loadChannels()}catch(e){toast(e.message,'error')}
+}
+async function testChannel(id){try{const d=await api('/api/notifications/'+id+'/test',{method:'POST'});toast(d.ok?'Test sent!':d.error,d.ok?'success':'error')}catch(e){toast(e.message,'error')}}
+async function deleteChannel(id){if(!confirm('Delete this channel?'))return;try{await api('/api/notifications/'+id,{method:'DELETE'});toast('Channel deleted','success');loadChannels()}catch(e){toast(e.message,'error')}}
+
+loadSettings();
+updateChannelFields();
+</script>
+</body>
+</html>

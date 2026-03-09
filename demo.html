@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¢entient¢ — Live Demo</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:#fff;min-height:100vh;overflow-x:hidden}
+
+        /* ── Demo Banner ── */
+        .demo-banner{background:rgba(255,255,255,.12);text-align:center;padding:10px 24px;font-size:12px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.08)}
+        .demo-banner .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4caf50;animation:dpulse 2s infinite}
+        @keyframes dpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+        /* ── Header ── */
+        .header{background:rgba(0,0,0,.3);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.1)}
+        .header h1{font-size:1.5em;font-weight:600;text-shadow:1px 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px}
+        .header .logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#42a5f5,#4caf50);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0}
+        .header-sub{color:rgba(255,255,255,.55);font-size:.82em;margin-top:2px}
+        .header-right{display:flex;align-items:center;gap:16px;font-size:.82em;color:rgba(255,255,255,.65)}
+        .uptime-badge{background:rgba(255,255,255,.1);padding:4px 12px;border-radius:20px}
+
+        /* ── Status Banner ── */
+        .status-banner{padding:10px 20px;text-align:center;font-size:.92em;font-weight:600;transition:all .3s}
+        .status-banner.ok{background:#28a745}
+        .status-banner.warning{background:#ffc107;color:#000}
+        .status-banner.alert{background:#dc3545;animation:sbpulse 2s infinite}
+        @keyframes sbpulse{0%,100%{opacity:1}50%{opacity:.7}}
+
+        /* ── Section Title ── */
+        .section-title{padding:4px 22px 8px;max-width:1500px;margin:0 auto;color:rgba(255,255,255,.45);font-size:.78em;text-transform:uppercase;letter-spacing:.06em}
+
+        /* ── Metric Strip ── */
+        .metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 22px;max-width:1500px;margin:0 auto}
+        .mc{background:rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;text-align:center;border:1px solid rgba(255,255,255,.1);transition:transform .2s}
+        .mc:hover{transform:translateY(-2px)}
+        .mc-label{font-size:.7em;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+        .mc-val{font-size:1.7em;font-weight:700}
+        .mc-sub{font-size:.68em;color:rgba(255,255,255,.4);margin-top:2px}
+        .g{color:#4caf50}.a{color:#ff9800}.r{color:#f44336}.b{color:#42a5f5}.w{color:#e0e0e0}
+
+        /* ── Server pills ── */
+        .server-pills{display:flex;gap:12px;padding:0 22px 10px;max-width:1500px;margin:0 auto;flex-wrap:wrap}
+        .server-pill{background:rgba(255,255,255,.07);border-radius:10px;padding:14px 18px;flex:1;min-width:280px;border:1px solid rgba(255,255,255,.08)}
+        .server-pill h4{color:#64b5f6;font-size:.85em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+        .server-pill .pill-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.78em}
+        .server-pill .pill-item{text-align:center}
+        .server-pill .pill-val{font-size:1.2em;font-weight:700}
+        .server-pill .pill-lbl{font-size:.65em;color:rgba(255,255,255,.4);text-transform:uppercase}
+        .pill-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+        .pill-dot.on{background:#4caf50}
+        .pill-dot.off{background:#f44336}
+
+        /* ── Grid ── */
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 22px 22px;max-width:1500px;margin:0 auto}
+        .card{background:rgba(255,255,255,.08);border-radius:12px;padding:18px;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1)}
+        .card h3{margin-bottom:10px;color:#64b5f6;font-size:1.05em}
+        .card.full{grid-column:1/-1}
+
+        /* ── Scrollable lists ── */
+        .slist{max-height:170px;overflow-y:auto;background:rgba(0,0,0,.15);border-radius:6px;padding:8px;font-family:'SF Mono','Fira Code',monospace;font-size:.8em}
+        .slist::-webkit-scrollbar{width:4px}
+        .slist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px}
+
+        /* ── Request feed ── */
+        .rr{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:center}
+        .rr:last-child{border:none}
+        .rt{color:rgba(255,255,255,.35);flex-shrink:0;width:60px}
+        .rm{font-weight:600;flex-shrink:0;width:38px}
+        .rm.GET{color:#4caf50}.rm.POST{color:#42a5f5}.rm.PUT{color:#ff9800}.rm.DELETE{color:#f44336}
+        .rp{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.75)}
+        .rs{flex-shrink:0;width:28px;text-align:right}
+        .rs.s2{color:#4caf50}.rs.s3{color:#42a5f5}.rs.s4{color:#ff9800}.rs.s5{color:#f44336}
+        .rsite{color:rgba(100,181,246,.7);flex-shrink:0;width:110px;text-align:right;font-size:.85em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ri{color:rgba(255,255,255,.35);flex-shrink:0;width:120px;text-align:right;font-size:.85em}
+
+        /* ── Status codes bar ── */
+        .sc-bar{display:flex;gap:10px;margin-top:8px}
+        .sc-item{text-align:center;flex:1}
+        .sc-val{font-size:1.3em;font-weight:700}
+        .sc-lbl{font-size:.65em;color:rgba(255,255,255,.45);text-transform:uppercase}
+
+        /* ── Services / PM2 ── */
+        .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:6px}
+        .sp{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.15);padding:7px 10px;border-radius:7px;font-size:.8em}
+        .sd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+        .sd.active,.sd.online{background:#4caf50}
+        .sd.failed,.sd.stopped{background:#f44336}
+        .sd.inactive{background:#9e9e9e}
+        .sn{flex:1}
+        .smem{color:rgba(255,255,255,.45);font-size:.85em}
+        .stag{color:rgba(255,255,255,.3);font-size:.75em;flex-shrink:0}
+
+        /* ── Site cards ── */
+        .site-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
+        .site-card{background:rgba(255,255,255,.08);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.1);transition:all .25s;position:relative;overflow:hidden}
+        .site-card:hover{transform:translateY(-3px);border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.12)}
+        .site-card .sc-name{font-size:1em;font-weight:700;margin-bottom:4px}
+        .site-card .sc-server{font-size:.7em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+        .site-card .sc-stats{display:flex;gap:12px;font-size:.82em}
+        .site-card .sc-stat{text-align:center}
+        .site-card .sc-stat-val{font-size:1.4em;font-weight:700}
+        .site-card .sc-stat-lbl{font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase}
+        .site-card .sc-bar-mini{display:flex;gap:6px;margin-top:8px;font-size:.72em}
+        .site-card .sc-bar-mini span{padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.06)}
+
+        /* ── Proxmox containers ── */
+        .ct-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
+        .ct-card{background:rgba(255,255,255,.08);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.1);transition:all .25s}
+        .ct-card:hover{transform:translateY(-2px);border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.12)}
+        .ct-card .ct-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+        .ct-card .ct-name{font-size:1em;font-weight:700}
+        .ct-card .ct-id{font-size:.72em;color:#64b5f6;font-weight:600;background:rgba(100,181,246,.12);padding:2px 8px;border-radius:10px}
+        .ct-card .ct-os{font-size:.72em;color:rgba(255,255,255,.4);margin-bottom:10px}
+        .ct-card .ct-bars{display:flex;flex-direction:column;gap:6px}
+        .ct-bar{display:flex;align-items:center;gap:8px}
+        .ct-bar .cb-label{width:32px;font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase;font-weight:600;flex-shrink:0}
+        .ct-bar .cb-track{flex:1;height:8px;background:rgba(0,0,0,.25);border-radius:4px;overflow:hidden}
+        .ct-bar .cb-fill{height:100%;border-radius:4px;transition:width .6s ease}
+        .ct-bar .cb-val{width:36px;text-align:right;font-size:.72em;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
+        .ct-card .ct-meta{display:flex;gap:14px;margin-top:8px;font-size:.75em;color:rgba(255,255,255,.4)}
+        .ct-card .ct-status{font-size:.72em;font-weight:600;padding:2px 8px;border-radius:10px}
+        .ct-card .ct-status.running{background:rgba(76,175,80,.18);color:#4caf50}
+        .ct-card .ct-status.stopped{background:rgba(244,67,54,.18);color:#f44336}
+
+        /* ── Ban / attack ── */
+        .ban{background:rgba(244,67,54,.18);border-left:3px solid #f44336;padding:4px 10px;margin:3px 0;border-radius:0 4px 4px 0}
+        .atk{border-left:3px solid #ff9800;padding:4px 10px;margin:3px 0}
+
+        .footer{text-align:center;padding:14px;color:rgba(255,255,255,.25);font-size:.72em}
+        .muted{color:rgba(255,255,255,.35)}
+
+        @media(max-width:900px){.grid{grid-template-columns:1fr}.header{flex-direction:column;gap:8px;text-align:center}.site-cards{grid-template-columns:1fr 1fr}.server-pills{flex-direction:column}.ct-cards{grid-template-columns:1fr}}
+        @media(max-width:600px){.site-cards{grid-template-columns:1fr}.metrics-strip{grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;padding:10px 12px}.mc{padding:8px 6px}.mc-val{font-size:1.3em}.header{padding:12px 14px}.header h1{font-size:1.15em}.grid{padding:0 12px 14px;gap:10px}.card{padding:12px}.server-pill{min-width:0;padding:10px 12px}.ri{display:none}.rsite{width:70px;font-size:.72em}.rt{width:44px;font-size:.72em}.rm{width:28px;font-size:.72em}.rp{font-size:.75em}.sgrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px}.sp{padding:5px 8px;font-size:.72em}.sc-val{font-size:1em}.slist{max-height:140px;font-size:.72em}}
+    </style>
+</head>
+<body>
+
+<div class="demo-banner">
+    <span class="pulse"></span>
+    INTERACTIVE DEMO — This dashboard is running with simulated data
+    <span class="pulse"></span>
+</div>
+
+<div class="header">
+    <div>
+        <h1><div class="logo">¢</div> ¢entient¢</h1>
+        <div class="header-sub">Infrastructure Monitoring · all servers · real-time</div>
+    </div>
+    <div class="header-right">
+        <div class="uptime-badge">⚙ PM2: 14/14</div>
+        <div id="clock">--:--:--</div>
+    </div>
+</div>
+
+<div class="status-banner ok" id="statusBanner">🟢 All systems operational — 847 IPs blocked historically</div>
+
+<!-- Server pills -->
+<div class="section-title" style="padding-top:14px">Servers</div>
+<div class="server-pills">
+    <div class="server-pill">
+        <h4><span class="pill-dot on"></span> Web Server</h4>
+        <div class="pill-grid">
+            <div class="pill-item"><div class="pill-val g" id="ws-cpu">0.24</div><div class="pill-lbl">CPU</div></div>
+            <div class="pill-item"><div class="pill-val g" id="ws-mem">34.2%</div><div class="pill-lbl">Memory</div></div>
+            <div class="pill-item"><div class="pill-val g" id="ws-disk">28.1%</div><div class="pill-lbl">Disk</div></div>
+            <div class="pill-item"><div class="pill-val b" id="ws-conn">18</div><div class="pill-lbl">Conns</div></div>
+        </div>
+    </div>
+    <div class="server-pill">
+        <h4><span class="pill-dot on"></span> Database Server</h4>
+        <div class="pill-grid">
+            <div class="pill-item"><div class="pill-val g" id="db-cpu">0.08</div><div class="pill-lbl">CPU</div></div>
+            <div class="pill-item"><div class="pill-val g" id="db-mem">52.6%</div><div class="pill-lbl">Memory</div></div>
+            <div class="pill-item"><div class="pill-val g" id="db-disk">41.3%</div><div class="pill-lbl">Disk</div></div>
+            <div class="pill-item"><div class="pill-val b" id="db-conn">6</div><div class="pill-lbl">Conns</div></div>
+        </div>
+    </div>
+    <div class="server-pill">
+        <h4><span class="pill-dot on"></span> Proxmox Node (pve-01)</h4>
+        <div class="pill-grid">
+            <div class="pill-item"><div class="pill-val g" id="pve-cpu">0.38</div><div class="pill-lbl">CPU</div></div>
+            <div class="pill-item"><div class="pill-val g" id="pve-mem">61.4%</div><div class="pill-lbl">Memory</div></div>
+            <div class="pill-item"><div class="pill-val g" id="pve-disk">22.7%</div><div class="pill-lbl">Disk</div></div>
+            <div class="pill-item"><div class="pill-val b" id="pve-conn">3</div><div class="pill-lbl">Conns</div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics strip -->
+<div class="metrics-strip">
+    <div class="mc"><div class="mc-label">Total Req/min</div><div class="mc-val b" id="m-rpm">42.0</div><div class="mc-sub" id="m-rpm-sub">210 total (5m)</div></div>
+    <div class="mc"><div class="mc-label">Visitors</div><div class="mc-val w" id="m-vis">18</div><div class="mc-sub">unique IPs (5m)</div></div>
+    <div class="mc"><div class="mc-label">Sites Online</div><div class="mc-val g" id="m-sites">5</div><div class="mc-sub">5 monitored</div></div>
+    <div class="mc"><div class="mc-label">PM2 Processes</div><div class="mc-val g" id="m-pm2">14</div><div class="mc-sub">14/14 running</div></div>
+    <div class="mc"><div class="mc-label">Containers</div><div class="mc-val b" id="m-ct">3</div><div class="mc-sub">3/3 running</div></div>
+    <div class="mc"><div class="mc-label">Banned IPs</div><div class="mc-val r" id="m-banned">847</div><div class="mc-sub">0 active / 847 total</div></div>
+    <div class="mc"><div class="mc-label">Attacks</div><div class="mc-val a" id="m-atk">0</div><div class="mc-sub">last 30m</div></div>
+    <div class="mc"><div class="mc-label">Vulnerabilities</div><div class="mc-val g" id="m-vuln">0</div><div class="mc-sub">0 critical</div></div>
+</div>
+
+<!-- Proxmox Containers -->
+<div class="section-title">Proxmox Containers — pve-01</div>
+<div class="ct-cards" id="ctCards"></div>
+
+<!-- Site cards -->
+<div class="section-title">Websites & Services</div>
+<div class="site-cards" id="siteCards"></div>
+
+<!-- Grid -->
+<div class="grid">
+    <!-- Live feed -->
+    <div class="card full">
+        <h3>📡 Live Request Feed <span class="muted" style="font-size:.75em;font-weight:400">(all sites)</span></h3>
+        <div id="feedList" class="slist" style="max-height:260px"></div>
+    </div>
+
+    <!-- Response codes -->
+    <div class="card">
+        <h3>📈 Response Codes (5 min)</h3>
+        <div class="sc-bar">
+            <div class="sc-item"><div class="sc-val g" id="sc2">210</div><div class="sc-lbl">2xx OK</div></div>
+            <div class="sc-item"><div class="sc-val b" id="sc3">3</div><div class="sc-lbl">3xx Redirect</div></div>
+            <div class="sc-item"><div class="sc-val a" id="sc4">2</div><div class="sc-lbl">4xx Client</div></div>
+            <div class="sc-item"><div class="sc-val r" id="sc5">0</div><div class="sc-lbl">5xx Server</div></div>
+        </div>
+        <div style="margin-top:14px">
+            <strong style="color:#ff6b6b;font-size:.85em">Banned IPs</strong>
+            <div class="slist" style="max-height:80px;margin-top:4px">
+                <div class="ban">185.220.101.34 — brute-force SSH — 2h ago</div>
+                <div class="ban">45.148.10.72 — wp-login spam — 5h ago</div>
+                <div class="ban">193.106.191.50 — directory traversal — 1d ago</div>
+            </div>
+        </div>
+        <div style="margin-top:10px">
+            <strong style="color:#ffa726;font-size:.85em">Attack Log</strong>
+            <div class="slist" style="max-height:80px;margin-top:4px"><span class="muted">No recent attacks</span></div>
+        </div>
+    </div>
+
+    <!-- Services & PM2 -->
+    <div class="card">
+        <h3>⚙️ Services & PM2</h3>
+        <div style="margin-bottom:10px">
+            <strong style="font-size:.78em;color:rgba(255,255,255,.45)">SYSTEMD — Web Server</strong>
+            <div class="sgrid" style="margin-top:5px" id="svcWeb"></div>
+        </div>
+        <div style="margin-bottom:10px">
+            <strong style="font-size:.78em;color:rgba(255,255,255,.45)">SYSTEMD — Database Server</strong>
+            <div class="sgrid" style="margin-top:5px" id="svcDB"></div>
+        </div>
+        <div>
+            <strong style="font-size:.78em;color:rgba(255,255,255,.45)">PM2 PROCESSES <span class="muted">(14)</span></strong>
+            <div class="sgrid" style="margin-top:5px;max-height:250px;overflow-y:auto" id="pm2List"></div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    Last updated: <span id="lastUp">just now</span><br>
+    A <a href="https://github.com/JoshuaMGoth" style="color:rgba(255,255,255,.45);text-decoration:none;">JoshuaGoth</a> Software · Powered by <strong>Project CloudStrap</strong><br>
+    <span style="font-size:.9em;">Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GNU GPL-3.0</a> · <a href="https://github.com/JoshuaMGoth/centient" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GitHub</a></span>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   ¢entient¢ Demo — Full infrastructure dashboard with fake data
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Clock ── */
+function updateClock(){
+  const d=new Date();
+  document.getElementById('clock').textContent=d.toLocaleTimeString('en-US',{hour12:true});
+}
+setInterval(updateClock,1000);updateClock();
+
+/* ── Containers ── */
+const containers=[
+  {ctid:100,name:'¢entient¢',os:'Debian 12',ip:'10.10.10.50',status:'running',cpu:6,ram:24,disk:11,uptime:'43d 7h 12m'},
+  {ctid:101,name:'nginx-proxy',os:'Debian 12',ip:'10.10.10.51',status:'running',cpu:18,ram:38,disk:32,uptime:'43d 7h 12m'},
+  {ctid:102,name:'pihole-dns',os:'Ubuntu 22.04',ip:'10.10.10.52',status:'running',cpu:4,ram:15,disk:7,uptime:'43d 7h 12m'},
+];
+
+function fillColor(pct){return pct<50?'#4caf50':pct<75?'#ff9800':pct<90?'#ff5722':'#f44336'}
+function renderContainers(){
+  document.getElementById('ctCards').innerHTML=containers.map(c=>`
+    <div class="ct-card">
+      <div class="ct-header">
+        <div><div class="ct-name">${c.name}</div></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="ct-status ${c.status}">${c.status}</span>
+          <span class="ct-id">CT ${c.ctid}</span>
+        </div>
+      </div>
+      <div class="ct-os">${c.os} · ${c.ip}</div>
+      <div class="ct-bars">
+        <div class="ct-bar"><span class="cb-label">CPU</span><div class="cb-track"><div class="cb-fill" style="width:${c.cpu}%;background:${fillColor(c.cpu)}"></div></div><span class="cb-val">${c.cpu}%</span></div>
+        <div class="ct-bar"><span class="cb-label">RAM</span><div class="cb-track"><div class="cb-fill" style="width:${c.ram}%;background:${fillColor(c.ram)}"></div></div><span class="cb-val">${c.ram}%</span></div>
+        <div class="ct-bar"><span class="cb-label">Disk</span><div class="cb-track"><div class="cb-fill" style="width:${c.disk}%;background:${fillColor(c.disk)}"></div></div><span class="cb-val">${c.disk}%</span></div>
+      </div>
+      <div class="ct-meta"><span>⏱ ${c.uptime}</span><span>📡 ${c.ip}</span></div>
+    </div>
+  `).join('');
+}
+
+/* ── Websites ── */
+const sites=[
+  {name:'MainSite.com',server:'WEB',rpm:12.4,visitors:6,reqs:62,s2:60,s3:1,s4:1,s5:0},
+  {name:'API Gateway',server:'WEB',rpm:18.2,visitors:4,reqs:91,s2:89,s3:2,s4:0,s5:0},
+  {name:'Documentation',server:'WEB',rpm:3.8,visitors:3,reqs:19,s2:19,s3:0,s4:0,s5:0},
+  {name:'Blog',server:'WEB',rpm:5.6,visitors:4,reqs:28,s2:27,s3:0,s4:1,s5:0},
+  {name:'Admin Panel',server:'WEB',rpm:2.0,visitors:1,reqs:10,s2:10,s3:0,s4:0,s5:0},
+];
+
+function renderSites(){
+  document.getElementById('siteCards').innerHTML=sites.map(s=>`
+    <div class="site-card">
+      <div class="sc-name">${s.name}</div>
+      <div class="sc-server">${s.server}</div>
+      <div class="sc-stats">
+        <div class="sc-stat"><div class="sc-stat-val b">${s.rpm}</div><div class="sc-stat-lbl">Req/m</div></div>
+        <div class="sc-stat"><div class="sc-stat-val w">${s.visitors}</div><div class="sc-stat-lbl">Visitors</div></div>
+        <div class="sc-stat"><div class="sc-stat-val w">${s.reqs}</div><div class="sc-stat-lbl">Reqs</div></div>
+      </div>
+      <div class="sc-bar-mini">
+        <span class="g">${s.s2} 2xx</span>
+        <span class="a">${s.s4} 4xx</span>
+        <span class="r">${s.s5} 5xx</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ── Systemd services ── */
+const svcWebData=['nginx','ssh','tailscaled','postfix','certbot.timer','ufw'];
+const svcDBData=['postgresql','redis-server','pgbouncer'];
+const pm2Data=[
+  {name:'api-gateway',mem:'82MB'},{name:'auth-service',mem:'45MB'},{name:'blog-backend',mem:'63MB'},
+  {name:'cms-api',mem:'54MB'},{name:'docs-builder',mem:'38MB'},{name:'email-worker',mem:'26MB'},
+  {name:'file-upload',mem:'41MB'},{name:'image-processor',mem:'92MB'},{name:'notification-svc',mem:'33MB'},
+  {name:'payment-api',mem:'57MB'},{name:'search-indexer',mem:'71MB'},{name:'scheduler',mem:'28MB'},
+  {name:'websocket-srv',mem:'44MB'},{name:'admin-dashboard',mem:'36MB'},
+];
+
+function renderServices(){
+  document.getElementById('svcWeb').innerHTML=svcWebData.map(s=>`<div class="sp"><div class="sd active"></div><span class="sn">${s}</span></div>`).join('');
+  document.getElementById('svcDB').innerHTML=svcDBData.map(s=>`<div class="sp"><div class="sd active"></div><span class="sn">${s}</span></div>`).join('');
+  document.getElementById('pm2List').innerHTML=pm2Data.map(p=>`<div class="sp"><div class="sd online"></div><span class="sn">${p.name}</span><span class="stag">web</span><span class="smem">${p.mem}</span></div>`).join('');
+}
+
+/* ── Live request feed ── */
+const feedPaths=['/','about','/api/v1/users','/api/v1/posts','/docs/getting-started','/blog/new-release','/login','/api/auth/token','/api/v1/search?q=test','/static/app.js','/css/main.css','/images/logo.png','/api/v1/health','/admin/settings','/api/v1/notifications','/sitemap.xml','/robots.txt','/api/v1/upload','/blog/rss.xml','/api/v1/comments'];
+const feedSites=['MainSite.com','API Gateway','Documentation','Blog','Admin Panel'];
+const feedIPs=['142.250.80.46','151.101.1.140','104.26.10.78','172.67.182.31','93.184.216.34','185.199.108.133','76.76.21.21','13.107.42.14','35.186.224.25','198.51.100.42'];
+
+function genFeedRow(){
+  const now=new Date();
+  const time=now.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const methods=['GET','GET','GET','GET','GET','GET','POST','PUT'];
+  const method=methods[Math.floor(Math.random()*methods.length)];
+  const path=feedPaths[Math.floor(Math.random()*feedPaths.length)];
+  const site=feedSites[Math.floor(Math.random()*feedSites.length)];
+  const ip=feedIPs[Math.floor(Math.random()*feedIPs.length)];
+  const codes=[200,200,200,200,200,200,200,200,301,304,404];
+  const code=codes[Math.floor(Math.random()*codes.length)];
+  const sc=code<300?'s2':code<400?'s3':code<500?'s4':'s5';
+  return `<div class="rr"><span class="rt">${time}</span><span class="rm ${method}">${method}</span><span class="rp">${path}</span><span class="rsite">${site}</span><span class="rs ${sc}">${code}</span><span class="ri">${ip}</span></div>`;
+}
+
+function initFeed(){
+  const el=document.getElementById('feedList');
+  let html='';
+  for(let i=0;i<20;i++) html=genFeedRow()+html;
+  el.innerHTML=html;
+}
+
+function addFeedRow(){
+  const el=document.getElementById('feedList');
+  el.innerHTML=genFeedRow()+el.innerHTML;
+  // Trim to 50
+  const rows=el.querySelectorAll('.rr');
+  if(rows.length>50) rows[rows.length-1].remove();
+}
+
+/* ── Jitter simulation ── */
+function jitter(val,pct){
+  const d=val*pct;
+  return Math.max(0,val+(Math.random()*d*2-d));
+}
+
+function simulateTick(){
+  // Server pills
+  document.getElementById('ws-cpu').textContent=jitter(0.24,.3).toFixed(2);
+  document.getElementById('ws-mem').textContent=jitter(34.2,.05).toFixed(1)+'%';
+  document.getElementById('ws-conn').textContent=Math.round(jitter(18,.2));
+  document.getElementById('db-cpu').textContent=jitter(0.08,.4).toFixed(2);
+  document.getElementById('db-mem').textContent=jitter(52.6,.03).toFixed(1)+'%';
+  document.getElementById('db-conn').textContent=Math.round(jitter(6,.2));
+  document.getElementById('pve-cpu').textContent=jitter(0.38,.2).toFixed(2);
+  document.getElementById('pve-mem').textContent=jitter(61.4,.03).toFixed(1)+'%';
+
+  // Containers
+  containers.forEach(c=>{
+    c.cpu=Math.max(1,Math.min(95,Math.round(c.cpu+(Math.random()*6-3))));
+    c.ram=Math.max(5,Math.min(95,Math.round(c.ram+(Math.random()*4-2))));
+  });
+  renderContainers();
+
+  // Sites
+  sites.forEach(s=>{
+    s.rpm=Math.max(0.5,jitter(s.rpm,.12));
+    s.reqs=Math.max(1,Math.round(jitter(s.reqs,.08)));
+    s.s2=Math.max(0,Math.round(jitter(s.s2,.08)));
+    s.visitors=Math.max(1,Math.round(jitter(s.visitors,.15)));
+  });
+  renderSites();
+
+  // Metrics
+  const totalRpm=sites.reduce((a,s)=>a+s.rpm,0);
+  const totalReqs=sites.reduce((a,s)=>a+s.reqs,0);
+  const totalVis=sites.reduce((a,s)=>a+s.visitors,0);
+  document.getElementById('m-rpm').textContent=totalRpm.toFixed(1);
+  document.getElementById('m-rpm-sub').textContent=totalReqs+' total (5m)';
+  document.getElementById('m-vis').textContent=totalVis;
+
+  // Response codes
+  const t2=sites.reduce((a,s)=>a+s.s2,0);
+  const t4=sites.reduce((a,s)=>a+s.s4,0);
+  const t5=sites.reduce((a,s)=>a+s.s5,0);
+  document.getElementById('sc2').textContent=t2;
+  document.getElementById('sc4').textContent=t4;
+  document.getElementById('sc5').textContent=t5;
+
+  document.getElementById('lastUp').textContent='just now';
+}
+
+/* ── Feed ticker — add new request every 1-3s ── */
+let feedTimer=0;
+setInterval(()=>{
+  feedTimer++;
+  if(feedTimer%2===0) addFeedRow();
+  if(feedTimer%3===0) addFeedRow();
+},1000);
+
+/* ── Main refresh cycle ── */
+setInterval(simulateTick,5000);
+
+/* ── Init ── */
+renderContainers();
+renderSites();
+renderServices();
+initFeed();
+</script>
+</body>
+</html>

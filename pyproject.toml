@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "centient"
+version = "1.0.0"
+description = "¢entient¢ — Professional server, service & website monitoring dashboard"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+requires-python = ">=3.10"
+authors = [{name = "Joshua Goth"}]
+keywords = ["monitoring", "dashboard", "server", "uptime", "devops"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+    "fastapi>=0.135.0",
+    "uvicorn[standard]>=0.41.0",
+    "aiosqlite>=0.22.0",
+    "httpx>=0.28.0",
+    "bcrypt>=5.0.0",
+    "PyJWT>=2.11.0",
+    "pyyaml>=6.0.3",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.22",
+]
+
+[project.optional-dependencies]
+tray = ["pystray>=0.19.5", "Pillow>=11.0.0"]
+dev = ["pytest", "pytest-asyncio", "httpx"]
+
+[project.scripts]
+centient = "centient.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/joshuagoth/centient"
+Documentation = "https://github.com/joshuagoth/centient#readme"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["centient*"]
+
+[tool.setuptools.package-data]
+centient = ["static/**/*", "templates/**/*"]
