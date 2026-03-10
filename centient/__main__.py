@@ -91,7 +91,7 @@ def _run_service_mode(host: str, port: int) -> None:
 def _run_tray_mode(host: str, port: int, auto_open: bool = False) -> None:
     """Desktop tray mode — uvicorn in a thread, tray icon on the main thread."""
     import uvicorn
-    from .tray import CentiencTray
+    from .tray import CentientTray
 
     logger.info("Starting in tray mode on %s:%d", host, port)
 
@@ -117,7 +117,7 @@ def _run_tray_mode(host: str, port: int, auto_open: bool = False) -> None:
         ).start()
 
     # Run tray on main thread (required by macOS)
-    tray = CentiencTray(port=port, host=host)
+    tray = CentientTray(port=port, host=host)
 
     def on_tray_quit():
         server.should_exit = True

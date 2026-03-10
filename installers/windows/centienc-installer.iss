@@ -5,10 +5,10 @@
   #define MyAppVersion "1.0.0"
 #endif
 
-#define MyAppName "Centienc"
+#define MyAppName "¢entien¢"
 #define MyAppPublisher "Joshua Goth"
-#define MyAppURL "https://joshuagoth.com/tools/centient/"
-#define MyAppExeName "Centienc-Installer.bat"
+#define MyAppURL "https://joshuagoth.com/tools/centienc/"
+#define MyAppExeName "centienc-installer.bat"
 
 [Setup]
 AppId={{B8F4BC39-1CE0-4D7B-9A53-58B8A0E6B8E7}
@@ -18,12 +18,12 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\CentiencInstaller
-DefaultGroupName=Centienc Installer
+DefaultDirName={autopf}\centienc-installer
+DefaultGroupName=¢entien¢ Installer
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 OutputDir=dist
-OutputBaseFilename=Centienc-Installer-Setup
+OutputBaseFilename=centienc-installer-setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -36,9 +36,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "install.ps1"; DestDir: "{tmp}\centient-installer"; Flags: ignoreversion deleteafterinstall
-Source: "install.cmd"; DestDir: "{tmp}\centient-installer"; Flags: ignoreversion deleteafterinstall
-Source: "Centienc-Installer.bat"; DestDir: "{tmp}\centient-installer"; Flags: ignoreversion deleteafterinstall
+Source: "install.ps1"; DestDir: "{tmp}\centienc-installer"; Flags: ignoreversion deleteafterinstall
+Source: "install.cmd"; DestDir: "{tmp}\centienc-installer"; Flags: ignoreversion deleteafterinstall
+Source: "centienc-installer.bat"; DestDir: "{tmp}\centienc-installer"; Flags: ignoreversion deleteafterinstall
 
 [Run]
-Filename: "{tmp}\centient-installer\install.cmd"; Description: "Run Centienc installer"; Flags: waituntilterminated
+Filename: "{tmp}\centienc-installer\install.cmd"; Description: "Run ¢entien¢ installer"; Flags: waituntilterminated

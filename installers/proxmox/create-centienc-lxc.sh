@@ -6,7 +6,7 @@
 #  installs ¢entien¢ inside it, and starts the service.
 #
 #  Usage (run on the Proxmox host):
-#    bash create-centient-lxc.sh [OPTIONS]
+#    bash create-centienc-lxc.sh [OPTIONS]
 #
 #  Options:
 #    --ctid    NUM    Container ID       (default: next available)
@@ -27,6 +27,8 @@
 #    --privileged    Create privileged container
 #    --ssh-key FILE  SSH public key to inject
 #    --password STR  Root password (prompted if not set)
+#    --interactive  Run guided setup prompts (default when TTY)
+#    --non-interactive  Skip prompts, use flags/defaults only
 #    --help          Show this help
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -49,6 +51,7 @@ START=true
 PRIVILEGED=false
 SSH_KEY=""
 ROOT_PASS=""
+INTERACTIVE="auto"
 
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -60,6 +63,35 @@ ok()    { echo -e "${GREEN}[OK]${NC}    $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 header(){ echo -e "\n${CYAN}── $* ──${NC}"; }
+
+prompt_default() {
+    local label="$1"
+    local current="$2"
+    local input
+    read -r -p "$label [$current]: " input
+    echo "${input:-$current}"
+}
+
+require_num() {
+    local value="$1"
+    local field="$2"
+    [[ "$value" =~ ^[0-9]+$ ]] || err "$field must be a number (got: $value)"
+}
+
+yes_no_prompt() {
+    local label="$1"
+    local current="$2" # true/false
+    local default_yn="y"
+    [[ "$current" == "true" ]] || default_yn="n"
+    local input
+    read -r -p "$label [${default_yn}]: " input
+    input="${input:-$default_yn}"
+    case "${input,,}" in
+        y|yes) echo "true" ;;
+        n|no) echo "false" ;;
+        *) echo "$current" ;;
+    esac
+}
 
 # ── Parse arguments ──────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -82,6 +114,8 @@ while [[ $# -gt 0 ]]; do
         --unprivileged) PRIVILEGED=false; shift;;
         --ssh-key)    SSH_KEY="$2"; shift 2;;
         --password)   ROOT_PASS="$2"; shift 2;;
+        --interactive) INTERACTIVE="true"; shift;;
+        --non-interactive) INTERACTIVE="false"; shift;;
         --help|-h)
             head -35 "$0" | tail -30
             exit 0;;
@@ -93,6 +127,14 @@ done
 command -v pct &>/dev/null || err "This script must be run on a Proxmox VE host (pct not found)"
 command -v pvesm &>/dev/null || err "pvesm not found — are you on a Proxmox VE host?"
 [[ $EUID -ne 0 ]] && err "Run as root on the Proxmox host"
+
+if [[ "$INTERACTIVE" == "auto" ]]; then
+    if [[ -t 0 ]]; then
+        INTERACTIVE="true"
+    else
+        INTERACTIVE="false"
+    fi
+fi
 
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
@@ -108,6 +150,70 @@ fi
 # Validate CTID not in use
 if pct status "$CTID" &>/dev/null; then
     err "CTID ${CTID} already exists. Choose a different one with --ctid"
+fi
+
+# ── Detect storage and bridge choices ───────────────────────
+mapfile -t AVAILABLE_STORAGES < <(pvesm status 2>/dev/null | awk 'NR>1 {print $1}')
+[[ ${#AVAILABLE_STORAGES[@]} -gt 0 ]] || err "No Proxmox storages found (pvesm status returned none)"
+
+if ! printf '%s\n' "${AVAILABLE_STORAGES[@]}" | grep -qx "$STORAGE"; then
+    warn "Storage '$STORAGE' not found. Falling back to '${AVAILABLE_STORAGES[0]}'."
+    STORAGE="${AVAILABLE_STORAGES[0]}"
+fi
+
+mapfile -t AVAILABLE_BRIDGES < <(ip -o link show | awk -F': ' '{print $2}' | grep '^vmbr' || true)
+if [[ ${#AVAILABLE_BRIDGES[@]} -eq 0 ]]; then
+    mapfile -t AVAILABLE_BRIDGES < <(ip -o link show | awk -F': ' '{print $2}' | grep -v '^lo$' || true)
+fi
+[[ ${#AVAILABLE_BRIDGES[@]} -gt 0 ]] || err "No network bridge/interface found for container networking"
+
+if ! printf '%s\n' "${AVAILABLE_BRIDGES[@]}" | grep -qx "$BRIDGE"; then
+    warn "Bridge '$BRIDGE' not found. Falling back to '${AVAILABLE_BRIDGES[0]}'."
+    BRIDGE="${AVAILABLE_BRIDGES[0]}"
+fi
+
+# ── Guided setup wizard ─────────────────────────────────────
+if [[ "$INTERACTIVE" == "true" ]]; then
+    header "Guided Setup"
+
+    echo "Available storages: ${AVAILABLE_STORAGES[*]}"
+    echo "Available bridges: ${AVAILABLE_BRIDGES[*]}"
+
+    CTID=$(prompt_default "Container ID" "$CTID")
+    require_num "$CTID" "Container ID"
+    if pct status "$CTID" &>/dev/null; then
+        err "CTID ${CTID} already exists. Re-run and choose another ID"
+    fi
+
+    CT_NAME=$(prompt_default "Container hostname" "$CT_NAME")
+    CORES=$(prompt_default "CPU cores" "$CORES")
+    MEMORY=$(prompt_default "RAM (MB)" "$MEMORY")
+    DISK_SIZE=$(prompt_default "Disk size (GB)" "$DISK_SIZE")
+    STORAGE=$(prompt_default "Storage pool" "$STORAGE")
+    BRIDGE=$(prompt_default "Network bridge" "$BRIDGE")
+    PORT=$(prompt_default "¢entien¢ port" "$PORT")
+
+    require_num "$CORES" "CPU cores"
+    require_num "$MEMORY" "RAM"
+    require_num "$DISK_SIZE" "Disk size"
+    require_num "$PORT" "Port"
+
+    if ! printf '%s\n' "${AVAILABLE_STORAGES[@]}" | grep -qx "$STORAGE"; then
+        err "Storage '$STORAGE' not found. Valid options: ${AVAILABLE_STORAGES[*]}"
+    fi
+    if ! printf '%s\n' "${AVAILABLE_BRIDGES[@]}" | grep -qx "$BRIDGE"; then
+        err "Bridge '$BRIDGE' not found. Valid options: ${AVAILABLE_BRIDGES[*]}"
+    fi
+
+    IP_ADDR=$(prompt_default "IP address (dhcp or CIDR like 10.10.10.50/24)" "$IP_ADDR")
+    if [[ "$IP_ADDR" != "dhcp" ]]; then
+        GATEWAY=$(prompt_default "Gateway IP (blank to skip)" "$GATEWAY")
+    else
+        GATEWAY=""
+    fi
+
+    START=$(yes_no_prompt "Start container after creation?" "$START")
+    PRIVILEGED=$(yes_no_prompt "Use privileged container?" "$PRIVILEGED")
 fi
 
 # ── Get/download template ────────────────────────────────────
@@ -187,8 +293,14 @@ pct create "${PCT_ARGS[@]}"
 ok "Container ${CTID} created"
 
 # ── Start container ──────────────────────────────────────────
-header "Starting Container"
-pct start "$CTID"
+if [[ "$START" == "true" ]]; then
+    header "Starting Container"
+    pct start "$CTID"
+else
+    warn "Container created but not started (--no-start selected)."
+    echo -e "Run ${BOLD}pct start ${CTID}${NC} when ready."
+    exit 0
+fi
 
 # Wait for container to be fully up
 info "Waiting for container to initialize..."
@@ -203,90 +315,83 @@ ok "Container is running"
 # ── Install ¢entien¢ inside the container ────────────────────────
 header "Installing ¢entien¢"
 
-# Update packages and install Python
+# Update packages and install Python + build tools
 info "Installing system packages inside container..."
 pct exec "$CTID" -- bash -c "
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq python3 python3-venv python3-pip iputils-ping curl
-" 2>&1 | tail -3
+    apt-get install -y -qq python3 python3-venv python3-pip build-essential iputils-ping curl
+" 2>&1 | tail -5
 ok "System packages installed"
 
-# Create venv and install ¢entien¢
-info "Setting up ¢entien¢..."
+# Create directories, venv, and system user
+info "Creating venv and system user..."
 pct exec "$CTID" -- bash -c "
     set -e
-
-    # Create directories
     mkdir -p /opt/centient /var/lib/centient
-
-    # Create venv
     python3 -m venv /opt/centient/venv
-    source /opt/centient/venv/bin/activate
-    pip install --upgrade pip -q
-
-    # Install centient (from PyPI when published, or pip install from wheel)
-    pip install fastapi 'uvicorn[standard]' aiosqlite httpx bcrypt PyJWT pyyaml jinja2 python-multipart -q
-
-    deactivate
-
-    # Create system user
+    /opt/centient/venv/bin/pip install --upgrade pip --quiet
     useradd -r -s /usr/sbin/nologin -d /var/lib/centient -M centient 2>/dev/null || true
-    chown -R centient:centient /opt/centient /var/lib/centient
 "
-ok "Python environment ready"
+ok "Environment ready"
 
-# ── Check if we have local source to push ────────────────────
+# ── Install ¢entien¢ ─────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." 2>/dev/null && pwd || echo "")"
 
 if [[ -n "$PROJECT_ROOT" && -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
-    info "Copying ¢entien¢ source into container..."
+    info "Bundling ¢entien¢ from local source..."
 
-    # Push the centient package
-    pct push "$CTID" "${PROJECT_ROOT}/pyproject.toml" /tmp/centient-pkg/pyproject.toml --mkdir
-    for f in "${PROJECT_ROOT}"/centient/*.py; do
-        fname=$(basename "$f")
-        pct push "$CTID" "$f" "/tmp/centient-pkg/centient/${fname}" --mkdir
-    done
+    # Build a clean tarball on the host, then push a single file
+    BUILD_TMP=$(mktemp -d /tmp/centient-build-XXXXXX)
+    trap 'rm -rf "$BUILD_TMP"' EXIT
 
-    # Push templates
-    if [[ -d "${PROJECT_ROOT}/centient/templates" ]]; then
-        for f in "${PROJECT_ROOT}"/centient/templates/*.html; do
-            fname=$(basename "$f")
-            pct push "$CTID" "$f" "/tmp/centient-pkg/centient/templates/${fname}" --mkdir
-        done
-    fi
+    mkdir -p "${BUILD_TMP}/centient-src"
+    cp "${PROJECT_ROOT}/pyproject.toml" "${BUILD_TMP}/centient-src/"
+    cp -r "${PROJECT_ROOT}/centient" "${BUILD_TMP}/centient-src/centient"
+    # Remove caches that would confuse pip
+    find "${BUILD_TMP}/centient-src" -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
+    find "${BUILD_TMP}/centient-src" -name '*.pyc' -delete 2>/dev/null || true
 
-    # Push static files
-    if [[ -d "${PROJECT_ROOT}/centient/static" ]]; then
-        for f in "${PROJECT_ROOT}"/centient/static/*; do
-            [[ -f "$f" ]] || continue
-            fname=$(basename "$f")
-            pct push "$CTID" "$f" "/tmp/centient-pkg/centient/static/${fname}" --mkdir
-        done
-    fi
+    tar -czf "${BUILD_TMP}/centient-src.tar.gz" -C "$BUILD_TMP" centient-src/
+    pct push "$CTID" "${BUILD_TMP}/centient-src.tar.gz" /tmp/centient-src.tar.gz
+    rm -rf "$BUILD_TMP"
+    trap - EXIT
 
-    # Install from local source
+    info "Installing from local source (this may take a minute)..."
     pct exec "$CTID" -- bash -c "
-        source /opt/centient/venv/bin/activate
-        pip install /tmp/centient-pkg -q
-        rm -rf /tmp/centient-pkg
-        deactivate
+        set -e
+        tar -xzf /tmp/centient-src.tar.gz -C /tmp/
+        /opt/centient/venv/bin/pip install /tmp/centient-src/ --no-cache-dir
+        rm -rf /tmp/centient-src.tar.gz /tmp/centient-src/
     "
     ok "¢entien¢ installed from local source"
 else
-    info "No local source found — installing centient from pip inside the container..."
-    if pct exec "$CTID" -- bash -c "
-        source /opt/centient/venv/bin/activate
-        pip install centient -q
-        deactivate
-    "; then
-        ok "¢entien¢ installed from pip"
-    else
-        err "Failed to install centient from pip inside container. Verify internet/PyPI access or run from local source checkout."
-    fi
+    info "No local source found — downloading ¢entien¢ from joshuagoth.com..."
+    SOURCE_URL="https://joshuagoth.com/downloads/centienc/centient-src.tar.gz"
+
+    # Download the source tarball into the container
+    pct exec "$CTID" -- bash -c "
+        set -e
+        curl -fsSL '${SOURCE_URL}' -o /tmp/centient-src.tar.gz \
+            || { echo 'Download failed — check internet access on this Proxmox host'; exit 1; }
+        tar -xzf /tmp/centient-src.tar.gz -C /tmp/
+        /opt/centient/venv/bin/pip install /tmp/centient-src/ --no-cache-dir
+        rm -rf /tmp/centient-src.tar.gz /tmp/centient-src/
+    " || err "Failed to install ¢entien¢. Verify this Proxmox host can reach https://joshuagoth.com"
+    ok "¢entien¢ installed from joshuagoth.com"
 fi
+
+# Fix ownership now that pip install is done
+pct exec "$CTID" -- chown -R centient:centient /opt/centient /var/lib/centient
+
+# ── Verify the installation is runnable ──────────────────────
+header "Verifying Installation"
+
+pct exec "$CTID" -- /opt/centient/venv/bin/python -m centient --help > /dev/null \
+    || err "Installation check failed — \"python -m centient\" is not runnable. The pip install likely failed above."
+
+ok "¢entien¢ is runnable — using /opt/centient/venv/bin/python -m centient"
 
 # ── Create systemd service inside container ──────────────────
 header "Configuring Service"
@@ -303,12 +408,11 @@ User=centient
 Group=centient
 WorkingDirectory=/var/lib/centient
 Environment=CENTIENT_DATA_DIR=/var/lib/centient
-ExecStart=/opt/centient/venv/bin/centient --host 0.0.0.0 --port ${PORT}
+ExecStart=/opt/centient/venv/bin/python -m centient --host 0.0.0.0 --port ${PORT}
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-AmbientCapabilities=CAP_NET_RAW
 
 [Install]
 WantedBy=multi-user.target
@@ -317,18 +421,31 @@ SVCEOF
 systemctl daemon-reload
 systemctl enable centient
 systemctl start centient
+sleep 3
+if ! systemctl is-active --quiet centient; then
+    echo '--- SERVICE FAILED TO START ---'
+    systemctl status centient --no-pager -l
+    journalctl -u centient -n 20 --no-pager
+    exit 1
+fi
 "
 ok "¢entien¢ service started"
 
 # ── Wait for service to be ready ─────────────────────────────
 info "Waiting for ¢entien¢ to be ready..."
-for i in $(seq 1 15); do
+APP_READY=false
+for i in $(seq 1 20); do
     if pct exec "$CTID" -- curl -s -o /dev/null -w '%{http_code}' "http://localhost:${PORT}/api/health" 2>/dev/null | grep -q 200; then
-        ok "¢entien¢ is responding"
+        APP_READY=true
+        ok "¢entien¢ is responding on port ${PORT}"
         break
     fi
     sleep 1
 done
+
+if [[ "$APP_READY" != "true" ]]; then
+    err "¢entien¢ did not respond after 20 seconds. Check logs with:\n  pct exec ${CTID} -- journalctl -u centient -n 30 --no-pager"
+fi
 
 # ── Get container IP ─────────────────────────────────────────
 CT_IP=$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "unknown")

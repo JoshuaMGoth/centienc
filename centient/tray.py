@@ -61,7 +61,7 @@ def _create_icon_image(color: tuple[int, int, int] = COLOR_GREEN):
     return img
 
 
-class CentiencTray:
+class CentientTray:
     """System tray icon for ¢entien¢."""
 
     def __init__(self, port: int = 9090, host: str = "127.0.0.1"):

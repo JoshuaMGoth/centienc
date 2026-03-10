@@ -1,22 +1,28 @@
 """¢entien¢ — Background monitoring workers.
 
-Runs async checks against servers (ICMP ping), services (TCP port),
-and websites (HTTP request) at configurable intervals.
+Runs async checks against servers (ICMP ping + SSH metrics),
+services (TCP port), websites (HTTP), and Proxmox nodes (API).
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import platform
+import re
 import time
 from typing import Any
 
+import asyncssh
 import httpx
 
 from .database import Database
 
 logger = logging.getLogger("centient.monitors")
+
+# ── SSH separator for batched commands ───────────────────────
+SEP = "---CENTIENT_SEP---"
 
 
 class MonitorEngine:
@@ -26,8 +32,9 @@ class MonitorEngine:
         self.db = db
         self._tasks: list[asyncio.Task[None]] = []
         self._running = False
-        # In-memory status cache (target_type:target_id -> latest status)
         self.status_cache: dict[str, dict[str, Any]] = {}
+        # Keep SSH connections alive across polls
+        self._ssh_conns: dict[int, asyncssh.SSHClientConnection] = {}
 
     async def start(self) -> None:
         """Start all monitoring loops."""
@@ -36,6 +43,8 @@ class MonitorEngine:
             asyncio.create_task(self._server_loop()),
             asyncio.create_task(self._service_loop()),
             asyncio.create_task(self._website_loop()),
+            asyncio.create_task(self._ssh_loop()),
+            asyncio.create_task(self._proxmox_loop()),
             asyncio.create_task(self._cleanup_loop()),
         ]
         logger.info("Monitor engine started (%d workers)", len(self._tasks))
@@ -46,9 +55,18 @@ class MonitorEngine:
         for t in self._tasks:
             t.cancel()
         self._tasks.clear()
+        # Close SSH connections
+        for conn in self._ssh_conns.values():
+            try:
+                conn.close()
+            except Exception:
+                pass
+        self._ssh_conns.clear()
         logger.info("Monitor engine stopped")
 
-    # ── Server monitoring (ICMP ping) ────────────────────────────
+    # ══════════════════════════════════════════════════════════════
+    #  Server monitoring (ICMP ping)
+    # ══════════════════════════════════════════════════════════════
 
     async def _server_loop(self) -> None:
         while self._running:
@@ -69,14 +87,12 @@ class MonitorEngine:
         start = time.monotonic()
         try:
             status, rtt = await self._ping(hostname)
-        except Exception as e:
+        except Exception:
             status, rtt = "down", None
-            logger.debug("Ping failed for %s: %s", hostname, e)
 
         elapsed = round((time.monotonic() - start) * 1000, 2) if rtt is None else rtt
         cache_key = f"server:{server['id']}"
 
-        # Track incidents
         prev = self.status_cache.get(cache_key, {}).get("status")
         if status == "down" and prev != "down":
             await self.db.open_incident("server", server["id"])
@@ -92,21 +108,17 @@ class MonitorEngine:
         await self.db.record_check("server", server["id"], status, elapsed if status == "up" else None)
 
     async def _ping(self, host: str) -> tuple[str, float | None]:
-        """Ping a host and return (status, rtt_ms)."""
         is_windows = platform.system().lower() == "windows"
         flag = "-n" if is_windows else "-c"
         timeout_flag = "-w" if is_windows else "-W"
         cmd = ["ping", flag, "1", timeout_flag, "3", host]
         try:
             proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
             if proc.returncode == 0:
                 output = stdout.decode("utf-8", errors="ignore")
-                # Parse RTT from ping output
                 rtt = self._parse_ping_rtt(output)
                 return "up", rtt
             return "down", None
@@ -115,27 +127,20 @@ class MonitorEngine:
 
     @staticmethod
     def _parse_ping_rtt(output: str) -> float | None:
-        """Extract average RTT from ping output."""
-        import re
-        # Linux: rtt min/avg/max/mdev = 1.234/2.345/3.456/0.123 ms
-        m = re.search(r"rtt min/avg/max/mdev = [\d.]+/([\d.]+)/", output)
-        if m:
-            return float(m.group(1))
-        # macOS: round-trip min/avg/max/stddev = 1.234/2.345/3.456/0.123 ms
-        m = re.search(r"round-trip min/avg/max/stddev = [\d.]+/([\d.]+)/", output)
-        if m:
-            return float(m.group(1))
-        # Windows: Average = 2ms
-        m = re.search(r"Average = (\d+)ms", output)
-        if m:
-            return float(m.group(1))
-        # Try to find time= from individual ping
-        m = re.search(r"time[=<]([\d.]+)\s*ms", output)
-        if m:
-            return float(m.group(1))
+        for pattern in [
+            r"rtt min/avg/max/mdev = [\d.]+/([\d.]+)/",
+            r"round-trip min/avg/max/stddev = [\d.]+/([\d.]+)/",
+            r"Average = (\d+)ms",
+            r"time[=<]([\d.]+)\s*ms",
+        ]:
+            m = re.search(pattern, output)
+            if m:
+                return float(m.group(1))
         return None
 
-    # ── Service monitoring (TCP port check) ──────────────────────
+    # ══════════════════════════════════════════════════════════════
+    #  Service monitoring (TCP port check)
+    # ══════════════════════════════════════════════════════════════
 
     async def _service_loop(self) -> None:
         while self._running:
@@ -159,8 +164,7 @@ class MonitorEngine:
 
         try:
             _, writer = await asyncio.wait_for(
-                asyncio.open_connection(host, port),
-                timeout=timeout,
+                asyncio.open_connection(host, port), timeout=timeout,
             )
             writer.close()
             await writer.wait_closed()
@@ -188,7 +192,9 @@ class MonitorEngine:
         }
         await self.db.record_check("service", service["id"], status, elapsed if status == "up" else None)
 
-    # ── Website monitoring (HTTP check) ──────────────────────────
+    # ══════════════════════════════════════════════════════════════
+    #  Website monitoring (HTTP check)
+    # ══════════════════════════════════════════════════════════════
 
     async def _website_loop(self) -> None:
         while self._running:
@@ -218,9 +224,7 @@ class MonitorEngine:
         details = None
         try:
             async with httpx.AsyncClient(
-                timeout=timeout,
-                follow_redirects=follow,
-                verify=verify_ssl,
+                timeout=timeout, follow_redirects=follow, verify=verify_ssl,
             ) as client:
                 resp = await client.request(method, url)
                 status_code = resp.status_code
@@ -260,7 +264,569 @@ class MonitorEngine:
             "website", website["id"], status, elapsed, status_code, details
         )
 
-    # ── Cleanup loop ─────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════
+    #  SSH-based remote metrics collection
+    # ══════════════════════════════════════════════════════════════
+
+    async def _ssh_loop(self) -> None:
+        """Poll each server with SSH credentials for rich metrics."""
+        while self._running:
+            try:
+                servers = await self.db.list_servers(enabled_only=True)
+                tasks = [
+                    self._poll_ssh(s) for s in servers
+                    if s.get("ssh_user")
+                ]
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("SSH loop error: %s", e)
+            interval = int(await self.db.get_setting("check_interval", "60"))
+            await asyncio.sleep(max(interval, 15))
+
+    async def _get_ssh_conn(self, server: dict[str, Any]) -> asyncssh.SSHClientConnection:
+        """Get or create a persistent SSH connection."""
+        sid = server["id"]
+        conn = self._ssh_conns.get(sid)
+        # Test if still alive
+        if conn is not None:
+            try:
+                # Quick check: run trivial command
+                result = await asyncio.wait_for(conn.run("echo ok", check=False), timeout=3)
+                if result.stdout and result.stdout.strip() == "ok":
+                    return conn
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._ssh_conns.pop(sid, None)
+
+        host = server.get("ip_address") or server["hostname"]
+        port = server.get("ssh_port") or server.get("port") or 22
+        user = server.get("ssh_user", "root")
+        key_path = server.get("ssh_key_path")
+        password = server.get("ssh_password")
+
+        connect_kwargs: dict[str, Any] = {
+            "host": host,
+            "port": int(port),
+            "username": user,
+            "known_hosts": None,
+            "connect_timeout": 8,
+        }
+
+        if key_path:
+            connect_kwargs["client_keys"] = [key_path]
+        elif password:
+            connect_kwargs["password"] = password
+        # If neither, asyncssh will try default keys (~/.ssh/id_rsa, etc.)
+
+        conn = await asyncssh.connect(**connect_kwargs)
+        self._ssh_conns[sid] = conn
+        return conn
+
+    async def _ssh_cmd(self, conn: asyncssh.SSHClientConnection, cmd: str, timeout: int = 12) -> str:
+        """Run a command over SSH and return stdout."""
+        result = await asyncio.wait_for(conn.run(cmd, check=False), timeout=timeout)
+        return result.stdout or ""
+
+    async def _ssh_sudo_cmd(self, conn: asyncssh.SSHClientConnection, cmd: str,
+                            sudo_pass: str | None = None, timeout: int = 15) -> str:
+        """Run a sudo command over SSH."""
+        if sudo_pass:
+            remote = f'echo "{sudo_pass}" | sudo -S {cmd} 2>/dev/null'
+        else:
+            remote = f'sudo {cmd} 2>/dev/null'
+        return await self._ssh_cmd(conn, remote, timeout)
+
+    async def _poll_ssh(self, server: dict[str, Any]) -> None:
+        """Fetch metrics from a server via SSH."""
+        sid = server["id"]
+        cache_key = f"ssh:{sid}"
+
+        # Parse monitor flags
+        raw_flags = server.get("monitor_flags") or "{}"
+        try:
+            flags = json.loads(raw_flags) if isinstance(raw_flags, str) else raw_flags
+        except (json.JSONDecodeError, TypeError):
+            flags = {}
+
+        results: dict[str, Any] = {
+            "server_id": sid,
+            "last_update": time.time(),
+            "error": None,
+        }
+
+        try:
+            conn = await self._get_ssh_conn(server)
+            sudo_pass = server.get("sudo_password")
+
+            # ── System metrics (always collected if ssh is configured) ──
+            if flags.get("system", True):
+                results["metrics"] = await self._ssh_system_metrics(conn)
+
+            # ── PM2 processes ──
+            if flags.get("pm2", False):
+                results["pm2"] = await self._ssh_pm2(conn)
+
+            # ── Services ──
+            if flags.get("services", False):
+                results["services"] = await self._ssh_services(conn)
+
+            # ── Nginx ──
+            if flags.get("nginx", False):
+                results["nginx"] = await self._ssh_nginx(conn, sudo_pass)
+
+            # ── Fail2ban ──
+            if flags.get("fail2ban", False):
+                results["fail2ban"] = await self._ssh_fail2ban(conn, sudo_pass)
+
+        except Exception as exc:
+            results["error"] = str(exc)
+            logger.warning("SSH poll failed for server %d: %s", sid, exc)
+            # Drop cached connection on failure
+            self._ssh_conns.pop(sid, None)
+
+        self.status_cache[cache_key] = results
+
+    async def _ssh_system_metrics(self, conn: asyncssh.SSHClientConnection) -> dict[str, Any]:
+        """Collect CPU, memory, disk, connections via a single batched SSH command."""
+        batch_cmd = (
+            f"cat /proc/loadavg && echo '{SEP}' && "
+            f"nproc && echo '{SEP}' && "
+            f"cat /proc/meminfo && echo '{SEP}' && "
+            f"df -BG / | tail -1 && echo '{SEP}' && "
+            f"cat /proc/uptime && echo '{SEP}' && "
+            f"ss -tn state established 2>/dev/null | tail -n +2 && echo '{SEP}' && "
+            f"cat /proc/net/dev"
+        )
+        raw = await self._ssh_cmd(conn, batch_cmd)
+        parts = raw.split(SEP)
+        if len(parts) < 7:
+            return {"error": "Incomplete system metrics response"}
+
+        result: dict[str, Any] = {}
+
+        # CPU load
+        try:
+            load_parts = parts[0].strip().split()
+            cores = int(parts[1].strip())
+            load1 = float(load_parts[0])
+            result["cpu_pct"] = round(load1 / cores * 100, 1)
+            result["load_1m"] = load1
+            result["cores"] = cores
+        except (ValueError, IndexError):
+            result["cpu_pct"] = 0
+            result["cores"] = 1
+
+        # Memory
+        try:
+            mem_text = parts[2].strip()
+            mem = {}
+            for line in mem_text.split("\n"):
+                if ":" in line:
+                    k, v = line.split(":", 1)
+                    mem[k.strip()] = int(v.strip().split()[0])  # value in kB
+            total = mem.get("MemTotal", 1)
+            avail = mem.get("MemAvailable", total)
+            used = total - avail
+            result["memory"] = {
+                "total_mb": round(total / 1024),
+                "used_mb": round(used / 1024),
+                "used_pct": round(used / total * 100, 1),
+            }
+        except (ValueError, IndexError):
+            result["memory"] = {"total_mb": 0, "used_mb": 0, "used_pct": 0}
+
+        # Disk
+        try:
+            disk_line = parts[3].strip().split()
+            total_g = int(disk_line[1].rstrip("G"))
+            used_g = int(disk_line[2].rstrip("G"))
+            result["disk"] = {
+                "total_gb": total_g,
+                "used_gb": used_g,
+                "used_pct": round(used_g / total_g * 100, 1) if total_g > 0 else 0,
+            }
+        except (ValueError, IndexError):
+            result["disk"] = {"total_gb": 0, "used_gb": 0, "used_pct": 0}
+
+        # Uptime
+        try:
+            uptime_secs = float(parts[4].strip().split()[0])
+            result["uptime"] = int(uptime_secs)
+        except (ValueError, IndexError):
+            result["uptime"] = 0
+
+        # Connections
+        try:
+            conn_lines = [l for l in parts[5].strip().split("\n") if l.strip()]
+            result["connections"] = len(conn_lines)
+        except Exception:
+            result["connections"] = 0
+
+        # Network I/O
+        try:
+            net_lines = parts[6].strip().split("\n")
+            for line in net_lines:
+                if "lo:" in line or "Inter-" in line or "face" in line:
+                    continue
+                cols = line.split()
+                if len(cols) >= 10:
+                    result["net_rx_bytes"] = int(cols[1])
+                    result["net_tx_bytes"] = int(cols[9])
+                    break
+        except Exception:
+            pass
+
+        return result
+
+    async def _ssh_pm2(self, conn: asyncssh.SSHClientConnection) -> list[dict[str, Any]]:
+        """Get PM2 process list via SSH."""
+        raw = await self._ssh_cmd(conn, "pm2 jlist 2>/dev/null || echo '[]'")
+        try:
+            # pm2 sometimes prints preamble text before the JSON
+            match = re.search(r'\[.*\]', raw, re.DOTALL)
+            data = json.loads(match.group(0)) if match else []
+        except (json.JSONDecodeError, AttributeError):
+            return []
+
+        procs = []
+        for p in data:
+            env = p.get("pm2_env", {})
+            monit = p.get("monit", {})
+            procs.append({
+                "name": p.get("name", "?"),
+                "status": env.get("status", "unknown"),
+                "cpu": monit.get("cpu", 0),
+                "memory_mb": round(monit.get("memory", 0) / 1048576, 1),
+                "restarts": env.get("restart_time", 0),
+                "uptime": env.get("pm_uptime", 0),
+            })
+        return procs
+
+    async def _ssh_services(self, conn: asyncssh.SSHClientConnection) -> list[dict[str, Any]]:
+        """Get systemd services via SSH — notable services only."""
+        raw = await self._ssh_cmd(conn,
+            "systemctl list-units --type=service --all --plain --no-legend 2>/dev/null"
+        )
+        services = []
+        for line in raw.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split(None, 4)
+            if len(parts) < 4:
+                continue
+            name = parts[0].replace(".service", "")
+            active = parts[2]  # active/inactive
+            sub = parts[3]     # running/dead/exited
+            ok = active == "active"
+            services.append({
+                "name": name,
+                "active": active,
+                "sub": sub,
+                "ok": ok,
+            })
+        return services
+
+    async def _ssh_nginx(self, conn: asyncssh.SSHClientConnection, sudo_pass: str | None = None) -> dict[str, Any]:
+        """Parse recent nginx access logs via SSH."""
+        # Read last ~5000 lines from all nginx access logs
+        cmd = "tail -5000 /var/log/nginx/*access*.log 2>/dev/null || tail -5000 /var/log/nginx/*.log 2>/dev/null || echo ''"
+        if sudo_pass:
+            raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass)
+        else:
+            raw = await self._ssh_cmd(conn, cmd)
+
+        window = 300  # 5 minutes
+        cutoff = time.time() - window
+        sites: dict[str, dict[str, Any]] = {}
+        recent_requests: list[dict[str, Any]] = []
+        total_requests = 0
+
+        # Combined nginx log format regex
+        log_re = re.compile(
+            r'(?P<ip>[\d.]+)\s+\S+\s+\S+\s+'
+            r'\[(?P<ts>[^\]]+)\]\s+'
+            r'"(?P<method>\S+)\s+(?P<path>\S+)\s+\S+"\s+'
+            r'(?P<status>\d+)\s+(?P<bytes>\d+)\s+'
+            r'"(?P<ref>[^"]*)"\s+"(?P<ua>[^"]*)"'
+        )
+
+        from datetime import datetime
+        for line in raw.strip().split("\n"):
+            m = log_re.search(line)
+            if not m:
+                continue
+            try:
+                ts_str = m.group("ts")
+                dt = datetime.strptime(ts_str, "%d/%b/%Y:%H:%M:%S %z")
+                ts = dt.timestamp()
+            except (ValueError, TypeError):
+                continue
+
+            if ts < cutoff:
+                continue
+
+            total_requests += 1
+            status_code = int(m.group("status"))
+            ip = m.group("ip")
+            method = m.group("method")
+            path = m.group("path")
+
+            # Detect site from log file header or server_name
+            # nginx combined log usually from ==> /var/log/nginx/sitename.access.log <==
+            site_name = "default"
+            # We parse it simply from file headers — tail outputs them
+            # But simpler: derive from the Host or just use one bucket
+            site = sites.setdefault(site_name, {
+                "total_requests": 0,
+                "status_codes": {},
+                "unique_ips": set(),
+                "rpm": 0,
+            })
+            site["total_requests"] += 1
+            code_bucket = str(status_code)
+            site["status_codes"][code_bucket] = site["status_codes"].get(code_bucket, 0) + 1
+            site["unique_ips"].add(ip)
+
+            if len(recent_requests) < 50:
+                recent_requests.append({
+                    "ts": ts,
+                    "method": method,
+                    "path": path,
+                    "status": status_code,
+                    "ip": ip,
+                    "site": site_name,
+                })
+
+        # Compute RPM
+        rpm = total_requests / (window / 60) if total_requests > 0 else 0
+
+        # Serialize sites (sets aren't JSON serializable)
+        serialized_sites: dict[str, Any] = {}
+        for name, data in sites.items():
+            serialized_sites[name] = {
+                "total_requests": data["total_requests"],
+                "status_codes": data["status_codes"],
+                "unique_visitors": len(data["unique_ips"]),
+                "rpm": round(data["total_requests"] / (window / 60), 1),
+                "period_minutes": window // 60,
+            }
+
+        recent_requests.sort(key=lambda r: r.get("ts", 0), reverse=True)
+
+        return {
+            "sites": serialized_sites,
+            "totals": {"rpm": round(rpm, 1), "total_requests": total_requests},
+            "recent_requests": recent_requests[:50],
+        }
+
+    async def _ssh_fail2ban(self, conn: asyncssh.SSHClientConnection, sudo_pass: str | None = None) -> dict[str, Any]:
+        """Query fail2ban status via SSH."""
+        if sudo_pass:
+            raw_status = await self._ssh_sudo_cmd(conn, "fail2ban-client status", sudo_pass)
+        else:
+            raw_status = await self._ssh_cmd(conn, "fail2ban-client status 2>/dev/null || sudo fail2ban-client status 2>/dev/null || echo ''")
+
+        total_banned = 0
+        active_bans = 0
+        jails: list[dict[str, Any]] = []
+
+        # Parse jail list
+        jail_match = re.search(r'Jail list:\s*(.+)', raw_status)
+        if jail_match:
+            jail_names = [j.strip() for j in jail_match.group(1).split(",") if j.strip()]
+            for jail in jail_names:
+                if sudo_pass:
+                    jail_raw = await self._ssh_sudo_cmd(conn, f"fail2ban-client status {jail}", sudo_pass)
+                else:
+                    jail_raw = await self._ssh_cmd(conn, f"fail2ban-client status {jail} 2>/dev/null || sudo fail2ban-client status {jail} 2>/dev/null || echo ''")
+
+                currently = 0
+                total = 0
+                m = re.search(r'Currently banned:\s*(\d+)', jail_raw)
+                if m:
+                    currently = int(m.group(1))
+                m = re.search(r'Total banned:\s*(\d+)', jail_raw)
+                if m:
+                    total = int(m.group(1))
+
+                banned_ips = []
+                m = re.search(r'Banned IP list:\s*(.+)', jail_raw)
+                if m:
+                    banned_ips = m.group(1).strip().split()
+
+                active_bans += currently
+                total_banned += total
+                jails.append({
+                    "name": jail,
+                    "currently_banned": currently,
+                    "total_banned": total,
+                    "banned_ips": banned_ips[:20],  # Limit
+                })
+
+        return {
+            "total_banned": total_banned,
+            "active_bans": active_bans,
+            "jails": jails,
+        }
+
+    # ══════════════════════════════════════════════════════════════
+    #  Proxmox monitoring (API)
+    # ══════════════════════════════════════════════════════════════
+
+    async def _proxmox_loop(self) -> None:
+        """Poll each configured Proxmox node for container/VM stats."""
+        while self._running:
+            try:
+                nodes = await self.db.list_proxmox_nodes(enabled_only=True)
+                tasks = [self._poll_proxmox(n) for n in nodes]
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Proxmox loop error: %s", e)
+            interval = int(await self.db.get_setting("check_interval", "60"))
+            await asyncio.sleep(max(interval, 30))
+
+    async def _poll_proxmox(self, node: dict[str, Any]) -> None:
+        """Fetch LXC/VM stats from a Proxmox node via API token."""
+        host = node["host"]
+        port = node.get("port", 8006)
+        pve_node = node.get("node", "pve")
+        user = node["user"]
+        token_id = node["token_id"]
+        token_secret = node["token_secret"]
+        verify_ssl = bool(node.get("verify_ssl", 0))
+        nid = node["id"]
+        cache_key = f"proxmox:{nid}"
+
+        base = f"https://{host}:{port}/api2/json"
+        auth_header = f"PVEAPIToken={user}!{token_id}={token_secret}"
+        headers = {"Authorization": auth_header}
+
+        results: dict[str, Any] = {
+            "node_id": nid,
+            "name": node["name"],
+            "last_update": time.time(),
+            "status": "unknown",
+            "containers": [],
+            "vms": [],
+            "node_status": {},
+            "error": None,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0, verify=verify_ssl) as client:
+                # Node status
+                try:
+                    r = await client.get(f"{base}/nodes/{pve_node}/status", headers=headers)
+                    if r.status_code == 200:
+                        ns = r.json().get("data", {})
+                        cpu_val = ns.get("cpu", 0)
+                        if isinstance(cpu_val, (int, float)):
+                            cpu_pct = round(cpu_val * 100, 1)
+                        else:
+                            cpu_pct = 0.0
+                        mem_info = ns.get("memory", {})
+                        results["node_status"] = {
+                            "cpu": cpu_pct,
+                            "mem_used": mem_info.get("used", 0),
+                            "mem_total": mem_info.get("total", 1),
+                            "uptime": ns.get("uptime", 0),
+                        }
+                        results["status"] = "up"
+                    elif r.status_code == 401:
+                        results["error"] = "Authentication failed — check API token"
+                        results["status"] = "down"
+                        logger.warning("Proxmox %s auth failed (401)", host)
+                    else:
+                        results["error"] = f"HTTP {r.status_code} from Proxmox API"
+                        results["status"] = "down"
+                        logger.warning("Proxmox %s returned %d", host, r.status_code)
+                except Exception as exc:
+                    results["status"] = "down"
+                    results["error"] = f"Connection error: {exc}"
+                    logger.debug("Proxmox node status error: %s", exc)
+
+                # Only fetch guests if node is reachable
+                if results["status"] == "up":
+                    # LXC containers
+                    try:
+                        r = await client.get(f"{base}/nodes/{pve_node}/lxc", headers=headers)
+                        if r.status_code == 200:
+                            for ct in r.json().get("data", []):
+                                vmid = ct.get("vmid")
+                                try:
+                                    rs = await client.get(
+                                        f"{base}/nodes/{pve_node}/lxc/{vmid}/status/current",
+                                        headers=headers,
+                                    )
+                                    cdata = rs.json().get("data", {}) if rs.status_code == 200 else {}
+                                except Exception:
+                                    cdata = {}
+                                maxmem = cdata.get("maxmem", 1) or 1
+                                maxdisk = cdata.get("maxdisk", 1) or 1
+                                results["containers"].append({
+                                    "vmid": vmid,
+                                    "name": ct.get("name", f"CT{vmid}"),
+                                    "status": ct.get("status", "unknown"),
+                                    "cpu_pct": round(cdata.get("cpu", 0) * 100, 1),
+                                    "mem_used": cdata.get("mem", 0),
+                                    "mem_total": maxmem,
+                                    "mem_pct": round(cdata.get("mem", 0) / maxmem * 100, 1),
+                                    "disk_used": cdata.get("disk", 0),
+                                    "disk_total": maxdisk,
+                                    "disk_pct": round(cdata.get("disk", 0) / maxdisk * 100, 1),
+                                    "uptime": cdata.get("uptime", 0),
+                                })
+                    except Exception as exc:
+                        logger.debug("Proxmox LXC list error: %s", exc)
+
+                    # VMs
+                    try:
+                        r = await client.get(f"{base}/nodes/{pve_node}/qemu", headers=headers)
+                        if r.status_code == 200:
+                            for vm in r.json().get("data", []):
+                                vmid = vm.get("vmid")
+                                try:
+                                    rs = await client.get(
+                                        f"{base}/nodes/{pve_node}/qemu/{vmid}/status/current",
+                                        headers=headers,
+                                    )
+                                    vdata = rs.json().get("data", {}) if rs.status_code == 200 else {}
+                                except Exception:
+                                    vdata = {}
+                                maxmem = vdata.get("maxmem", 1) or 1
+                                results["vms"].append({
+                                    "vmid": vmid,
+                                    "name": vm.get("name", f"VM{vmid}"),
+                                    "status": vm.get("status", "unknown"),
+                                    "cpu_pct": round(vdata.get("cpu", 0) * 100, 1),
+                                    "mem_used": vdata.get("mem", 0),
+                                    "mem_total": maxmem,
+                                    "mem_pct": round(vdata.get("mem", 0) / maxmem * 100, 1),
+                                    "uptime": vdata.get("uptime", 0),
+                                })
+                    except Exception as exc:
+                        logger.debug("Proxmox VM list error: %s", exc)
+
+        except Exception as exc:
+            results["error"] = str(exc)
+            results["status"] = "down"
+            logger.warning("Proxmox poll failed for node %d (%s): %s", nid, host, exc)
+
+        self.status_cache[cache_key] = results
+
+    # ══════════════════════════════════════════════════════════════
+    #  Cleanup loop
+    # ══════════════════════════════════════════════════════════════
 
     async def _cleanup_loop(self) -> None:
         """Periodically clean up old check results."""
@@ -274,9 +840,11 @@ class MonitorEngine:
                 break
             except Exception as e:
                 logger.error("Cleanup error: %s", e)
-            await asyncio.sleep(3600)  # Run hourly
+            await asyncio.sleep(3600)
 
-    # ── Manual check ─────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════
+    #  Manual check
+    # ══════════════════════════════════════════════════════════════
 
     async def check_now(self, target_type: str, target_id: int) -> dict[str, Any]:
         """Run an immediate check on a specific target."""
@@ -295,13 +863,17 @@ class MonitorEngine:
         cache_key = f"{target_type}:{target_id}"
         return self.status_cache.get(cache_key, {"status": "unknown"})
 
-    # ── Aggregate status ─────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════
+    #  Aggregate status
+    # ══════════════════════════════════════════════════════════════
 
     def get_overview(self) -> dict[str, Any]:
         """Get a summary of all monitored targets from the cache."""
         servers = []
         services = []
         websites = []
+        proxmox_nodes = []
+
         for key, val in self.status_cache.items():
             ttype, tid = key.split(":", 1)
             entry = {"id": int(tid), **val}
@@ -311,16 +883,50 @@ class MonitorEngine:
                 services.append(entry)
             elif ttype == "website":
                 websites.append(entry)
+            elif ttype == "proxmox":
+                proxmox_nodes.append(entry)
+
+        # Merge SSH data into server entries
+        for srv in servers:
+            ssh_data = self.status_cache.get(f"ssh:{srv['id']}")
+            if ssh_data:
+                srv["ssh"] = ssh_data
 
         total = len(servers) + len(services) + len(websites)
         up = sum(1 for s in servers + services + websites if s.get("status") == "up")
         down = sum(1 for s in servers + services + websites if s.get("status") == "down")
         warning = sum(1 for s in servers + services + websites if s.get("status") == "warning")
 
+        # Aggregate nginx + fail2ban across all SSH-monitored servers
+        all_recent_requests: list[dict[str, Any]] = []
+        total_rpm = 0.0
+        fail2ban_total = 0
+        fail2ban_active = 0
+        for srv in servers:
+            ssh = srv.get("ssh") or {}
+            nginx = ssh.get("nginx") or {}
+            for req in nginx.get("recent_requests", []):
+                all_recent_requests.append({**req, "server_name": srv.get("name", "")})
+            total_rpm += (nginx.get("totals") or {}).get("rpm", 0)
+            fb = ssh.get("fail2ban") or {}
+            fail2ban_total += fb.get("total_banned", 0)
+            fail2ban_active += fb.get("active_bans", 0)
+
+        all_recent_requests.sort(key=lambda r: r.get("ts", 0), reverse=True)
+
         return {
             "servers": servers,
             "services": services,
             "websites": websites,
+            "proxmox_nodes": proxmox_nodes,
+            "nginx": {
+                "total_rpm": round(total_rpm, 1),
+                "recent_requests": all_recent_requests[:50],
+            },
+            "fail2ban": {
+                "total_banned": fail2ban_total,
+                "active_bans": fail2ban_active,
+            },
             "stats": {
                 "total": total,
                 "up": up,

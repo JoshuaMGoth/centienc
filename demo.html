@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>¢entien¢ — Live Demo</title>
+  <link rel="icon" type="image/png" href="./favicon.png">
+  <link rel="shortcut icon" href="./favicon.ico">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="¢entien¢ — Live Demo">
+  <meta property="og:description" content="Interactive infrastructure monitoring demo with simulated real-time data.">
+  <meta property="og:image" content="./centienc-og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="¢entien¢ — Live Demo">
+  <meta name="twitter:description" content="Interactive infrastructure monitoring demo with simulated real-time data.">
+  <meta name="twitter:image" content="./centienc-og.png">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:#fff;min-height:100vh;overflow-x:hidden}
@@ -16,7 +26,7 @@
         /* ── Header ── */
         .header{background:rgba(0,0,0,.3);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.1)}
         .header h1{font-size:1.5em;font-weight:600;text-shadow:1px 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px}
-        .header .logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#42a5f5,#4caf50);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0}
+        .header .logo{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
         .header-sub{color:rgba(255,255,255,.55);font-size:.82em;margin-top:2px}
         .header-right{display:flex;align-items:center;gap:16px;font-size:.82em;color:rgba(255,255,255,.65)}
         .uptime-badge{background:rgba(255,255,255,.1);padding:4px 12px;border-radius:20px}
@@ -145,7 +155,7 @@
 
 <div class="header">
     <div>
-        <h1><div class="logo">¢</div> ¢entien¢</h1>
+    <h1><img class="logo" src="./centienc-logo.png" alt="¢entien¢ logo"> ¢entien¢</h1>
         <div class="header-sub">Infrastructure Monitoring · all servers · real-time</div>
     </div>
     <div class="header-right">
@@ -260,7 +270,7 @@
 <div class="footer">
     Last updated: <span id="lastUp">just now</span><br>
     A <a href="https://github.com/JoshuaMGoth" style="color:rgba(255,255,255,.45);text-decoration:none;">JoshuaGoth</a> Software · Powered by <strong>Project CloudStrap</strong><br>
-    <span style="font-size:.9em;">Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GNU GPL-3.0</a> · <a href="https://github.com/JoshuaMGoth/centient" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GitHub</a></span>
+    <span style="font-size:.9em;">Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GNU GPL-3.0</a> · <a href="https://github.com/JoshuaMGoth/centienc" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GitHub</a></span>
 </div>
 
 <script>
@@ -319,7 +329,7 @@ function renderSites(){
       <div class="sc-name">${s.name}</div>
       <div class="sc-server">${s.server}</div>
       <div class="sc-stats">
-        <div class="sc-stat"><div class="sc-stat-val b">${s.rpm}</div><div class="sc-stat-lbl">Req/m</div></div>
+        <div class="sc-stat"><div class="sc-stat-val b">${s.rpm.toFixed(1)}</div><div class="sc-stat-lbl">Req/m</div></div>
         <div class="sc-stat"><div class="sc-stat-val w">${s.visitors}</div><div class="sc-stat-lbl">Visitors</div></div>
         <div class="sc-stat"><div class="sc-stat-val w">${s.reqs}</div><div class="sc-stat-lbl">Reqs</div></div>
       </div>
@@ -409,7 +419,7 @@ function simulateTick(){
 
   // Sites
   sites.forEach(s=>{
-    s.rpm=Math.max(0.5,jitter(s.rpm,.12));
+    s.rpm=Number(Math.max(0.5,jitter(s.rpm,.12)).toFixed(1));
     s.reqs=Math.max(1,Math.round(jitter(s.reqs,.08)));
     s.s2=Math.max(0,Math.round(jitter(s.s2,.08)));
     s.visitors=Math.max(1,Math.round(jitter(s.visitors,.15)));

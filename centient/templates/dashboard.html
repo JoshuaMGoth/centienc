@@ -1,186 +1,230 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>¢entien¢</title>
+<title>&#xa2;entien&#xa2;</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+<link rel="apple-touch-icon" href="/static/centienc-logo.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="&#xa2;entien&#xa2;">
+<meta property="og:description" content="Lightweight monitoring dashboard.">
+<meta property="og:image" content="/static/centienc-og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="&#xa2;entien&#xa2;">
+<meta name="twitter:image" content="/static/centienc-og.png">
 <style>
-/* ── Reset & Variables ─────────────────────────────────────── */
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg:#0d1117;--surface:#161b22;--surface2:#1c2333;--border:#30363d;
-  --text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#388bfd;
-  --green:#3fb950;--red:#f85149;--yellow:#d29922;--orange:#db6d28;
-  --radius:10px;--shadow:0 2px 8px rgba(0,0,0,.3);
-  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-}
-[data-theme="light"]{
-  --bg:#f6f8fa;--surface:#ffffff;--surface2:#f0f3f6;--border:#d0d7de;
-  --text:#1f2328;--text2:#656d76;--accent:#0969da;--accent2:#0550ae;
-  --shadow:0 2px 8px rgba(0,0,0,.08);
-}
-html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text)}
-
-/* ── Layout ────────────────────────────────────────────────── */
-.top-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border)}
-.top-bar h1{font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
-.top-bar .logo{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--green));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
-.top-bar .actions{display:flex;gap:10px;align-items:center}
-.top-bar .actions a,.top-bar .actions button{background:none;border:1px solid var(--border);color:var(--text2);padding:6px 14px;border-radius:6px;cursor:pointer;text-decoration:none;font-size:13px;transition:.2s}
-.top-bar .actions a:hover,.top-bar .actions button:hover{border-color:var(--accent);color:var(--accent)}
-.main{padding:24px;max-width:1400px;margin:0 auto}
-
-/* ── Stats Row ─────────────────────────────────────────────── */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;box-shadow:var(--shadow)}
-.stat-card .value{font-size:32px;font-weight:700;margin-bottom:4px}
-.stat-card .label{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
-.stat-card.up .value{color:var(--green)}
-.stat-card.down .value{color:var(--red)}
-.stat-card.warn .value{color:var(--yellow)}
-.stat-card.total .value{color:var(--accent)}
-
-/* ── Section ───────────────────────────────────────────────── */
-.section{margin-bottom:28px}
-.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.section-head h2{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
-.section-head h2 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.section-head .count{font-size:12px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:12px;margin-left:6px}
-.add-btn{background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:.2s}
-.add-btn:hover{background:var(--accent2)}
-
-/* ── Cards Grid ────────────────────────────────────────────── */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);transition:.2s;position:relative}
-.card:hover{border-color:var(--accent);transform:translateY(-1px)}
-.card .status-dot{width:10px;height:10px;border-radius:50%;position:absolute;top:16px;right:16px}
-.card .status-dot.up{background:var(--green);box-shadow:0 0 6px var(--green)}
-.card .status-dot.down{background:var(--red);box-shadow:0 0 6px var(--red)}
-.card .status-dot.warning{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
-.card .status-dot.unknown{background:var(--text2)}
-.card .card-name{font-size:14px;font-weight:600;margin-bottom:4px;padding-right:24px}
-.card .card-sub{font-size:12px;color:var(--text2);margin-bottom:10px}
-.card .card-meta{display:flex;gap:16px;font-size:12px;color:var(--text2)}
-.card .card-meta span{display:flex;align-items:center;gap:4px}
-.card .card-actions{display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
-.card .card-actions button{background:none;border:1px solid var(--border);color:var(--text2);padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;transition:.15s}
-.card .card-actions button:hover{border-color:var(--accent);color:var(--accent)}
-.card .card-actions button.del:hover{border-color:var(--red);color:var(--red)}
-
-/* ── Incidents ─────────────────────────────────────────────── */
-.incident-list{display:flex;flex-direction:column;gap:8px}
-.incident{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:13px}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:#fff;min-height:100vh;overflow-x:hidden}
+.header{background:rgba(0,0,0,.3);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.1)}
+.header h1{font-size:1.35em;font-weight:700;display:flex;align-items:center;gap:10px;text-shadow:1px 1px 3px rgba(0,0,0,.5)}
+.header .logo{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
+.header-sub{color:rgba(255,255,255,.5);font-size:.78em;margin-top:2px}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.header-right a,.header-right button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:5px 13px;border-radius:20px;cursor:pointer;font-size:.8em;text-decoration:none;transition:.2s}
+.header-right a:hover,.header-right button:hover{background:rgba(255,255,255,.2);color:#fff}
+.status-banner{padding:8px 20px;text-align:center;font-size:.86em;font-weight:600;transition:background .4s}
+.status-banner.ok{background:#28a745}.status-banner.warning{background:#e6a817;color:#000}.status-banner.alert{background:#dc3545;animation:sbpulse 2s infinite}
+@keyframes sbpulse{0%,100%{opacity:1}50%{opacity:.75}}
+.metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;padding:14px 24px;max-width:1600px;margin:0 auto}
+.mc{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 10px;text-align:center;transition:transform .2s,background .2s}
+.mc:hover{transform:translateY(-2px);background:rgba(255,255,255,.14)}
+.mc-val{font-size:1.7em;font-weight:700;line-height:1}
+.mc-label{font-size:.64em;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.mc-val.g{color:#4caf50}.mc-val.r{color:#f44336}.mc-val.a{color:#ff9800}.mc-val.b{color:#64b5f6}.mc-val.w{color:#e0e0e0}.mc-val.y{color:#ffd54f}
+.section-title{padding:5px 24px 7px;max-width:1600px;margin:0 auto;color:rgba(255,255,255,.45);font-size:.73em;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;justify-content:space-between}
+.add-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:4px 12px;border-radius:16px;cursor:pointer;font-size:.76em;font-weight:600;transition:.2s;letter-spacing:.02em}
+.add-btn:hover{background:rgba(100,181,246,.35);border-color:#64b5f6}
+.cards-wrap{padding:0 24px 4px;max-width:1600px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px}
+.card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:15px;backdrop-filter:blur(8px);transition:all .25s;position:relative;overflow:hidden}
+.card:hover{transform:translateY(-2px);border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.12)}
+.card .status-dot{width:9px;height:9px;border-radius:50%;position:absolute;top:15px;right:15px}
+.card .status-dot.up{background:#4caf50;box-shadow:0 0 6px #4caf50}.card .status-dot.down{background:#f44336;box-shadow:0 0 6px #f44336}.card .status-dot.warning{background:#ff9800;box-shadow:0 0 6px #ff9800}.card .status-dot.unknown{background:rgba(255,255,255,.3)}
+.card .card-name{font-size:.93em;font-weight:700;margin-bottom:2px;padding-right:20px}
+.card .card-sub{font-size:.72em;color:rgba(255,255,255,.42);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .card-meta{display:flex;gap:12px;font-size:.73em;color:rgba(255,255,255,.5)}
+.card .card-actions{display:flex;gap:6px;margin-top:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:9px;flex-wrap:wrap}
+.card .card-actions button{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:3px 9px;border-radius:5px;cursor:pointer;font-size:.7em;transition:.15s}
+.card .card-actions button:hover{border-color:#64b5f6;color:#64b5f6}.card .card-actions button.del:hover{border-color:#f44336;color:#f44336}
+.agent-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:9px 0 4px;padding:8px;background:rgba(0,0,0,.2);border-radius:8px;border:1px solid rgba(255,255,255,.06)}
+.agent-pill{text-align:center}
+.agent-pill .ap-val{font-size:.85em;font-weight:700;color:#64b5f6}
+.agent-pill .ap-val.warn{color:#ff9800}.agent-pill .ap-val.crit{color:#f44336}
+.agent-pill .ap-label{font-size:.58em;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.pbar{height:4px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;margin-top:3px}
+.pbar .fill{height:100%;border-radius:3px;transition:width .4s}
+.pbar .fill.g{background:#4caf50}.pbar .fill.a{background:#ff9800}.pbar .fill.r{background:#f44336}
+.details-toggle{font-size:.67em;color:rgba(100,181,246,.7);cursor:pointer;padding:3px 0;user-select:none;display:flex;align-items:center;gap:4px;margin-top:4px;grid-column:1/-1}
+.details-toggle:hover{color:#64b5f6}
+.details-body{display:none;grid-column:1/-1;margin-top:6px}
+.details-body.open{display:block}
+.proc-list{display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto}
+.proc-row{display:flex;justify-content:space-between;font-size:.7em;padding:3px 6px;background:rgba(255,255,255,.05);border-radius:4px}
+.proc-row .proc-name{flex:1;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proc-row .proc-stat{color:rgba(255,255,255,.45);flex-shrink:0;margin-left:8px}
+.proc-row .proc-stat.ok{color:#4caf50}.proc-row .proc-stat.bad{color:#f44336}
+.svc-table{width:100%;font-size:.68em;border-collapse:collapse}
+.svc-table td{padding:3px 5px;border-bottom:1px solid rgba(255,255,255,.05)}
+.svc-table tr:last-child td{border-bottom:none}
+.sites-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.site-card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:13px;backdrop-filter:blur(6px);transition:all .25s}
+.site-card:hover{transform:translateY(-2px);background:rgba(255,255,255,.12)}
+.site-card .sc-name{font-size:.88em;font-weight:700;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.site-card .sc-stats{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.site-card .sc-stat{background:rgba(0,0,0,.2);border-radius:6px;padding:6px;text-align:center}
+.site-card .sc-stat .sv{font-size:1.05em;font-weight:700;color:#64b5f6}
+.site-card .sc-stat .sl{font-size:.57em;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.code-pills{display:flex;gap:4px;margin-top:7px;flex-wrap:wrap}
+.code-pill{background:rgba(255,255,255,.1);border-radius:5px;padding:2px 6px;font-size:.63em;font-weight:600}
+.code-pill.c2{background:rgba(76,175,80,.25);color:#81c784}.code-pill.c3{background:rgba(255,193,7,.2);color:#ffd54f}.code-pill.c4{background:rgba(255,152,0,.25);color:#ffb74d}.code-pill.c5{background:rgba(244,67,54,.25);color:#e57373}
+.feed-wrap{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:13px;backdrop-filter:blur(6px);max-height:320px;overflow:hidden;display:flex;flex-direction:column}
+.feed-wrap .fw-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.feed-wrap .fw-title{font-size:.75em;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5)}
+.feed-live{display:flex;align-items:center;gap:4px;font-size:.65em;color:#4caf50}
+.feed-live::before{content:'';width:6px;height:6px;background:#4caf50;border-radius:50%;display:inline-block;animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.feed-scroll{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
+.feed-row{display:grid;grid-template-columns:52px 38px 1fr 72px 38px 85px;gap:5px;font-size:.66em;padding:3px 5px;border-radius:4px;align-items:center}
+.feed-row:hover{background:rgba(255,255,255,.05)}
+.feed-row .f-time{color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums}
+.feed-row .f-meth{font-weight:700;color:#64b5f6}
+.feed-row .f-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.7)}
+.feed-row .f-site{color:rgba(255,255,255,.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-row .f-ip{color:rgba(255,255,255,.3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f-code.c2{color:#81c784}.f-code.c3{color:#ffd54f}.f-code.c4{color:#ffb74d}.f-code.c5{color:#e57373}
+.proxmox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;margin-bottom:16px}
+.pve-card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:15px;backdrop-filter:blur(8px)}
+.pve-card .pve-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.pve-card .pve-name{font-size:.92em;font-weight:700}
+.pve-card .pve-status{font-size:.66em;padding:2px 8px;border-radius:10px}
+.pve-card .pve-status.up{background:rgba(76,175,80,.25);color:#81c784}.pve-card .pve-status.down{background:rgba(244,67,54,.2);color:#e57373}.pve-card .pve-status.unknown{background:rgba(255,255,255,.1);color:rgba(255,255,255,.5)}
+.pve-node-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:10px}
+.pve-ns{background:rgba(0,0,0,.2);border-radius:6px;padding:6px;text-align:center}
+.pve-ns .nv{font-size:1em;font-weight:700;color:#64b5f6}.pve-ns .nl{font-size:.57em;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.ct-list{display:flex;flex-direction:column;gap:5px}
+.ct-row{background:rgba(0,0,0,.15);border-radius:7px;padding:7px}
+.ct-row .ct-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.ct-row .ct-name{font-size:.76em;font-weight:600}
+.ct-row .ct-vmid{font-size:.63em;color:rgba(255,255,255,.35)}
+.ct-st{font-size:.62em;padding:1px 5px;border-radius:8px}
+.ct-st.running{background:rgba(76,175,80,.2);color:#81c784}.ct-st.stopped{background:rgba(244,67,54,.15);color:#e57373}.ct-st.paused{background:rgba(255,152,0,.2);color:#ffb74d}
+.ct-bars{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+.ct-bar{text-align:center}
+.ct-bar .cb-val{font-size:.67em;color:rgba(255,255,255,.65);margin-bottom:2px}
+.ct-bar .cb-lbl{font-size:.57em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.03em}
+.pve-actions{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)}
+.pve-btn{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:3px 9px;border-radius:5px;cursor:pointer;font-size:.7em;transition:.15s}
+.pve-btn:hover{border-color:#64b5f6;color:#64b5f6}.pve-btn.del:hover{border-color:#f44336;color:#f44336}
+.incident-list{display:flex;flex-direction:column;gap:7px}
+.incident{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);border-radius:10px;padding:11px 15px;display:flex;align-items:center;gap:12px;font-size:.8em;backdrop-filter:blur(4px)}
 .incident .i-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.incident .i-dot.open{background:var(--red)}
-.incident .i-dot.resolved{background:var(--green)}
-.incident .i-info{flex:1}
-.incident .i-time{color:var(--text2);font-size:11px}
-
-/* ── Modal ─────────────────────────────────────────────────── */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;align-items:center;justify-content:center}
+.incident .i-dot.open{background:#f44336;box-shadow:0 0 5px #f44336}.incident .i-dot.resolved{background:#4caf50}
+.incident .i-info{flex:1;color:rgba(255,255,255,.8)}.incident .i-time{color:rgba(255,255,255,.35);font-size:.85em;white-space:nowrap}
+.empty{text-align:center;padding:32px 20px;color:rgba(255,255,255,.35);font-size:.82em}
+.empty .empty-icon{font-size:32px;margin-bottom:8px;opacity:.35}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
 .modal-overlay.active{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;min-width:400px;max-width:500px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.4)}
-.modal h3{font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
-.modal label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;margin-top:12px}
-.modal input,.modal select{width:100%;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none}
-.modal input:focus,.modal select:focus{border-color:var(--accent)}
-.modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
-.modal .modal-actions button{padding:8px 18px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:13px;font-weight:500;transition:.2s}
-.modal .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-.modal .btn-primary:hover{background:var(--accent2)}
-.modal .btn-cancel{background:none;color:var(--text2)}
-.modal .btn-cancel:hover{color:var(--text)}
-
-/* ── Toast ─────────────────────────────────────────────────── */
+.modal{background:rgba(18,35,70,.97);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:24px;min-width:400px;max-width:520px;width:90%;box-shadow:0 12px 50px rgba(0,0,0,.6);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:.97em;font-weight:700;margin-bottom:14px;color:#64b5f6}
+.modal label{display:block;font-size:.7em;color:rgba(255,255,255,.5);margin-bottom:3px;margin-top:11px;text-transform:uppercase;letter-spacing:.04em}
+.modal input,.modal select{width:100%;padding:8px 11px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:7px;color:#fff;font-size:.86em;outline:none;transition:.2s}
+.modal input:focus,.modal select:focus{border-color:#64b5f6;background:rgba(255,255,255,.1)}
+.modal select option{background:#1e3c72;color:#fff}
+.modal .hint{font-size:.67em;color:rgba(255,255,255,.35);margin-top:3px}
+.modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.modal .modal-actions button{padding:7px 16px;border-radius:8px;border:1px solid rgba(255,255,255,.2);cursor:pointer;font-size:.8em;font-weight:600;transition:.2s}
+.modal .btn-primary{background:#1e88e5;color:#fff;border-color:#1e88e5}.modal .btn-primary:hover{background:#1565c0}
+.modal .btn-cancel{background:rgba(255,255,255,.07);color:rgba(255,255,255,.7)}.modal .btn-cancel:hover{background:rgba(255,255,255,.14);color:#fff}
 .toast-container{position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px}
-.toast{padding:12px 20px;border-radius:8px;font-size:13px;color:#fff;box-shadow:var(--shadow);animation:slideIn .3s ease}
-.toast.success{background:var(--green)}
-.toast.error{background:var(--red)}
-.toast.info{background:var(--accent)}
+.toast{padding:10px 16px;border-radius:8px;font-size:.8em;font-weight:600;color:#fff;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:slideIn .3s ease;backdrop-filter:blur(6px)}
+.toast.success{background:rgba(76,175,80,.88)}.toast.error{background:rgba(244,67,54,.88)}.toast.info{background:rgba(30,136,229,.88)}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-
-/* ── Empty state ───────────────────────────────────────────── */
-.empty{text-align:center;padding:40px 20px;color:var(--text2);font-size:14px}
-.empty .empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
-
-/* ── Responsive ────────────────────────────────────────────── */
-@media(max-width:640px){.main{padding:16px}.stats{grid-template-columns:repeat(2,1fr)}.cards{grid-template-columns:1fr}.modal{min-width:auto}}
+#clock{font-size:.8em;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;min-width:62px;text-align:right}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 24px 4px;max-width:1600px;margin:0 auto}
+.flags-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.flag-check{display:flex;align-items:center;gap:6px;font-size:.8em;color:rgba(255,255,255,.7);cursor:pointer;padding:4px 6px;border-radius:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);transition:.15s}
+.flag-check:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15)}
+.flag-check input[type="checkbox"]{accent-color:#1e88e5;width:15px;height:15px;cursor:pointer}
+.ssh-section{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)}
+.ssh-section-title{font-size:.72em;color:#64b5f6;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+@media(max-width:1100px){.two-col{grid-template-columns:1fr}}
+@media(max-width:900px){.header{flex-direction:column;gap:8px;text-align:center;padding:10px 14px}.cards{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.cards{grid-template-columns:1fr}.metrics-strip{grid-template-columns:repeat(2,1fr)}.cards-wrap{padding:0 12px 4px}.section-title{padding:5px 12px 7px}.two-col{padding:0 12px 4px}}
 </style>
 </head>
 <body>
-<div class="top-bar">
-  <h1><div class="logo">¢</div> <span id="appTitle">¢entien¢</span></h1>
-  <div class="actions">
-    <a href="/admin">⚙ Admin</a>
-    <button onclick="toggleTheme()" id="themeBtn">☀ Light</button>
+<div class="header">
+  <div>
+    <h1><img class="logo" src="/static/centienc-logo.png" alt="logo"> <span id="appTitle">&#xa2;entien&#xa2;</span></h1>
+    <div class="header-sub">Infrastructure Monitoring &middot; real-time</div>
+  </div>
+  <div class="header-right">
+    <a href="/admin">&#x2699; Admin</a>
     <button onclick="logout()" id="logoutBtn" style="display:none">Logout</button>
+    <span id="clock">--:--:--</span>
   </div>
 </div>
-
-<div class="main">
-  <!-- Stats -->
-  <div class="stats">
-    <div class="stat-card total"><div class="value" id="statTotal">—</div><div class="label">Total Monitors</div></div>
-    <div class="stat-card up"><div class="value" id="statUp">—</div><div class="label">Healthy</div></div>
-    <div class="stat-card down"><div class="value" id="statDown">—</div><div class="label">Down</div></div>
-    <div class="stat-card warn"><div class="value" id="statUptime">—</div><div class="label">Uptime %</div></div>
-  </div>
-
-  <!-- Servers -->
-  <div class="section">
-    <div class="section-head">
-      <h2><span class="dot" style="background:var(--accent)"></span> Servers <span class="count" id="serverCount">0</span></h2>
-      <button class="add-btn" onclick="openModal('server')">+ Add Server</button>
+<div class="status-banner ok" id="statusBanner">&#x1F7E2; All systems operational</div>
+<div class="metrics-strip">
+  <div class="mc"><div class="mc-val w" id="statTotal">&#x2014;</div><div class="mc-label">Total</div></div>
+  <div class="mc"><div class="mc-val g" id="statUp">&#x2014;</div><div class="mc-label">Healthy</div></div>
+  <div class="mc"><div class="mc-val r" id="statDown">&#x2014;</div><div class="mc-label">Down</div></div>
+  <div class="mc"><div class="mc-val b" id="statUptime">&#x2014;</div><div class="mc-label">Uptime %</div></div>
+  <div class="mc"><div class="mc-val b" id="statRpm">&#x2014;</div><div class="mc-label">Req/min</div></div>
+  <div class="mc"><div class="mc-val y" id="statBanned">&#x2014;</div><div class="mc-label">IPs Banned</div></div>
+  <div class="mc"><div class="mc-val a" id="statActiveBans">&#x2014;</div><div class="mc-label">Active Bans</div></div>
+</div>
+<div class="section-title" style="margin-top:4px">
+  <span>Servers <span id="serverCount" style="opacity:.6;margin-left:4px">0</span></span>
+  <button class="add-btn" onclick="openModal('server')">+ Add Server</button>
+</div>
+<div class="cards-wrap"><div class="cards" id="serverCards"></div></div>
+<div class="section-title">
+  <span>Nginx Sites</span>
+</div>
+<div class="two-col">
+  <div><div class="sites-grid" id="siteCards"></div></div>
+  <div>
+    <div class="feed-wrap">
+      <div class="fw-header"><span class="fw-title">Live Request Feed</span><span class="feed-live">Live</span></div>
+      <div class="feed-scroll" id="requestFeed"></div>
     </div>
-    <div class="cards" id="serverCards"></div>
-  </div>
-
-  <!-- Services -->
-  <div class="section">
-    <div class="section-head">
-      <h2><span class="dot" style="background:var(--green)"></span> Services <span class="count" id="serviceCount">0</span></h2>
-      <button class="add-btn" onclick="openModal('service')">+ Add Service</button>
-    </div>
-    <div class="cards" id="serviceCards"></div>
-  </div>
-
-  <!-- Websites -->
-  <div class="section">
-    <div class="section-head">
-      <h2><span class="dot" style="background:var(--yellow)"></span> Websites <span class="count" id="websiteCount">0</span></h2>
-      <button class="add-btn" onclick="openModal('website')">+ Add Website</button>
-    </div>
-    <div class="cards" id="websiteCards"></div>
-  </div>
-
-  <!-- Incidents -->
-  <div class="section">
-    <div class="section-head">
-      <h2><span class="dot" style="background:var(--red)"></span> Recent Incidents</h2>
-    </div>
-    <div class="incident-list" id="incidentList"></div>
   </div>
 </div>
-
-<!-- Add/Edit Modal -->
+<div class="section-title">
+  <span>Proxmox <span id="proxmoxCount" style="opacity:.6;margin-left:4px">0</span></span>
+  <button class="add-btn" onclick="openModal('proxmox')">+ Add Node</button>
+</div>
+<div class="cards-wrap"><div class="proxmox-grid" id="proxmoxCards"></div></div>
+<div class="section-title">
+  <span>Services <span id="serviceCount" style="opacity:.6;margin-left:4px">0</span></span>
+  <button class="add-btn" onclick="openModal('service')">+ Add Service</button>
+</div>
+<div class="cards-wrap"><div class="cards" id="serviceCards"></div></div>
+<div class="section-title">
+  <span>Websites <span id="websiteCount" style="opacity:.6;margin-left:4px">0</span></span>
+  <button class="add-btn" onclick="openModal('website')">+ Add Website</button>
+</div>
+<div class="cards-wrap"><div class="cards" id="websiteCards"></div></div>
+<div class="section-title">Recent Incidents</div>
+<div class="cards-wrap" style="margin-bottom:30px"><div class="incident-list" id="incidentList"></div></div>
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
-  <div class="modal" id="modal">
-    <h3 id="modalTitle">Add Server</h3>
+  <div class="modal">
+    <h3 id="modalTitle">Add</h3>
     <div id="modalBody"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
-      <button class="btn-primary" id="modalSave" onclick="saveModal()">Save</button>
+      <button class="btn-primary" onclick="saveModal()">Save</button>
     </div>
   </div>
 </div>
-
 <div class="toast-container" id="toasts"></div>
-
 <script>
-/* ── State ──────────────────────────────────────────────────── */
-let currentTheme='dark', modalType='', modalEditId=null;
-
-/* ── API helpers ───────────────────────────────────────────── */
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false})}
+updateClock();setInterval(updateClock,1000);
+let modalType='',modalEditId=null;
 async function api(path,opts={}){
   const r=await fetch(path,{headers:{'Content-Type':'application/json'},...opts});
   if(r.status===401){location.href='/login';return null}
@@ -188,204 +232,369 @@ async function api(path,opts={}){
   if(!r.ok)throw new Error(d.detail||'Request failed');
   return d;
 }
-
-/* ── Toast ──────────────────────────────────────────────────── */
-function toast(msg,type='info'){
-  const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;
-  document.getElementById('toasts').appendChild(t);
-  setTimeout(()=>t.remove(),3500);
-}
-
-/* ── Theme ─────────────────────────────────────────────────── */
-function toggleTheme(){
-  currentTheme=currentTheme==='dark'?'light':'dark';
-  document.documentElement.setAttribute('data-theme',currentTheme);
-  document.getElementById('themeBtn').textContent=currentTheme==='dark'?'☀ Light':'🌙 Dark';
-  localStorage.setItem('centient_theme',currentTheme);
-}
-function loadTheme(t){currentTheme=t||'dark';document.documentElement.setAttribute('data-theme',currentTheme);document.getElementById('themeBtn').textContent=currentTheme==='dark'?'☀ Light':'🌙 Dark'}
-
-/* ── Auth ──────────────────────────────────────────────────── */
+function toast(msg,type='info'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>t.remove(),3500)}
 async function logout(){await api('/api/auth/logout',{method:'POST'}).catch(()=>{});location.href='/login'}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+function el(id){return document.getElementById(id)}
+function fmtUptime(s){if(!s||s<0)return '\u2014';const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);return d>0?`${d}d ${h}h`:`${h}h ${m}m`}
+function barClass(p){return p>85?'r':p>60?'a':'g'}
+function fmtDur(s){if(s<60)return s+'s';if(s<3600)return Math.round(s/60)+'m';return Math.round(s/3600)+'h '+Math.round((s%3600)/60)+'m'}
+function fmtTime(ts){return new Date(ts*1000).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'})}
 
-/* ── Load data ─────────────────────────────────────────────── */
 async function loadDashboard(){
   try{
     const d=await api('/api/overview');
     if(!d)return;
-
-    // Settings
-    document.getElementById('appTitle').textContent=d.settings?.app_title||'¢entien¢';
-    document.title=d.settings?.app_title||'¢entien¢';
-    loadTheme(localStorage.getItem('centient_theme')||d.settings?.theme||'dark');
-    document.getElementById('logoutBtn').style.display=d.settings?.auth_enabled==='true'?'':'none';
-
-    // Stats
+    const title=d.settings?.app_title||'\u00a2entien\u00a2';
+    el('appTitle').textContent=title;document.title=title;
+    el('logoutBtn').style.display=d.settings?.auth_enabled==='true'?'':'none';
     const s=d.stats||{};
-    document.getElementById('statTotal').textContent=s.total||0;
-    document.getElementById('statUp').textContent=s.up||0;
-    document.getElementById('statDown').textContent=s.down||0;
-    document.getElementById('statUptime').textContent=(s.uptime_pct??100)+'%';
-
-    // Servers
-    renderCards('serverCards','serverCount',d.servers||[],'server');
-    renderCards('serviceCards','serviceCount',d.services||[],'service');
-    renderCards('websiteCards','websiteCount',d.websites||[],'website');
-
-    // Incidents
+    el('statTotal').textContent=s.total||0;el('statUp').textContent=s.up||0;
+    el('statDown').textContent=s.down||0;el('statUptime').textContent=(s.uptime_pct??100)+'%';
+    const ng=d.nginx||{};
+    el('statRpm').textContent=(ng.total_rpm||0).toFixed(1);
+    const fb=d.fail2ban||{};
+    el('statBanned').textContent=fb.total_banned||0;el('statActiveBans').textContent=fb.active_bans||0;
+    const tot=s.total||0,dn=s.down||0,up=s.up||0;
+    const banner=el('statusBanner');
+    if(dn===0&&tot>0){banner.className='status-banner ok';banner.textContent='\u{1F7E2} All systems operational'}
+    else if(dn>0&&dn<tot){banner.className='status-banner warning';banner.textContent=`\u26A0 ${dn} monitor${dn>1?'s':''} down \u2014 ${up} healthy`}
+    else if(dn>=tot&&tot>0){banner.className='status-banner alert';banner.textContent='\u{1F534} All monitors down'}
+    else{banner.className='status-banner ok';banner.textContent='\u{1F7E2} No monitors configured yet'}
+    renderServers(d.servers||[]);
+    renderSimpleCards('serviceCards','serviceCount',d.services||[],'service');
+    renderSimpleCards('websiteCards','websiteCount',d.websites||[],'website');
+    renderSites(d.servers||[]);
+    renderFeed(ng.recent_requests||[]);
+    renderProxmox(d.proxmox_nodes||[]);
     renderIncidents(d.incidents||[]);
-  }catch(e){console.error('Dashboard load error:',e)}
+  }catch(e){console.error('Load error:',e)}
 }
 
-function renderCards(containerId,countId,items,type){
-  document.getElementById(countId).textContent=items.length;
-  const c=document.getElementById(containerId);
-  if(!items.length){c.innerHTML='<div class="empty"><div class="empty-icon">📡</div>No '+type+'s configured yet</div>';return}
+function renderServers(servers){
+  el('serverCount').textContent=servers.length;
+  const c=el('serverCards');
+  if(!servers.length){c.innerHTML='<div class="empty"><div class="empty-icon">\uD83D\uDDA5</div>No servers configured yet</div>';return}
+  c.innerHTML=servers.map(s=>{
+    const st=s.live_status||s.status||'unknown';
+    const rt=s.response_time!=null?s.response_time.toFixed(1)+'ms':'\u2014';
+    const sub=(s.ip_address||s.hostname||'')+(s.type?' \u00b7 '+s.type:'');
+    const ssh=s.ssh;
+    let sshHTML='';
+    if(ssh&&!ssh.error&&ssh.metrics){
+      const m=ssh.metrics;const cpu=m.cpu_pct??0;const mem=(m.memory||{}).used_pct??0;const disk=(m.disk||{}).used_pct??0;const conn=m.connections??0;
+      const cc=barClass(cpu),mc=barClass(mem),dc=barClass(disk);
+      const pm2=ssh.pm2||[];const pm2r=pm2.filter(p=>p.status==='online').length;
+      sshHTML=`<div class="agent-strip">
+        <div class="agent-pill"><div class="ap-val ${cc}">${cpu.toFixed(1)}%</div><div class="pbar"><div class="fill ${cc}" style="width:${Math.min(cpu,100)}%"></div></div><div class="ap-label">CPU</div></div>
+        <div class="agent-pill"><div class="ap-val ${mc}">${mem.toFixed(1)}%</div><div class="pbar"><div class="fill ${mc}" style="width:${Math.min(mem,100)}%"></div></div><div class="ap-label">RAM</div></div>
+        <div class="agent-pill"><div class="ap-val ${dc}">${disk.toFixed(1)}%</div><div class="pbar"><div class="fill ${dc}" style="width:${Math.min(disk,100)}%"></div></div><div class="ap-label">Disk</div></div>
+        <div class="agent-pill"><div class="ap-val b">${conn}</div><div class="ap-label">Conns</div></div>
+        ${pm2.length?`<div class="details-toggle" onclick="toggleDet(${s.id},'pm2')">\u25B6 PM2 (${pm2r}/${pm2.length})</div><div class="details-body" id="det-pm2-${s.id}">${renderPm2(pm2)}</div>`:''}
+        ${(ssh.services||[]).length?`<div class="details-toggle" onclick="toggleDet(${s.id},'svc')">\u25B6 Services</div><div class="details-body" id="det-svc-${s.id}">${renderSvcList(ssh.services||[])}</div>`:''}
+      </div>`;
+    } else if(ssh&&ssh.error){
+      sshHTML=`<div class="agent-strip" style="grid-template-columns:1fr"><div style="text-align:center;font-size:.72em;color:#e57373;padding:2px">\u26A0 SSH: ${esc(ssh.error)}</div></div>`;
+    }
+    const hasSSH=!!s.ssh_user;
+    return `<div class="card">
+      <div class="status-dot ${st}"></div>
+      <div class="card-name">${esc(s.name)}</div>
+      <div class="card-sub">${esc(sub)}</div>
+      ${sshHTML}
+      <div class="card-meta" style="margin-top:6px"><span>\u23F1 ${rt}</span><span>\u25CF ${st.toUpperCase()}</span>${ssh&&ssh.metrics?`<span>\u23F3 ${fmtUptime(ssh.metrics.uptime)}</span>`:''}</div>
+      <div class="card-actions">
+        <button onclick="checkNow('server',${s.id})">\u21BB Ping</button>
+        ${hasSSH?`<button onclick="refreshSSH(${s.id})">\u21BB SSH</button>`:''}
+        <button onclick="openModal('server',${s.id})">\u270E Edit</button>
+        <button class="del" onclick="deleteTarget('server',${s.id})">\u2715</button>
+      </div>
+    </div>`
+  }).join('');
+}
+
+function renderPm2(procs){
+  if(!procs.length)return '<div style="font-size:.7em;color:rgba(255,255,255,.35);padding:4px 0">No PM2 processes</div>';
+  return '<div class="proc-list">'+procs.map(p=>`<div class="proc-row"><span class="proc-name">${esc(p.name)}</span><span class="proc-stat ${p.status==='online'?'ok':'bad'}">${p.status}</span><span class="proc-stat">${p.memory_mb}MB</span><span class="proc-stat">${p.restarts}\u21BA</span></div>`).join('')+'</div>';
+}
+
+function renderSvcList(svcs){
+  const notable=['nginx','apache2','apache','mysql','postgresql','mongodb','redis','docker','ssh','fail2ban','postfix','openvpn','certbot','cron','ufw','php','php-fpm'];
+  const shown=svcs.filter(s=>!s.ok||notable.some(n=>s.name.toLowerCase().includes(n))).slice(0,20);
+  if(!shown.length)return '<div style="font-size:.7em;color:rgba(255,255,255,.35);padding:4px 0">No notable services</div>';
+  return '<table class="svc-table"><tbody>'+shown.map(s=>`<tr><td style="color:rgba(255,255,255,.75)">${esc(s.name)}</td><td style="color:${s.ok?'#81c784':'#e57373'}">${s.active}</td><td style="color:rgba(255,255,255,.4)">${s.sub}</td></tr>`).join('')+'</tbody></table>';
+}
+
+function toggleDet(sid,which){
+  const e=document.getElementById(`det-${which}-${sid}`);if(!e)return;
+  const open=e.classList.toggle('open');
+  const tog=e.previousElementSibling;
+  if(tog)tog.textContent=tog.textContent.replace(open?'\u25B6':'\u25BC',open?'\u25BC':'\u25B6');
+}
+
+function renderSimpleCards(cid,countId,items,type){
+  el(countId).textContent=items.length;
+  const c=el(cid);
+  if(!items.length){c.innerHTML='<div class="empty"><div class="empty-icon">\uD83D\uDCE1</div>No '+type+'s configured yet</div>';return}
   c.innerHTML=items.map(i=>{
-    const st=i.status||'unknown';
-    const rt=i.response_time!=null?i.response_time.toFixed(1)+'ms':'—';
-    let sub='';
-    if(type==='server')sub=(i.ip_address||i.hostname||'')+(i.type?' · '+i.type:'');
-    if(type==='service')sub=(i.host||'')+':'+(i.port||'')+(i.type?' · '+i.type:'');
-    if(type==='website')sub=i.url||'';
+    const st=i.live_status||i.status||'unknown';const rt=i.response_time!=null?i.response_time.toFixed(1)+'ms':'\u2014';
+    const sub=type==='service'?(i.host||'')+':'+(i.port||'')+(i.type?' \u00b7 '+i.type:''):(i.url||'');
     return `<div class="card">
       <div class="status-dot ${st}"></div>
       <div class="card-name">${esc(i.name)}</div>
       <div class="card-sub">${esc(sub)}</div>
-      <div class="card-meta">
-        <span>⏱ ${rt}</span>
-        <span>● ${st.toUpperCase()}</span>
-      </div>
+      <div class="card-meta" style="margin-top:8px"><span>\u23F1 ${rt}</span><span>\u25CF ${st.toUpperCase()}</span>${i.status_code?`<span>${i.status_code}</span>`:''}</div>
       <div class="card-actions">
-        <button onclick="checkNow('${type}',${i.id})">↻ Check</button>
-        <button onclick="openModal('${type}',${i.id})">✎ Edit</button>
-        <button class="del" onclick="deleteTarget('${type}',${i.id})">✕ Delete</button>
+        <button onclick="checkNow('${type}',${i.id})">\u21BB Check</button>
+        <button onclick="openModal('${type}',${i.id})">\u270E Edit</button>
+        <button class="del" onclick="deleteTarget('${type}',${i.id})">\u2715</button>
+      </div>
+    </div>`
+  }).join('');
+}
+
+function renderSites(servers){
+  const sites=[];
+  servers.forEach(srv=>{const ng=(srv.ssh||{}).nginx||{};Object.entries(ng.sites||{}).forEach(([name,stats])=>sites.push({name,stats,server:srv.name}));});
+  const c=el('siteCards');
+  if(!sites.length){c.innerHTML='<div class="empty"><div class="empty-icon">\uD83C\uDF10</div>No nginx data &mdash; configure SSH and enable Nginx monitoring</div>';return}
+  c.innerHTML=sites.map(({name,stats,server})=>{
+    const codes=stats.status_codes||{};
+    const cp=Object.entries(codes).filter(([,v])=>v>0).map(([k,v])=>`<span class="code-pill c${k[0]}">${k}: ${v}</span>`).join('');
+    return `<div class="site-card">
+      <div class="sc-name" title="${esc(server)} \u00b7 ${esc(name)}">${esc(name)}</div>
+      <div class="sc-stats">
+        <div class="sc-stat"><div class="sv">${(stats.rpm||0).toFixed(1)}</div><div class="sl">Req/min</div></div>
+        <div class="sc-stat"><div class="sv">${stats.unique_visitors||0}</div><div class="sl">Visitors/${stats.period_minutes||5}m</div></div>
+        <div class="sc-stat"><div class="sv">${stats.total_requests||0}</div><div class="sl">Requests</div></div>
+        <div class="sc-stat"><div class="sv">${esc(server)}</div><div class="sl">Server</div></div>
+      </div>
+      ${cp?`<div class="code-pills">${cp}</div>`:''}
+    </div>`
+  }).join('');
+}
+
+function renderFeed(requests){
+  const c=el('requestFeed');
+  if(!requests.length){c.innerHTML='<div style="font-size:.72em;color:rgba(255,255,255,.3);padding:12px;text-align:center">No requests yet &mdash; enable Nginx monitoring on a server via SSH</div>';return}
+  c.innerHTML=requests.slice(0,80).map(r=>{
+    const code=r.status||0;const cls='c'+Math.floor(code/100);
+    const t=r.ts?fmtTime(r.ts):'\u2014';
+    return `<div class="feed-row">
+      <span class="f-time">${t}</span>
+      <span class="f-meth">${esc(r.method||'')}</span>
+      <span class="f-path" title="${esc(r.path||'')}">${esc(r.path||'')}</span>
+      <span class="f-site">${esc(r.site||r.server_name||'')}</span>
+      <span class="f-code ${cls}">${code}</span>
+      <span class="f-ip">${esc(r.ip||'')}</span>
+    </div>`
+  }).join('');
+}
+
+function renderProxmox(nodes){
+  el('proxmoxCount').textContent=nodes.length;
+  const c=el('proxmoxCards');
+  if(!nodes.length){c.innerHTML='<div class="empty"><div class="empty-icon">\uD83D\uDDA7</div>No Proxmox nodes configured yet</div>';return}
+  c.innerHTML=nodes.map(n=>{
+    const st=n.live_status||'unknown';const ns=n.node_status||{};
+    const err=n.error;
+    const memTot=ns.mem_total||1,memUsed=ns.mem_used||0,memPct=Math.round(memUsed/memTot*100);
+    const upHTML=st==='up'?`<div class="pve-node-stats">
+      <div class="pve-ns"><div class="nv ${barClass(ns.cpu||0)}">${(ns.cpu||0).toFixed(1)}%</div><div class="nl">CPU</div></div>
+      <div class="pve-ns"><div class="nv ${barClass(memPct)}">${memPct}%</div><div class="nl">RAM</div></div>
+      <div class="pve-ns"><div class="nv b">${fmtUptime(ns.uptime)}</div><div class="nl">Uptime</div></div>
+      <div class="pve-ns"><div class="nv w">${(n.containers||[]).length+(n.vms||[]).length}</div><div class="nl">Guests</div></div>
+    </div>`:err?`<div style="padding:8px;font-size:.75em;color:#e57373;background:rgba(244,67,54,.1);border-radius:6px;margin-bottom:8px">\u26A0 ${esc(err)}</div>`:'';
+    const guests=[...(n.containers||[]).map(x=>({...x,kind:'CT'})),...(n.vms||[]).map(x=>({...x,kind:'VM'}))];
+    const gHTML=guests.map(g=>`<div class="ct-row">
+      <div class="ct-head"><span class="ct-name">${esc(g.kind)} ${g.vmid} \u00b7 ${esc(g.name)}</span><span class="ct-st ${g.status||'unknown'}">${g.status||'?'}</span></div>
+      <div class="ct-bars">
+        <div class="ct-bar"><div class="cb-val">${(g.cpu_pct||0).toFixed(1)}%</div><div class="pbar"><div class="fill ${barClass(g.cpu_pct||0)}" style="width:${Math.min(g.cpu_pct||0,100)}%"></div></div><div class="cb-lbl">CPU</div></div>
+        <div class="ct-bar"><div class="cb-val">${(g.mem_pct||0).toFixed(1)}%</div><div class="pbar"><div class="fill ${barClass(g.mem_pct||0)}" style="width:${Math.min(g.mem_pct||0,100)}%"></div></div><div class="cb-lbl">RAM</div></div>
+        <div class="ct-bar"><div class="cb-val">${g.disk_pct!=null?(g.disk_pct||0).toFixed(1)+'%':'\u2014'}</div>${g.disk_pct!=null?`<div class="pbar"><div class="fill ${barClass(g.disk_pct||0)}" style="width:${Math.min(g.disk_pct||0,100)}%"></div></div>`:''}<div class="cb-lbl">Disk</div></div>
+      </div>
+    </div>`).join('');
+    return `<div class="pve-card">
+      <div class="pve-header"><span class="pve-name">${esc(n.name)}</span><span class="pve-status ${st}">${st.toUpperCase()}</span></div>
+      ${upHTML}
+      <div class="ct-list">${gHTML||'<div style="font-size:.73em;color:rgba(255,255,255,.35);padding:5px">No guests running</div>'}</div>
+      <div class="pve-actions">
+        <button class="pve-btn" onclick="refreshProxmox(${n.id})">\u21BB Refresh</button>
+        <button class="pve-btn" onclick="openModal('proxmox',${n.id})">\u270E Edit</button>
+        <button class="pve-btn del" onclick="deleteProxmox(${n.id})">\u2715 Remove</button>
       </div>
     </div>`
   }).join('');
 }
 
 function renderIncidents(items){
-  const c=document.getElementById('incidentList');
-  if(!items.length){c.innerHTML='<div class="empty"><div class="empty-icon">✓</div>No recent incidents</div>';return}
-  c.innerHTML=items.map(i=>{
-    const st=i.status||'open';
-    const dur=i.duration?formatDuration(i.duration):'ongoing';
-    return `<div class="incident">
-      <div class="i-dot ${st}"></div>
-      <div class="i-info">${esc(i.target_type)} #${i.target_id} — ${st} (${dur})</div>
-      <div class="i-time">${i.started_at||''}</div>
-    </div>`
-  }).join('');
+  const c=el('incidentList');
+  if(!items.length){c.innerHTML='<div class="empty"><div class="empty-icon">\u2713</div>No recent incidents</div>';return}
+  c.innerHTML=items.map(i=>`<div class="incident">
+    <div class="i-dot ${i.status||'open'}"></div>
+    <div class="i-info">${esc(i.target_type)} #${i.target_id} \u2014 ${i.status||'open'} (${i.duration?fmtDur(i.duration):'ongoing'})</div>
+    <div class="i-time">${i.started_at||''}</div>
+  </div>`).join('');
 }
 
-function formatDuration(s){if(s<60)return s+'s';if(s<3600)return Math.round(s/60)+'m';return Math.round(s/3600)+'h '+Math.round((s%3600)/60)+'m'}
-function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
+async function checkNow(type,id){try{const d=await api(`/api/${type}s/${id}/check`,{method:'POST'});toast(`${type}: ${d.status||'done'}`,'success');loadDashboard()}catch(e){toast(e.message,'error')}}
+async function refreshSSH(sid){try{await api(`/api/servers/${sid}/ssh-refresh`,{method:'POST'});toast('SSH refresh complete','success');loadDashboard()}catch(e){toast(e.message,'error')}}
+async function refreshProxmox(nid){try{await api(`/api/proxmox/${nid}/refresh`,{method:'POST'});toast('Proxmox refreshed','success');loadDashboard()}catch(e){toast(e.message,'error')}}
+async function deleteTarget(type,id){if(!confirm(`Delete this ${type}?`))return;try{await api(`/api/${type}s/${id}`,{method:'DELETE'});toast(`${type} deleted`,'success');loadDashboard()}catch(e){toast(e.message,'error')}}
+async function deleteProxmox(id){if(!confirm('Delete this Proxmox node?'))return;try{await api(`/api/proxmox/${id}`,{method:'DELETE'});toast('Node deleted','success');loadDashboard()}catch(e){toast(e.message,'error')}}
 
-/* ── Check now ─────────────────────────────────────────────── */
-async function checkNow(type,id){
-  try{
-    const d=await api(`/api/${type}s/${id}/check`,{method:'POST'});
-    toast(`${type} check: ${d.status||'done'}`,'success');
-    loadDashboard();
-  }catch(e){toast(e.message,'error')}
-}
-
-/* ── Delete ─────────────────────────────────────────────────── */
-async function deleteTarget(type,id){
-  if(!confirm(`Delete this ${type}?`))return;
-  try{
-    await api(`/api/${type}s/${id}`,{method:'DELETE'});
-    toast(`${type} deleted`,'success');
-    loadDashboard();
-  }catch(e){toast(e.message,'error')}
-}
-
-/* ── Modal ─────────────────────────────────────────────────── */
 function openModal(type,editId=null){
   modalType=type;modalEditId=editId;
-  document.getElementById('modalTitle').textContent=(editId?'Edit ':'Add ')+type.charAt(0).toUpperCase()+type.slice(1);
+  el('modalTitle').textContent=(editId?'Edit ':'Add ')+type.charAt(0).toUpperCase()+type.slice(1);
   let html='';
   if(type==='server'){
     html=`<label>Name</label><input id="fName" placeholder="Production Server">
-          <label>Hostname</label><input id="fHostname" placeholder="srv1.example.com">
-          <label>IP Address</label><input id="fIP" placeholder="10.0.0.1">
-          <label>Type</label><select id="fType"><option value="linux">Linux</option><option value="windows">Windows</option><option value="proxmox">Proxmox</option><option value="other">Other</option></select>
-          <label>SSH Port</label><input id="fPort" type="number" value="22">
-          <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
+      <label>Hostname / IP</label><input id="fHostname" placeholder="srv1.example.com">
+      <label>IP Address (optional)</label><input id="fIP" placeholder="10.0.0.1">
+      <label>Type</label><select id="fType"><option value="linux">Linux</option><option value="windows">Windows</option><option value="other">Other</option></select>
+      <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">
+      <div class="ssh-section">
+        <div class="ssh-section-title">\uD83D\uDD11 SSH Connection</div>
+        <div class="hint" style="margin-bottom:8px">Configure SSH to collect CPU, RAM, disk, and more from this server. Uses key-based auth by default (~/.ssh/id_rsa), or specify a password.</div>
+        <label>SSH User</label><input id="fSSHUser" placeholder="root" value="root">
+        <label>SSH Port</label><input id="fSSHPort" type="number" value="22">
+        <label>SSH Key Path (optional)</label><input id="fSSHKeyPath" placeholder="~/.ssh/id_rsa">
+        <div class="hint">Leave blank to use system default SSH keys</div>
+        <label>SSH Password (optional)</label><input id="fSSHPassword" type="password" placeholder="Only needed if no SSH key">
+        <label>Sudo Password (optional)</label><input id="fSudoPassword" type="password" placeholder="For fail2ban, nginx logs, etc.">
+      </div>
+      <div class="ssh-section">
+        <div class="ssh-section-title">\u2611 Monitoring Options</div>
+        <div class="hint" style="margin-bottom:6px">Choose what to monitor on this server via SSH.</div>
+        <div class="flags-grid">
+          <label class="flag-check"><input type="checkbox" id="fFlagSystem" checked> System Metrics</label>
+          <label class="flag-check"><input type="checkbox" id="fFlagNginx"> Nginx</label>
+          <label class="flag-check"><input type="checkbox" id="fFlagPm2"> PM2 Processes</label>
+          <label class="flag-check"><input type="checkbox" id="fFlagServices"> Systemd Services</label>
+          <label class="flag-check"><input type="checkbox" id="fFlagFail2ban"> Fail2ban</label>
+        </div>
+      </div>`;
   }else if(type==='service'){
-    html=`<label>Name</label><input id="fName" placeholder="SSH,Nginx,etc.">
-          <label>Type</label><select id="fType"><option value="ssh">SSH</option><option value="http">HTTP</option><option value="https">HTTPS</option><option value="database">Database</option><option value="smtp">SMTP</option><option value="custom">Custom</option></select>
-          <label>Host</label><input id="fHost" placeholder="10.0.0.1">
-          <label>Port</label><input id="fPort" type="number" placeholder="22">
-          <label>Timeout (s)</label><input id="fTimeout" type="number" value="10">
-          <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
+    html=`<label>Name</label><input id="fName" placeholder="SSH, Nginx, etc.">
+      <label>Type</label><select id="fType"><option value="tcp">TCP</option><option value="ssh">SSH</option><option value="http">HTTP</option><option value="database">Database</option><option value="smtp">SMTP</option><option value="custom">Custom</option></select>
+      <label>Host</label><input id="fHost" placeholder="10.0.0.1">
+      <label>Port</label><input id="fPort" type="number" placeholder="22">
+      <label>Timeout (s)</label><input id="fTimeout" type="number" value="10">
+      <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
   }else if(type==='website'){
     html=`<label>Name</label><input id="fName" placeholder="Company Website">
-          <label>URL</label><input id="fURL" placeholder="https://example.com">
-          <label>Method</label><select id="fMethod"><option>GET</option><option>HEAD</option><option>POST</option></select>
-          <label>Expected Status</label><input id="fExpected" type="number" value="200">
-          <label>Timeout (s)</label><input id="fTimeout" type="number" value="15">
-          <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
+      <label>URL</label><input id="fURL" placeholder="https://example.com">
+      <label>Method</label><select id="fMethod"><option>GET</option><option>HEAD</option><option>POST</option></select>
+      <label>Expected Status</label><input id="fExpected" type="number" value="200">
+      <label>Timeout (s)</label><input id="fTimeout" type="number" value="15">
+      <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
+  }else if(type==='proxmox'){
+    html=`<label>Display Name</label><input id="fName" placeholder="Main Proxmox">
+      <label>Host (IP or hostname)</label><input id="fHost" placeholder="192.168.1.10">
+      <label>Port</label><input id="fPort" type="number" value="8006">
+      <label>PVE Node name</label><input id="fNode" placeholder="pve">
+      <label>API User (e.g. root@pam)</label><input id="fUser" placeholder="root@pam">
+      <label>API Token ID</label><input id="fTokenId" placeholder="monitoring">
+      <label>API Token Secret</label><input id="fTokenSecret" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+      <div class="hint">Create in Proxmox: Datacenter &rarr; Permissions &rarr; API Tokens. Assign PVEAuditor role.</div>
+      <label>Verify SSL</label><select id="fVerifySsl"><option value="0">No (self-signed OK)</option><option value="1">Yes</option></select>
+      <label>Check Interval (s)</label><input id="fInterval" type="number" value="60">`;
   }
-  document.getElementById('modalBody').innerHTML=html;
-  document.getElementById('modalOverlay').classList.add('active');
-
-  // If editing, load current values
+  el('modalBody').innerHTML=html;
+  el('modalOverlay').classList.add('active');
   if(editId)loadEditValues(type,editId);
 }
 
 async function loadEditValues(type,id){
   try{
-    const d=await api(`/api/${type}s`);
-    const items=d[type+'s']||[];
-    const item=items.find(i=>i.id===id);
+    const endpoint=type==='proxmox'?'/api/proxmox':`/api/${type}s`;
+    const d=await api(endpoint);
+    const key=type==='proxmox'?'nodes':`${type}s`;
+    const item=(d[key]||[]).find(i=>i.id===id);
     if(!item)return;
     if(type==='server'){
-      el('fName').value=item.name||'';el('fHostname').value=item.hostname||'';
-      el('fIP').value=item.ip_address||'';el('fType').value=item.type||'linux';
-      el('fPort').value=item.port||22;el('fInterval').value=item.check_interval||60;
+      el('fName').value=item.name||'';el('fHostname').value=item.hostname||'';el('fIP').value=item.ip_address||'';
+      el('fType').value=item.type||'linux';el('fInterval').value=item.check_interval||60;
+      el('fSSHUser').value=item.ssh_user||'root';
+      el('fSSHPort').value=item.ssh_port||22;
+      el('fSSHKeyPath').value=item.ssh_key_path||'';
+      el('fSSHPassword').value=item.ssh_password||'';
+      el('fSudoPassword').value=item.sudo_password||'';
+      // Parse monitor flags
+      let flags={system:true,nginx:false,pm2:false,services:false,fail2ban:false};
+      try{flags=typeof item.monitor_flags==='string'?JSON.parse(item.monitor_flags):item.monitor_flags||flags}catch(e){}
+      el('fFlagSystem').checked=flags.system!==false;
+      el('fFlagNginx').checked=!!flags.nginx;
+      el('fFlagPm2').checked=!!flags.pm2;
+      el('fFlagServices').checked=!!flags.services;
+      el('fFlagFail2ban').checked=!!flags.fail2ban;
     }else if(type==='service'){
-      el('fName').value=item.name||'';el('fType').value=item.type||'custom';
+      el('fName').value=item.name||'';el('fType').value=item.type||'tcp';
       el('fHost').value=item.host||'';el('fPort').value=item.port||'';
       el('fTimeout').value=item.timeout||10;el('fInterval').value=item.check_interval||60;
     }else if(type==='website'){
       el('fName').value=item.name||'';el('fURL').value=item.url||'';
       el('fMethod').value=item.method||'GET';el('fExpected').value=item.expected_status||200;
       el('fTimeout').value=item.timeout||15;el('fInterval').value=item.check_interval||60;
+    }else if(type==='proxmox'){
+      el('fName').value=item.name||'';el('fHost').value=item.host||'';el('fPort').value=item.port||8006;
+      el('fNode').value=item.node||'pve';el('fUser').value=item.user||'';
+      el('fTokenId').value=item.token_id||'';el('fTokenSecret').value=item.token_secret||'';
+      el('fVerifySsl').value=item.verify_ssl?'1':'0';el('fInterval').value=item.check_interval||60;
     }
   }catch(e){}
 }
 
-function el(id){return document.getElementById(id)}
-
-function closeModal(){document.getElementById('modalOverlay').classList.remove('active');modalEditId=null}
+function closeModal(){el('modalOverlay').classList.remove('active');modalEditId=null}
 
 async function saveModal(){
   let body={},endpoint='';
   if(modalType==='server'){
-    body={name:el('fName').value,hostname:el('fHostname').value,ip_address:el('fIP').value,type:el('fType').value,port:parseInt(el('fPort').value)||22,check_interval:parseInt(el('fInterval').value)||60};
+    body={name:el('fName').value,hostname:el('fHostname').value,ip_address:el('fIP').value,
+      type:el('fType').value,
+      ssh_user:el('fSSHUser').value.trim()||'root',
+      ssh_port:parseInt(el('fSSHPort').value)||22,
+      ssh_key_path:el('fSSHKeyPath').value.trim()||null,
+      ssh_password:el('fSSHPassword').value||null,
+      sudo_password:el('fSudoPassword').value||null,
+      monitor_flags:{
+        system:el('fFlagSystem').checked,
+        nginx:el('fFlagNginx').checked,
+        pm2:el('fFlagPm2').checked,
+        services:el('fFlagServices').checked,
+        fail2ban:el('fFlagFail2ban').checked
+      },
+      check_interval:parseInt(el('fInterval').value)||60};
     endpoint='/api/servers';
   }else if(modalType==='service'){
-    body={name:el('fName').value,type:el('fType').value,host:el('fHost').value,port:parseInt(el('fPort').value),timeout:parseInt(el('fTimeout').value)||10,check_interval:parseInt(el('fInterval').value)||60};
+    body={name:el('fName').value,type:el('fType').value,host:el('fHost').value,
+      port:parseInt(el('fPort').value),timeout:parseInt(el('fTimeout').value)||10,
+      check_interval:parseInt(el('fInterval').value)||60};
     endpoint='/api/services';
   }else if(modalType==='website'){
-    body={name:el('fName').value,url:el('fURL').value,method:el('fMethod').value,expected_status:parseInt(el('fExpected').value)||200,timeout:parseInt(el('fTimeout').value)||15,check_interval:parseInt(el('fInterval').value)||60};
+    body={name:el('fName').value,url:el('fURL').value,method:el('fMethod').value,
+      expected_status:parseInt(el('fExpected').value)||200,timeout:parseInt(el('fTimeout').value)||15,
+      check_interval:parseInt(el('fInterval').value)||60};
     endpoint='/api/websites';
+  }else if(modalType==='proxmox'){
+    body={name:el('fName').value,host:el('fHost').value,port:parseInt(el('fPort').value)||8006,
+      node:el('fNode').value||'pve',user:el('fUser').value,
+      token_id:el('fTokenId').value,token_secret:el('fTokenSecret').value,
+      verify_ssl:parseInt(el('fVerifySsl').value)||0,
+      check_interval:parseInt(el('fInterval').value)||60};
+    endpoint='/api/proxmox';
   }
   try{
-    if(modalEditId){
-      await api(endpoint+'/'+modalEditId,{method:'PUT',body:JSON.stringify(body)});
-      toast(modalType+' updated','success');
-    }else{
-      await api(endpoint,{method:'POST',body:JSON.stringify(body)});
-      toast(modalType+' added','success');
+    if(modalEditId){await api(endpoint+'/'+modalEditId,{method:'PUT',body:JSON.stringify(body)});toast(modalType+' updated','success')}
+    else{
+      const res=await api(endpoint,{method:'POST',body:JSON.stringify(body)});toast(modalType+' added','success');
+      // Auto-trigger initial poll for newly added proxmox nodes
+      if(modalType==='proxmox'&&res&&res.id){try{await api(`/api/proxmox/${res.id}/refresh`,{method:'POST'})}catch(e){}}
     }
     closeModal();loadDashboard();
   }catch(e){toast(e.message,'error')}
 }
 
-/* ── Init ──────────────────────────────────────────────────── */
 loadDashboard();
 setInterval(loadDashboard,15000);
 </script>

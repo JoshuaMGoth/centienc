@@ -26,15 +26,15 @@ Lightweight server, service, and website monitoring that runs as a desktop tray 
 ### One-Line Install (Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/joshuagoth/centient/main/installers/universal/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/joshuagoth/centienc/main/installers/universal/install.sh | sudo bash
 ```
 
 ### Manual Install
 
 ```bash
 # Clone the repository
-git clone https://github.com/joshuagoth/centient.git
-cd centient
+git clone https://github.com/joshuagoth/centienc.git
+cd centienc
 
 # Create a virtual environment
 python3 -m venv .venv
@@ -56,7 +56,7 @@ Open `http://localhost:9090` to run the setup wizard.
 
 ```bash
 # On your Proxmox VE host:
-bash installers/proxmox/create-centient-lxc.sh \
+bash installers/proxmox/create-centienc-lxc.sh \
     --name centient \
     --ip 10.10.10.50/24 \
     --gw 10.10.10.1 \
@@ -73,16 +73,16 @@ This creates and configures a Debian 12 LXC container with ¢entien¢ pre-instal
 | **Debian/Ubuntu** | `installers/debian/install.sh` | apt + systemd, `--tray` flag |
 | **Arch Linux** | `installers/arch/install.sh` | pacman + systemd, `--tray` flag |
 | **Universal Linux** | `installers/universal/install.sh` | Auto-detects distro |
-| **macOS** | `installers/macos/install.command` | Double-clickable wrapper for `install.sh` |
-| **Windows** | `installers/windows/Centienc-Installer-Setup.exe` | Standard installer `.exe` (build from Inno Setup) |
-| **Proxmox LXC** | `installers/proxmox/create-centient-lxc.sh` | Full container provisioning |
+| **macOS** | `installers/macos/centienc-installer.command` | Double-clickable wrapper for `install.sh` |
+| **Windows** | `installers/windows/centienc-installer-setup.exe` | Standard installer `.exe` (build from Inno Setup) |
+| **Proxmox LXC** | `installers/proxmox/create-centienc-lxc.sh` | Full container provisioning |
 
 ### Double-Click Installers
 
 - **Linux (`.sh`)**: Ensure the script is executable (`chmod +x`) and choose “Run in Terminal” when prompted.
-- **macOS (`.command`)**: Double-click `installers/macos/install.command` in Finder.
-- **Windows (`.exe`, recommended)**: Run `Centienc-Installer-Setup.exe`.
-- **Windows script fallback (`.bat`)**: Double-click `installers/windows/Centienc-Installer.bat`.
+- **macOS (`.command`)**: Double-click `installers/macos/centienc-installer.command` in Finder.
+- **Windows (`.exe`, recommended)**: Run `centienc-installer-setup.exe`.
+- **Windows script fallback (`.bat`)**: Double-click `installers/windows/centienc-installer.bat`.
 
 ### Build Windows `.exe` Installer
 
@@ -98,7 +98,7 @@ The current industry standard for direct Windows installs is a signed `.exe` ins
 
 Output file:
 
-- `installers/windows/dist/Centienc-Installer-Setup.exe`
+- `installers/windows/dist/centienc-installer-setup.exe`
 
 ## Configuration
 

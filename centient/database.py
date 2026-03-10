@@ -52,8 +52,28 @@ CREATE TABLE IF NOT EXISTS servers (
     ip_address     TEXT,
     port           INTEGER DEFAULT 22,
     type           TEXT DEFAULT 'linux',
-    ssh_user       TEXT,
+    ssh_user       TEXT DEFAULT 'root',
+    ssh_port       INTEGER DEFAULT 22,
     ssh_key_path   TEXT,
+    ssh_password   TEXT,
+    sudo_password  TEXT,
+    monitor_flags  TEXT DEFAULT '{"system":true,"nginx":false,"pm2":false,"services":false,"fail2ban":false}',
+    check_interval INTEGER DEFAULT 60,
+    enabled        INTEGER DEFAULT 1,
+    created_at     TEXT DEFAULT (datetime('now'))
+);
+
+-- Proxmox nodes (API integration)
+CREATE TABLE IF NOT EXISTS proxmox_nodes (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT NOT NULL,
+    host           TEXT NOT NULL,
+    port           INTEGER DEFAULT 8006,
+    node           TEXT DEFAULT 'pve',
+    user           TEXT NOT NULL,
+    token_id       TEXT NOT NULL,
+    token_secret   TEXT NOT NULL,
+    verify_ssl     INTEGER DEFAULT 0,
     check_interval INTEGER DEFAULT 60,
     enabled        INTEGER DEFAULT 1,
     created_at     TEXT DEFAULT (datetime('now'))
@@ -144,6 +164,27 @@ class Database:
             conn.row_factory = aiosqlite.Row
             await conn.executescript(SCHEMA)
             await conn.commit()
+
+            # ── Migrations (additive column additions) ──────────────
+            def _has_column(columns: list[str], name: str) -> bool:
+                return any(c["name"] == name for c in columns)
+
+            # servers: migration for SSH columns
+            cur = await conn.execute("PRAGMA table_info(servers)")
+            server_cols = [dict(r) for r in await cur.fetchall()]
+            for col, default in [
+                ("ssh_user", "'root'"),
+                ("ssh_port", "22"),
+                ("ssh_key_path", "NULL"),
+                ("ssh_password", "NULL"),
+                ("sudo_password", "NULL"),
+                ("monitor_flags", "'{\"system\":true,\"nginx\":false,\"pm2\":false,\"services\":false,\"fail2ban\":false}'"),
+            ]:
+                if not _has_column(server_cols, col):
+                    await conn.execute(f"ALTER TABLE servers ADD COLUMN {col} DEFAULT {default}")
+            # Drop agent columns if they exist (safe — just ignore if not present)
+            await conn.commit()
+
             # Set defaults if first run
             cursor = await conn.execute("SELECT COUNT(*) FROM settings")
             count = (await cursor.fetchone())[0]
@@ -439,6 +480,23 @@ class Database:
             )
             await conn.commit()
             return cursor.rowcount
+
+    # ── Proxmox Nodes ──────────────────────────────────────────────
+
+    async def add_proxmox_node(self, data: dict[str, Any]) -> int:
+        return await self._insert("proxmox_nodes", data)
+
+    async def update_proxmox_node(self, nid: int, data: dict[str, Any]) -> bool:
+        return await self._update("proxmox_nodes", nid, data)
+
+    async def delete_proxmox_node(self, nid: int) -> bool:
+        return await self._delete("proxmox_nodes", nid)
+
+    async def get_proxmox_node(self, nid: int) -> dict[str, Any] | None:
+        return await self._get("proxmox_nodes", nid)
+
+    async def list_proxmox_nodes(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+        return await self._list("proxmox_nodes", {"enabled": 1} if enabled_only else None)
 
     # ── Incidents ─────────────────────────────────────────────────
 

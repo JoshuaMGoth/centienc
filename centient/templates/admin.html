@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin — ¢entien¢</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+<link rel="apple-touch-icon" href="/static/centienc-logo.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Admin — ¢entien¢">
+<meta property="og:description" content="Manage settings, users, and alerts in ¢entien¢.">
+<meta property="og:image" content="/static/centienc-og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Admin — ¢entien¢">
+<meta name="twitter:description" content="Manage settings, users, and alerts in ¢entien¢.">
+<meta name="twitter:image" content="/static/centienc-og.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2333;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#388bfd;--green:#3fb950;--red:#f85149;--yellow:#d29922;--radius:10px;--shadow:0 2px 8px rgba(0,0,0,.3);--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
@@ -14,7 +25,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .shell{display:flex;height:100vh}
 .sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
 .sidebar .brand{padding:18px 16px;font-weight:700;font-size:15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.sidebar .brand .logo{width:24px;height:24px;border-radius:5px;background:linear-gradient(135deg,var(--accent),var(--green));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff}
+.sidebar .brand .logo{width:24px;height:24px;border-radius:5px;object-fit:cover;display:block}
 .sidebar nav{flex:1;padding:12px 0}
 .sidebar nav a{display:flex;align-items:center;gap:10px;padding:10px 16px;color:var(--text2);text-decoration:none;font-size:13px;border-left:3px solid transparent;transition:.15s}
 .sidebar nav a:hover,.sidebar nav a.active{color:var(--text);background:var(--surface2);border-left-color:var(--accent)}
@@ -77,12 +88,13 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 <body>
 <div class="shell">
   <div class="sidebar">
-    <div class="brand"><div class="logo">¢</div> Admin</div>
+    <div class="brand"><img class="logo" src="/static/centienc-logo.png" alt="¢entien¢ logo"> Admin</div>
     <nav>
       <a href="#" onclick="showPage('general')" class="active" data-page="general">🔧 General</a>
       <a href="#" onclick="showPage('users')" data-page="users">👤 Users</a>
       <a href="#" onclick="showPage('notifications')" data-page="notifications">🔔 Notifications</a>
       <a href="#" onclick="showPage('data')" data-page="data">🗄 Data</a>
+      <a href="#" onclick="showPage('proxmox')" data-page="proxmox">🖧 Proxmox</a>
     </nav>
     <div class="bottom"><a href="/">← Back to Dashboard</a></div>
   </div>
@@ -138,6 +150,25 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       </div>
     </div>
 
+    <!-- PROXMOX -->
+    <div class="page" id="page-proxmox">
+      <h2>Proxmox Nodes</h2>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">🖧 Nodes</h3>
+          <button class="btn btn-primary" onclick="openPveModal()">+ Add Node</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Host</th><th>Node</th><th>User</th><th>Token ID</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="pveTableBody"></tbody>
+        </table>
+      </div>
+      <div class="panel" style="border-color:#58a6ff22;background:rgba(88,166,255,.05)">
+        <h3>� SSH-Based Monitoring</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">¢entien¢ connects to your servers via SSH — no agents to install. Configure SSH credentials and select monitoring options when adding a server in the dashboard.</p>
+        <p style="font-size:12px;color:var(--text2)"><strong>Tip:</strong> For passwordless access, ensure your SSH public key (<code>~/.ssh/id_rsa.pub</code>) is in <code>~/.ssh/authorized_keys</code> on your monitored servers.</p>
+      </div>
+    </div>
     <!-- DATA -->
     <div class="page" id="page-data">
       <h2>Data Management</h2>
@@ -164,6 +195,26 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <div class="modal-actions">
       <button class="btn" onclick="closeUserModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveUser()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Proxmox Modal -->
+<div class="modal-overlay" id="pveModalOverlay" onclick="if(event.target===this)closePveModal()">
+  <div class="modal">
+    <h3 id="pveModalTitle">Add Proxmox Node</h3>
+    <label>Display Name</label><input id="fpName" placeholder="Main Proxmox">
+    <label>Host (IP or hostname)</label><input id="fpHost" placeholder="192.168.1.10">
+    <label>Port</label><input id="fpPort" type="number" value="8006">
+    <label>PVE Node name</label><input id="fpNode" placeholder="pve">
+    <label>API User</label><input id="fpUser" placeholder="root@pam">
+    <label>API Token ID</label><input id="fpTokenId" placeholder="monitoring">
+    <label>API Token Secret</label><input id="fpTokenSecret" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <label>Verify SSL</label><select id="fpVerifySSL"><option value="0">No (self-signed OK)</option><option value="1">Yes</option></select>
+    <label>Check Interval (s)</label><input id="fpInterval" type="number" value="60">
+    <div class="modal-actions">
+      <button class="btn" onclick="closePveModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePve()">Save</button>
     </div>
   </div>
 </div>
@@ -273,6 +324,61 @@ async function saveChannel(){
 }
 async function testChannel(id){try{const d=await api('/api/notifications/'+id+'/test',{method:'POST'});toast(d.ok?'Test sent!':d.error,d.ok?'success':'error')}catch(e){toast(e.message,'error')}}
 async function deleteChannel(id){if(!confirm('Delete this channel?'))return;try{await api('/api/notifications/'+id,{method:'DELETE'});toast('Channel deleted','success');loadChannels()}catch(e){toast(e.message,'error')}}
+
+/* Proxmox */
+let editPveId=null;
+async function loadPveNodes(){
+  try{
+    const d=await api('/api/proxmox');if(!d)return;
+    const tb=document.getElementById('pveTableBody');
+    tb.innerHTML=(d.nodes||[]).map(n=>`<tr>
+      <td>${n.name}</td><td>${n.host}:${n.port||8006}</td><td>${n.node||'pve'}</td>
+      <td>${n.user||'—'}</td><td>${n.token_id||'—'}</td>
+      <td style="color:${n.live_status==='up'?'var(--green)':'var(--red)'}">${n.live_status||'unknown'}</td>
+      <td class="actions">
+        <button onclick="openPveModal(${n.id})">Edit</button>
+        <button class="del" onclick="deletePve(${n.id})">Delete</button>
+      </td>
+    </tr>`).join('');
+  }catch(e){toast(e.message,'error')}
+}
+function openPveModal(id=null){
+  editPveId=id;
+  document.getElementById('pveModalTitle').textContent=id?'Edit Node':'Add Proxmox Node';
+  if(!id){['fpName','fpHost','fpNode','fpUser','fpTokenId','fpTokenSecret'].forEach(i=>document.getElementById(i).value='');document.getElementById('fpPort').value='8006';document.getElementById('fpInterval').value='60';document.getElementById('fpVerifySSL').value='0';}
+  document.getElementById('pveModalOverlay').classList.add('active');
+  if(id)loadPveEdit(id);
+}
+async function loadPveEdit(id){
+  try{
+    const d=await api('/api/proxmox');if(!d)return;
+    const n=(d.nodes||[]).find(x=>x.id===id);if(!n)return;
+    document.getElementById('fpName').value=n.name||'';
+    document.getElementById('fpHost').value=n.host||'';
+    document.getElementById('fpPort').value=n.port||8006;
+    document.getElementById('fpNode').value=n.node||'pve';
+    document.getElementById('fpUser').value=n.user||'';
+    document.getElementById('fpTokenId').value=n.token_id||'';
+    document.getElementById('fpTokenSecret').value=n.token_secret||'';
+    document.getElementById('fpVerifySSL').value=n.verify_ssl?'1':'0';
+    document.getElementById('fpInterval').value=n.check_interval||60;
+  }catch(e){}
+}
+function closePveModal(){document.getElementById('pveModalOverlay').classList.remove('active');editPveId=null}
+async function savePve(){
+  const body={name:document.getElementById('fpName').value,host:document.getElementById('fpHost').value,port:parseInt(document.getElementById('fpPort').value)||8006,node:document.getElementById('fpNode').value||'pve',user:document.getElementById('fpUser').value,token_id:document.getElementById('fpTokenId').value,token_secret:document.getElementById('fpTokenSecret').value,verify_ssl:parseInt(document.getElementById('fpVerifySSL').value)||0,check_interval:parseInt(document.getElementById('fpInterval').value)||60};
+  try{
+    if(editPveId)await api('/api/proxmox/'+editPveId,{method:'PUT',body:JSON.stringify(body)});
+    else await api('/api/proxmox',{method:'POST',body:JSON.stringify(body)});
+    toast(editPveId?'Node updated':'Node added','success');
+    closePveModal();loadPveNodes();
+  }catch(e){toast(e.message,'error')}
+}
+async function deletePve(id){if(!confirm('Delete this Proxmox node?'))return;try{await api('/api/proxmox/'+id,{method:'DELETE'});toast('Node deleted','success');loadPveNodes()}catch(e){toast(e.message,'error')}}
+
+/* Override showPage to load proxmox */
+const _origShowPage=showPage;
+function showPage(p){_origShowPage(p);if(p==='proxmox')loadPveNodes();}
 
 loadSettings();
 updateChannelFields();

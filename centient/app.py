@@ -243,6 +243,18 @@ async def api_overview(request: Request):
     overview = engine.get_overview()
     settings = await db.get_all_settings()
     incidents = await db.get_recent_incidents(10)
+    # Merge DB-sourced proxmox nodes with cache so new nodes appear immediately
+    db_pve_nodes = await db.list_proxmox_nodes()
+    cache_ids = {n["id"] for n in overview.get("proxmox_nodes", [])}
+    for n in db_pve_nodes:
+        if n["id"] not in cache_ids:
+            cache = engine.status_cache.get(f"proxmox:{n['id']}", {})
+            n["live_status"] = cache.get("status", "unknown")
+            n["containers"] = cache.get("containers", [])
+            n["vms"] = cache.get("vms", [])
+            n["node_status"] = cache.get("node_status", {})
+            n["last_update"] = cache.get("last_update")
+            overview["proxmox_nodes"].append(n)
     return {
         "ok": True,
         **overview,
@@ -264,11 +276,14 @@ async def api_overview(request: Request):
 async def list_servers(request: Request):
     await _require_auth_or_401(request)
     servers = await db.list_servers()
-    # Enrich with live status from cache
+    # Enrich with live status and SSH metrics from cache
     for s in servers:
         cache = engine.status_cache.get(f"server:{s['id']}", {})
         s["live_status"] = cache.get("status", "unknown")
         s["response_time"] = cache.get("response_time")
+        ssh_data = engine.status_cache.get(f"ssh:{s['id']}")
+        if ssh_data:
+            s["ssh"] = ssh_data
     return {"ok": True, "servers": servers}
 
 
@@ -276,8 +291,13 @@ async def list_servers(request: Request):
 async def add_server(request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
-    allowed = {"name", "hostname", "ip_address", "port", "type", "ssh_user", "ssh_key_path", "check_interval", "enabled"}
+    allowed = {"name", "hostname", "ip_address", "port", "type",
+               "ssh_user", "ssh_port", "ssh_key_path", "ssh_password",
+               "sudo_password", "monitor_flags", "check_interval", "enabled"}
     data = {k: v for k, v in body.items() if k in allowed}
+    # Serialize monitor_flags if passed as object
+    if "monitor_flags" in data and isinstance(data["monitor_flags"], dict):
+        data["monitor_flags"] = json.dumps(data["monitor_flags"])
     if not data.get("name") or not data.get("hostname"):
         raise HTTPException(400, "name and hostname are required")
     sid = await db.add_server(data)
@@ -288,8 +308,13 @@ async def add_server(request: Request):
 async def update_server(server_id: int, request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
-    allowed = {"name", "hostname", "ip_address", "port", "type", "ssh_user", "ssh_key_path", "check_interval", "enabled"}
+    allowed = {"name", "hostname", "ip_address", "port", "type",
+               "ssh_user", "ssh_port", "ssh_key_path", "ssh_password",
+               "sudo_password", "monitor_flags", "check_interval", "enabled"}
     data = {k: v for k, v in body.items() if k in allowed}
+    # Serialize monitor_flags if passed as object
+    if "monitor_flags" in data and isinstance(data["monitor_flags"], dict):
+        data["monitor_flags"] = json.dumps(data["monitor_flags"])
     ok = await db.update_server(server_id, data)
     if not ok:
         raise HTTPException(404, "Server not found")
@@ -304,6 +329,7 @@ async def delete_server(server_id: int, request: Request):
         raise HTTPException(404, "Server not found")
     # Clean cache
     engine.status_cache.pop(f"server:{server_id}", None)
+    engine.status_cache.pop(f"ssh:{server_id}", None)
     return {"ok": True}
 
 
@@ -321,6 +347,88 @@ async def server_history(server_id: int, request: Request):
     history = await db.get_history("server", server_id, hours=hours)
     uptime = await db.get_uptime("server", server_id, hours=hours)
     return {"ok": True, "history": history, "uptime_pct": round(uptime, 2)}
+
+
+@app.post("/api/servers/{server_id}/ssh-refresh")
+async def refresh_server_ssh(server_id: int, request: Request):
+    """Immediately poll a server's metrics via SSH."""
+    await _require_auth_or_401(request)
+    server = await db.get_server(server_id)
+    if not server:
+        raise HTTPException(404, "Server not found")
+    if not server.get("ssh_user"):
+        raise HTTPException(400, "Server has no SSH user configured")
+    await engine._poll_ssh(server)
+    cache = engine.status_cache.get(f"ssh:{server_id}", {})
+    return {"ok": True, **cache}
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Proxmox Nodes CRUD API
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/proxmox")
+async def list_proxmox_nodes(request: Request):
+    await _require_auth_or_401(request)
+    nodes = await db.list_proxmox_nodes()
+    # Enrich with live cache data
+    for n in nodes:
+        cache = engine.status_cache.get(f"proxmox:{n['id']}", {})
+        n["live_status"] = cache.get("status", "unknown")
+        n["containers"] = cache.get("containers", [])
+        n["vms"] = cache.get("vms", [])
+        n["node_status"] = cache.get("node_status", {})
+        n["last_update"] = cache.get("last_update")
+    return {"ok": True, "nodes": nodes}
+
+
+@app.post("/api/proxmox")
+async def add_proxmox_node(request: Request):
+    await _require_auth_or_401(request)
+    body = await request.json()
+    allowed = {"name", "host", "port", "node", "user", "token_id", "token_secret",
+               "verify_ssl", "check_interval", "enabled"}
+    data = {k: v for k, v in body.items() if k in allowed}
+    required = {"name", "host", "user", "token_id", "token_secret"}
+    missing = required - set(data.keys())
+    if missing:
+        raise HTTPException(400, f"Required fields missing: {', '.join(missing)}")
+    nid = await db.add_proxmox_node(data)
+    return {"ok": True, "id": nid}
+
+
+@app.put("/api/proxmox/{node_id}")
+async def update_proxmox_node(node_id: int, request: Request):
+    await _require_auth_or_401(request)
+    body = await request.json()
+    allowed = {"name", "host", "port", "node", "user", "token_id", "token_secret",
+               "verify_ssl", "check_interval", "enabled"}
+    data = {k: v for k, v in body.items() if k in allowed}
+    ok = await db.update_proxmox_node(node_id, data)
+    if not ok:
+        raise HTTPException(404, "Proxmox node not found")
+    return {"ok": True}
+
+
+@app.delete("/api/proxmox/{node_id}")
+async def delete_proxmox_node(node_id: int, request: Request):
+    await _require_auth_or_401(request)
+    ok = await db.delete_proxmox_node(node_id)
+    if not ok:
+        raise HTTPException(404, "Proxmox node not found")
+    engine.status_cache.pop(f"proxmox:{node_id}", None)
+    return {"ok": True}
+
+
+@app.post("/api/proxmox/{node_id}/refresh")
+async def refresh_proxmox_node(node_id: int, request: Request):
+    await _require_auth_or_401(request)
+    node = await db.get_proxmox_node(node_id)
+    if not node:
+        raise HTTPException(404, "Proxmox node not found")
+    await engine._poll_proxmox(node)
+    cache = engine.status_cache.get(f"proxmox:{node_id}", {})
+    return {"ok": True, **cache}
 
 
 # ═══════════════════════════════════════════════════════════════════

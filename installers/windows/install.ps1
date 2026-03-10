@@ -12,11 +12,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Version = "1.0.0"
-$InstallDir = "$env:ProgramFiles\Centienc"
-$DataDir = "$env:ProgramData\Centienc"
+$InstallDir = "$env:ProgramFiles\¢entien¢"
+$DataDir = "$env:ProgramData\¢entien¢"
 $VenvDir = "$InstallDir\venv"
 $Port = 9090
-$ServiceName = "Centienc"
+$ServiceName = "¢entien¢"
 $Mode = if ($Service) { "service" } elseif ($Tray) { "tray" } else { "tray" }  # Default: tray on Windows
 
 function Write-Info  { Write-Host "[INFO]  $args" -ForegroundColor Cyan }
@@ -79,11 +79,11 @@ Write-Ok "¢entien¢ installed"
 # ── Create Windows service using NSSM or Task Scheduler ──────
 Write-Info "Creating scheduled task..."
 
-$CentiencArgs = if ($Mode -eq "tray") { "--tray --port $Port --open" } else { "--service --host 0.0.0.0 --port $Port" }
+$¢entien¢Args = if ($Mode -eq "tray") { "--tray --port $Port --open" } else { "--service --host 0.0.0.0 --port $Port" }
 
 $Action = New-ScheduledTaskAction `
     -Execute "$VenvDir\Scripts\python.exe" `
-    -Argument "-m centient $CentiencArgs --data-dir `"$DataDir`""
+    -Argument "-m centient $¢entien¢Args --data-dir `"$DataDir`""
 
 $Trigger = New-ScheduledTaskTrigger -AtStartup
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)

@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$issFile = Join-Path $scriptDir "CentiencInstaller.iss"
+$issFile = Join-Path $scriptDir "centienc-installer.iss"
 
 if (-not (Test-Path $issFile)) {
     throw "Inno Setup script not found: $issFile"
