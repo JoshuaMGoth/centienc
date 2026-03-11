@@ -1,44 +1,48 @@
-; ¢entien¢ Inno Setup Installer
-; Builds a standard Windows Setup .exe that launches the existing install.cmd flow.
+; ══════════════════════════════════════════════════════════════════
+;  ¢entien¢ — Inno Setup Installer Script
+;
+;  Builds a standard Windows Setup .exe that bundles the PowerShell
+;  installer and runs it with admin privileges.
+;
+;  Build: Run build-exe.ps1 or ISCC.exe centienc-installer.iss
+; ══════════════════════════════════════════════════════════════════
 
-#ifndef MyAppVersion
-  #define MyAppVersion "1.0.0"
-#endif
-
-#define MyAppName "¢entien¢"
+#define MyAppName "centient"
+#define MyAppVersion "1.0.0"
 #define MyAppPublisher "Joshua Goth"
-#define MyAppURL "https://joshuagoth.com/tools/centienc/"
-#define MyAppExeName "centienc-installer.bat"
+#define MyAppURL "https://github.com/joshuagoth/centient"
 
 [Setup]
-AppId={{B8F4BC39-1CE0-4D7B-9A53-58B8A0E6B8E7}
+AppId={{7A8C3D2E-4F5B-6A1D-8E9F-0C1B2A3D4E5F}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}
-AppUpdatesURL={#MyAppURL}
-DefaultDirName={autopf}\centienc-installer
-DefaultGroupName=¢entien¢ Installer
-DisableDirPage=yes
+DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
-OutputDir=dist
-OutputBaseFilename=centienc-installer-setup
-Compression=lzma
+PrivilegesRequired=admin
+OutputBaseFilename=centient-setup-{#MyAppVersion}
+Compression=lzma2/ultra
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=admin
-PrivilegesRequiredOverridesAllowed=dialog
-Uninstallable=no
-ArchitecturesInstallIn64BitMode=x64compatible
-
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+SetupIconFile=compiler:SetupClassicIcon.ico
+UninstallDisplayName={#MyAppName}
+CreateUninstallRegKey=no
 
 [Files]
-Source: "install.ps1"; DestDir: "{tmp}\centienc-installer"; Flags: ignoreversion deleteafterinstall
-Source: "install.cmd"; DestDir: "{tmp}\centienc-installer"; Flags: ignoreversion deleteafterinstall
-Source: "centienc-installer.bat"; DestDir: "{tmp}\centienc-installer"; Flags: ignoreversion deleteafterinstall
+Source: "install.ps1"; DestDir: "{tmp}"; Flags: ignoreversion deleteafterinstall
+Source: "install.cmd"; DestDir: "{tmp}"; Flags: ignoreversion deleteafterinstall
+Source: "..\..\centient\*"; DestDir: "{tmp}\centient\centient"; Flags: ignoreversion recursesubdirs createallsubdirs deleteafterinstall
+Source: "..\..\pyproject.toml"; DestDir: "{tmp}\centient"; Flags: ignoreversion deleteafterinstall
+Source: "..\..\requirements.txt"; DestDir: "{tmp}\centient"; Flags: ignoreversion deleteafterinstall
+Source: "..\..\README.md"; DestDir: "{tmp}\centient"; Flags: ignoreversion deleteafterinstall
 
 [Run]
-Filename: "{tmp}\centienc-installer\install.cmd"; Description: "Run ¢entien¢ installer"; Flags: waituntilterminated
+Filename: "powershell.exe"; \
+    Parameters: "-ExecutionPolicy Bypass -File ""{tmp}\install.ps1"""; \
+    StatusMsg: "Installing centient..."; \
+    Flags: runhidden waituntilterminated
+
+[Messages]
+WelcomeLabel1=centient Server Monitor
+WelcomeLabel2=This will install centient v{#MyAppVersion} on your computer.%n%ncentient is a professional server, service, and website monitoring dashboard that runs as a background service.%n%nAfter installation, open the dashboard URL shown in the terminal to complete setup.

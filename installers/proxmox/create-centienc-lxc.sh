@@ -5,6 +5,10 @@
 #  Creates a lightweight LXC container on a Proxmox VE host,
 #  installs ¢entien¢ inside it, and starts the service.
 #
+#  Repository: https://github.com/JoshuaMGoth/centienc
+#  Website:    https://joshuagoth.com
+#  License:    GNU GPL-3.0
+#
 #  Usage (run on the Proxmox host):
 #    bash create-centienc-lxc.sh [OPTIONS]
 #
@@ -324,6 +328,14 @@ pct exec "$CTID" -- bash -c "
 " 2>&1 | tail -5
 ok "System packages installed"
 
+# Allow non-root users to send ICMP ping (required in unprivileged LXC containers)
+info "Configuring ICMP ping permissions for service user..."
+pct exec "$CTID" -- bash -c "
+    echo 'net.ipv4.ping_group_range = 0 2147483647' > /etc/sysctl.d/99-centient.conf
+    sysctl -p /etc/sysctl.d/99-centient.conf >/dev/null 2>&1 || true
+"
+ok "Ping group range configured"
+
 # Create directories, venv, and system user
 info "Creating venv and system user..."
 pct exec "$CTID" -- bash -c "
@@ -367,23 +379,31 @@ if [[ -n "$PROJECT_ROOT" && -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
     "
     ok "¢entien¢ installed from local source"
 else
-    info "No local source found — downloading ¢entien¢ from joshuagoth.com..."
-    SOURCE_URL="https://joshuagoth.com/downloads/centienc/centient-src.tar.gz"
-
-    # Download the source tarball into the container
+    info "No local source found — installing ¢entien¢ from GitHub..."
     pct exec "$CTID" -- bash -c "
         set -e
-        curl -fsSL '${SOURCE_URL}' -o /tmp/centient-src.tar.gz \
-            || { echo 'Download failed — check internet access on this Proxmox host'; exit 1; }
-        tar -xzf /tmp/centient-src.tar.gz -C /tmp/
-        /opt/centient/venv/bin/pip install /tmp/centient-src/ --no-cache-dir
-        rm -rf /tmp/centient-src.tar.gz /tmp/centient-src/
-    " || err "Failed to install ¢entien¢. Verify this Proxmox host can reach https://joshuagoth.com"
-    ok "¢entien¢ installed from joshuagoth.com"
+        /opt/centient/venv/bin/pip install 'centient @ git+https://github.com/JoshuaMGoth/centienc.git' --no-cache-dir
+    " || err "Failed to install ¢entien¢. Verify this Proxmox host can reach https://github.com"
+    ok "¢entien¢ installed from GitHub"
 fi
 
 # Fix ownership now that pip install is done
 pct exec "$CTID" -- chown -R centient:centient /opt/centient /var/lib/centient
+
+# ── Generate SSH keypair for the centient service user ───────
+header "SSH Keys"
+
+info "Generating SSH keypair for centient user..."
+pct exec "$CTID" -- bash -c "
+    mkdir -p /var/lib/centient/.ssh
+    chmod 700 /var/lib/centient/.ssh
+    ssh-keygen -t ed25519 -f /var/lib/centient/.ssh/id_ed25519 -N '' -C 'centient@${CT_NAME}' -q
+    chown -R centient:centient /var/lib/centient/.ssh
+    chmod 600 /var/lib/centient/.ssh/id_ed25519
+    chmod 644 /var/lib/centient/.ssh/id_ed25519.pub
+"
+SSH_PUBKEY=$(pct exec "$CTID" -- cat /var/lib/centient/.ssh/id_ed25519.pub 2>/dev/null || echo "[key generation failed]")
+ok "SSH keypair created"
 
 # ── Verify the installation is runnable ──────────────────────
 header "Verifying Installation"
@@ -468,10 +488,23 @@ echo -e "    Dashboard:    ${BLUE}http://${CT_IP}:${PORT}${NC}"
 echo -e "    Data Dir:     /var/lib/centient"
 echo -e "    Root Pass:    ${YELLOW}${ROOT_PASS}${NC}"
 echo ""
+echo -e "  ${BOLD}SSH Public Key (copy to monitored servers):${NC}"
+echo -e "    ${CYAN}${SSH_PUBKEY}${NC}"
+echo ""
+echo -e "  To authorize on each server you want to monitor:"
+echo -e "    ${BOLD}ssh USER@SERVER 'mkdir -p ~/.ssh && echo \"${SSH_PUBKEY}\" >> ~/.ssh/authorized_keys'${NC}"
+echo ""
 echo -e "  ${BOLD}Management:${NC}"
 echo -e "    pct enter ${CTID}"
 echo -e "    pct exec ${CTID} -- systemctl status centient"
 echo -e "    pct exec ${CTID} -- journalctl -u centient -f"
 echo ""
 echo -e "  Open ${BLUE}http://${CT_IP}:${PORT}${NC} to run the setup wizard."
+echo ""
+echo -e "  ${BOLD}Links${NC}"
+echo -e "    GitHub:      ${BLUE}https://github.com/JoshuaMGoth/centienc${NC}"
+echo -e "    Website:     ${BLUE}https://joshuagoth.com${NC}"
+echo -e "    License:     GNU GPL-3.0"
+echo ""
+echo -e "  ${GREEN}A JoshuaGoth Software${NC}"
 echo ""

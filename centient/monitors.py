@@ -1,7 +1,7 @@
 """¢entien¢ — Background monitoring workers.
 
-Runs async checks against servers (ICMP ping + SSH metrics),
-services (TCP port), websites (HTTP), and Proxmox nodes (API).
+Agentless monitoring: ping/TCP, services (TCP port), websites (HTTP),
+and Proxmox nodes (API).  Nothing is installed on monitored hosts.
 """
 
 from __future__ import annotations
@@ -19,10 +19,9 @@ import httpx
 
 from .database import Database
 
-logger = logging.getLogger("centient.monitors")
+SEP = "---CENTIENT-SEP---"
 
-# ── SSH separator for batched commands ───────────────────────
-SEP = "---CENTIENT_SEP---"
+logger = logging.getLogger("centient.monitors")
 
 
 class MonitorEngine:
@@ -33,7 +32,6 @@ class MonitorEngine:
         self._tasks: list[asyncio.Task[None]] = []
         self._running = False
         self.status_cache: dict[str, dict[str, Any]] = {}
-        # Keep SSH connections alive across polls
         self._ssh_conns: dict[int, asyncssh.SSHClientConnection] = {}
 
     async def start(self) -> None:
@@ -55,7 +53,7 @@ class MonitorEngine:
         for t in self._tasks:
             t.cancel()
         self._tasks.clear()
-        # Close SSH connections
+        # Close any open SSH connections
         for conn in self._ssh_conns.values():
             try:
                 conn.close()
@@ -79,8 +77,8 @@ class MonitorEngine:
                 break
             except Exception as e:
                 logger.error("Server loop error: %s", e)
-            interval = int(await self.db.get_setting("check_interval", "60"))
-            await asyncio.sleep(max(interval, 10))
+            interval = int(await self.db.get_setting("check_interval", "10"))
+            await asyncio.sleep(max(interval, 5))
 
     async def _check_server(self, server: dict[str, Any]) -> None:
         hostname = server.get("ip_address") or server["hostname"]
@@ -116,14 +114,42 @@ class MonitorEngine:
             proc = await asyncio.create_subprocess_exec(
                 *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=5)
             if proc.returncode == 0:
                 output = stdout.decode("utf-8", errors="ignore")
                 rtt = self._parse_ping_rtt(output)
                 return "up", rtt
+            # ICMP may be blocked (unprivileged LXC container, Docker, restricted env).
+            # Fall back to TCP port probing so servers are still detected.
+            err_text = stderr.decode("utf-8", errors="ignore").lower()
+            if any(kw in err_text for kw in ("permission denied", "operation not permitted", "socket")):
+                logger.debug("ICMP blocked for %s, falling back to TCP probe", host)
+                return await self._tcp_probe(host)
             return "down", None
+        except PermissionError:
+            logger.debug("ICMP PermissionError for %s, falling back to TCP probe", host)
+            return await self._tcp_probe(host)
         except (asyncio.TimeoutError, OSError):
             return "down", None
+
+    async def _tcp_probe(self, host: str, ports: tuple[int, ...] = (22, 80, 443, 3389, 8080)) -> tuple[str, float | None]:
+        """TCP connectivity fallback used when ICMP ping is unavailable (e.g. unprivileged LXC)."""
+        start = time.monotonic()
+        for port in ports:
+            try:
+                _, writer = await asyncio.wait_for(
+                    asyncio.open_connection(host, port), timeout=3.0,
+                )
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+                rtt = round((time.monotonic() - start) * 1000, 2)
+                return "up", rtt
+            except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
+                continue
+        return "down", None
 
     @staticmethod
     def _parse_ping_rtt(output: str) -> float | None:
@@ -153,8 +179,8 @@ class MonitorEngine:
                 break
             except Exception as e:
                 logger.error("Service loop error: %s", e)
-            interval = int(await self.db.get_setting("check_interval", "60"))
-            await asyncio.sleep(max(interval, 10))
+            interval = int(await self.db.get_setting("check_interval", "10"))
+            await asyncio.sleep(max(interval, 5))
 
     async def _check_service(self, service: dict[str, Any]) -> None:
         host = service["host"]
@@ -207,8 +233,8 @@ class MonitorEngine:
                 break
             except Exception as e:
                 logger.error("Website loop error: %s", e)
-            interval = int(await self.db.get_setting("check_interval", "60"))
-            await asyncio.sleep(max(interval, 10))
+            interval = int(await self.db.get_setting("check_interval", "10"))
+            await asyncio.sleep(max(interval, 5))
 
     async def _check_website(self, website: dict[str, Any]) -> None:
         url = website["url"]
@@ -265,7 +291,7 @@ class MonitorEngine:
         )
 
     # ══════════════════════════════════════════════════════════════
-    #  SSH-based remote metrics collection
+    #  SSH-based remote metrics collection (agentless)
     # ══════════════════════════════════════════════════════════════
 
     async def _ssh_loop(self) -> None:
@@ -283,17 +309,15 @@ class MonitorEngine:
                 break
             except Exception as e:
                 logger.error("SSH loop error: %s", e)
-            interval = int(await self.db.get_setting("check_interval", "60"))
-            await asyncio.sleep(max(interval, 15))
+            interval = int(await self.db.get_setting("check_interval", "10"))
+            await asyncio.sleep(max(interval, 5))
 
     async def _get_ssh_conn(self, server: dict[str, Any]) -> asyncssh.SSHClientConnection:
         """Get or create a persistent SSH connection."""
         sid = server["id"]
         conn = self._ssh_conns.get(sid)
-        # Test if still alive
         if conn is not None:
             try:
-                # Quick check: run trivial command
                 result = await asyncio.wait_for(conn.run("echo ok", check=False), timeout=3)
                 if result.stdout and result.stdout.strip() == "ok":
                     return conn
@@ -323,7 +347,6 @@ class MonitorEngine:
             connect_kwargs["client_keys"] = [key_path]
         elif password:
             connect_kwargs["password"] = password
-        # If neither, asyncssh will try default keys (~/.ssh/id_rsa, etc.)
 
         conn = await asyncssh.connect(**connect_kwargs)
         self._ssh_conns[sid] = conn
@@ -348,7 +371,6 @@ class MonitorEngine:
         sid = server["id"]
         cache_key = f"ssh:{sid}"
 
-        # Parse monitor flags
         raw_flags = server.get("monitor_flags") or "{}"
         try:
             flags = json.loads(raw_flags) if isinstance(raw_flags, str) else raw_flags
@@ -365,30 +387,24 @@ class MonitorEngine:
             conn = await self._get_ssh_conn(server)
             sudo_pass = server.get("sudo_password")
 
-            # ── System metrics (always collected if ssh is configured) ──
             if flags.get("system", True):
                 results["metrics"] = await self._ssh_system_metrics(conn)
 
-            # ── PM2 processes ──
             if flags.get("pm2", False):
                 results["pm2"] = await self._ssh_pm2(conn)
 
-            # ── Services ──
             if flags.get("services", False):
                 results["services"] = await self._ssh_services(conn)
 
-            # ── Nginx ──
             if flags.get("nginx", False):
                 results["nginx"] = await self._ssh_nginx(conn, sudo_pass)
 
-            # ── Fail2ban ──
             if flags.get("fail2ban", False):
                 results["fail2ban"] = await self._ssh_fail2ban(conn, sudo_pass)
 
         except Exception as exc:
             results["error"] = str(exc)
             logger.warning("SSH poll failed for server %d: %s", sid, exc)
-            # Drop cached connection on failure
             self._ssh_conns.pop(sid, None)
 
         self.status_cache[cache_key] = results
@@ -430,7 +446,7 @@ class MonitorEngine:
             for line in mem_text.split("\n"):
                 if ":" in line:
                     k, v = line.split(":", 1)
-                    mem[k.strip()] = int(v.strip().split()[0])  # value in kB
+                    mem[k.strip()] = int(v.strip().split()[0])
             total = mem.get("MemTotal", 1)
             avail = mem.get("MemAvailable", total)
             used = total - avail
@@ -489,7 +505,6 @@ class MonitorEngine:
         """Get PM2 process list via SSH."""
         raw = await self._ssh_cmd(conn, "pm2 jlist 2>/dev/null || echo '[]'")
         try:
-            # pm2 sometimes prints preamble text before the JSON
             match = re.search(r'\[.*\]', raw, re.DOTALL)
             data = json.loads(match.group(0)) if match else []
         except (json.JSONDecodeError, AttributeError):
@@ -522,34 +537,31 @@ class MonitorEngine:
             if len(parts) < 4:
                 continue
             name = parts[0].replace(".service", "")
-            active = parts[2]  # active/inactive
-            sub = parts[3]     # running/dead/exited
+            active = parts[2]
+            sub = parts[3]
             ok = active == "active"
-            services.append({
-                "name": name,
-                "active": active,
-                "sub": sub,
-                "ok": ok,
-            })
+            services.append({"name": name, "active": active, "sub": sub, "ok": ok})
         return services
 
     async def _ssh_nginx(self, conn: asyncssh.SSHClientConnection, sudo_pass: str | None = None) -> dict[str, Any]:
         """Parse recent nginx access logs via SSH."""
-        # Read last ~5000 lines from all nginx access logs
         cmd = "tail -5000 /var/log/nginx/*access*.log 2>/dev/null || tail -5000 /var/log/nginx/*.log 2>/dev/null || echo ''"
         if sudo_pass:
             raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass)
         else:
             raw = await self._ssh_cmd(conn, cmd)
 
-        window = 300  # 5 minutes
+        window = 300
         cutoff = time.time() - window
         sites: dict[str, dict[str, Any]] = {}
         recent_requests: list[dict[str, Any]] = []
         total_requests = 0
 
-        # Combined nginx log format regex
+        # Support two formats:
+        #   1) vhost-prefixed: "joshuagoth.com 1.2.3.4 - - [ts] ..."
+        #   2) standard combined: "1.2.3.4 - - [ts] ..."
         log_re = re.compile(
+            r'(?:(?P<vhost>[a-zA-Z0-9._-]+)\s+)?'
             r'(?P<ip>[\d.]+)\s+\S+\s+\S+\s+'
             r'\[(?P<ts>[^\]]+)\]\s+'
             r'"(?P<method>\S+)\s+(?P<path>\S+)\s+\S+"\s+'
@@ -568,7 +580,6 @@ class MonitorEngine:
                 ts = dt.timestamp()
             except (ValueError, TypeError):
                 continue
-
             if ts < cutoff:
                 continue
 
@@ -578,11 +589,7 @@ class MonitorEngine:
             method = m.group("method")
             path = m.group("path")
 
-            # Detect site from log file header or server_name
-            # nginx combined log usually from ==> /var/log/nginx/sitename.access.log <==
-            site_name = "default"
-            # We parse it simply from file headers — tail outputs them
-            # But simpler: derive from the Host or just use one bucket
+            site_name = m.group("vhost") or "default"
             site = sites.setdefault(site_name, {
                 "total_requests": 0,
                 "status_codes": {},
@@ -604,10 +611,8 @@ class MonitorEngine:
                     "site": site_name,
                 })
 
-        # Compute RPM
         rpm = total_requests / (window / 60) if total_requests > 0 else 0
 
-        # Serialize sites (sets aren't JSON serializable)
         serialized_sites: dict[str, Any] = {}
         for name, data in sites.items():
             serialized_sites[name] = {
@@ -637,7 +642,6 @@ class MonitorEngine:
         active_bans = 0
         jails: list[dict[str, Any]] = []
 
-        # Parse jail list
         jail_match = re.search(r'Jail list:\s*(.+)', raw_status)
         if jail_match:
             jail_names = [j.strip() for j in jail_match.group(1).split(",") if j.strip()]
@@ -667,7 +671,7 @@ class MonitorEngine:
                     "name": jail,
                     "currently_banned": currently,
                     "total_banned": total,
-                    "banned_ips": banned_ips[:20],  # Limit
+                    "banned_ips": banned_ips[:20],
                 })
 
         return {
@@ -692,8 +696,8 @@ class MonitorEngine:
                 break
             except Exception as e:
                 logger.error("Proxmox loop error: %s", e)
-            interval = int(await self.db.get_setting("check_interval", "60"))
-            await asyncio.sleep(max(interval, 30))
+            interval = int(await self.db.get_setting("check_interval", "10"))
+            await asyncio.sleep(max(interval * 3, 30))
 
     async def _poll_proxmox(self, node: dict[str, Any]) -> None:
         """Fetch LXC/VM stats from a Proxmox node via API token."""
@@ -724,7 +728,7 @@ class MonitorEngine:
 
         try:
             async with httpx.AsyncClient(timeout=15.0, verify=verify_ssl) as client:
-                # Node status
+                # Node status (may 403 if token lacks Sys.Audit — that's fine, we still fetch guests)
                 try:
                     r = await client.get(f"{base}/nodes/{pve_node}/status", headers=headers)
                     if r.status_code == 200:
@@ -743,9 +747,19 @@ class MonitorEngine:
                         }
                         results["status"] = "up"
                     elif r.status_code == 401:
-                        results["error"] = "Authentication failed — check API token"
+                        results["error"] = "Authentication failed — check API token credentials"
                         results["status"] = "down"
                         logger.warning("Proxmox %s auth failed (401)", host)
+                    elif r.status_code == 403:
+                        # Token works but lacks Sys.Audit for node stats.
+                        # Mark as "up" (token is valid) and try fetching guests.
+                        results["status"] = "up"
+                        results["error"] = (
+                            "Node stats unavailable (403) — token lacks Sys.Audit permission. "
+                            "In Proxmox: Datacenter → Permissions → Add, "
+                            "Path=/, Role=PVEAuditor, assign to root@pam!monitor."
+                        )
+                        logger.info("Proxmox %s: node status 403 — fetching guests anyway", host)
                     else:
                         results["error"] = f"HTTP {r.status_code} from Proxmox API"
                         results["status"] = "down"
@@ -755,7 +769,7 @@ class MonitorEngine:
                     results["error"] = f"Connection error: {exc}"
                     logger.debug("Proxmox node status error: %s", exc)
 
-                # Only fetch guests if node is reachable
+                # Fetch guests if node is reachable (including partial-403 access)
                 if results["status"] == "up":
                     # LXC containers
                     try:

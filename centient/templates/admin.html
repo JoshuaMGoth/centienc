@@ -91,6 +91,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <div class="brand"><img class="logo" src="/static/centienc-logo.png" alt="¢entien¢ logo"> Admin</div>
     <nav>
       <a href="#" onclick="showPage('general')" class="active" data-page="general">🔧 General</a>
+      <a href="#" onclick="showPage('servers')" data-page="servers">🖥 Servers</a>
+      <a href="#" onclick="showPage('websites')" data-page="websites">🌐 Websites</a>
       <a href="#" onclick="showPage('users')" data-page="users">👤 Users</a>
       <a href="#" onclick="showPage('notifications')" data-page="notifications">🔔 Notifications</a>
       <a href="#" onclick="showPage('data')" data-page="data">🗄 Data</a>
@@ -115,6 +117,48 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <div class="hint" style="margin-left:146px">When disabled, the dashboard is open to anyone with the URL.</div>
       </div>
       <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+
+    <!-- SERVERS -->
+    <div class="page" id="page-servers">
+      <h2>Server Management</h2>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">🖥 Servers</h3>
+          <button class="btn btn-primary" onclick="openServerModal()">+ Add Server</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Hostname</th><th>Port</th><th>SSH User</th><th>SSH Port</th><th>Monitoring</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="serverTableBody"></tbody>
+        </table>
+      </div>
+      <div class="panel" style="border-color:#58a6ff22;background:rgba(88,166,255,.05)">
+        <h3>🔑 SSH-Based Monitoring</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">¢entien¢ connects to your servers via SSH — no agents to install. Configure SSH credentials and monitoring features per server.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px;color:var(--text2);margin-top:10px">
+          <div><strong style="color:var(--text)">System Metrics</strong> — CPU, memory, disk, uptime, network</div>
+          <div><strong style="color:var(--text)">PM2 Processes</strong> — Status, memory, restarts for Node.js apps</div>
+          <div><strong style="color:var(--text)">Systemd Services</strong> — Active/failed state for system daemons</div>
+          <div><strong style="color:var(--text)">Nginx Logs</strong> — Live request feed, status codes, RPM</div>
+          <div><strong style="color:var(--text)">Fail2Ban</strong> — Banned IPs, active jails, attack detection</div>
+          <div><strong style="color:var(--text)">SSH Keys</strong> — Prefer key-based auth for passwordless access</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEBSITES -->
+    <div class="page" id="page-websites">
+      <h2>Website Monitoring</h2>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">🌐 Websites</h3>
+          <button class="btn btn-primary" onclick="openWebsiteModal()">+ Add Website</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>URL</th><th>Expected</th><th>Timeout</th><th>Status</th><th>Response</th><th>Actions</th></tr></thead>
+          <tbody id="websiteTableBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- USERS -->
@@ -233,10 +277,57 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   </div>
 </div>
 
+<!-- Server Modal -->
+<div class="modal-overlay" id="serverModalOverlay" onclick="if(event.target===this)closeServerModal()">
+  <div class="modal" style="max-width:580px">
+    <h3 id="serverModalTitle">Add Server</h3>
+    <label>Server Name</label><input id="fsName" placeholder="Production Server">
+    <label>Hostname / IP</label><input id="fsHostname" placeholder="192.168.1.100">
+    <label>Port</label><input id="fsPort" type="number" value="22">
+    <div style="margin-top:16px;padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--accent)">SSH Configuration</div>
+      <label>SSH Username</label><input id="fsSshUser" placeholder="root">
+      <label>SSH Port</label><input id="fsSshPort" type="number" value="22">
+      <label>SSH Key Path</label><input id="fsSshKeyPath" placeholder="/root/.ssh/id_ed25519">
+      <label>SSH Password (if no key)</label><input id="fsSshPassword" type="password" placeholder="Leave blank for key auth">
+      <label>Sudo Password</label><input id="fsSudoPassword" type="password" placeholder="Leave blank for passwordless sudo">
+      <label style="margin-top:14px">Monitoring Features</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmSystem" checked style="width:auto;flex:none;min-width:0"> System</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmPm2" style="width:auto;flex:none;min-width:0"> PM2</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmServices" style="width:auto;flex:none;min-width:0"> Systemd</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmNginx" style="width:auto;flex:none;min-width:0"> Nginx</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmFail2ban" style="width:auto;flex:none;min-width:0"> Fail2Ban</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeServerModal()">Cancel</button>
+      <button class="btn btn-danger" id="serverDeleteBtn" style="display:none" onclick="deleteServer()">Delete</button>
+      <button class="btn btn-primary" onclick="saveServer()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Website Modal -->
+<div class="modal-overlay" id="websiteModalOverlay" onclick="if(event.target===this)closeWebsiteModal()">
+  <div class="modal">
+    <h3 id="websiteModalTitle">Add Website</h3>
+    <label>Name</label><input id="fwName" placeholder="My Website">
+    <label>URL</label><input id="fwUrl" placeholder="https://example.com">
+    <label>Expected Status</label><input id="fwExpectedStatus" type="number" value="200">
+    <label>Timeout (seconds)</label><input id="fwTimeout" type="number" value="15">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeWebsiteModal()">Cancel</button>
+      <button class="btn btn-danger" id="websiteDeleteBtn" style="display:none" onclick="deleteWebsite()">Delete</button>
+      <button class="btn btn-primary" onclick="saveWebsite()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toasts"></div>
 
 <script>
-let settings={},editUserId=null,editChannelId=null;
+let settings={},editUserId=null,editChannelId=null,editServerId=null,editWebsiteId=null;
 
 async function api(p,o={}){const r=await fetch(p,{headers:{'Content-Type':'application/json'},...o});if(r.status===401){location.href='/login';return null}const d=await r.json();if(!r.ok)throw new Error(d.detail||'Failed');return d}
 function toast(m,t='info'){const e=document.createElement('div');e.className='toast '+t;e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(()=>e.remove(),3500)}
@@ -249,6 +340,9 @@ function showPage(p){
   document.querySelector(`[data-page="${p}"]`).classList.add('active');
   if(p==='users')loadUsers();
   if(p==='notifications')loadChannels();
+  if(p==='servers')loadServers();
+  if(p==='websites')loadWebsites();
+  if(p==='proxmox')loadPveNodes();
 }
 
 /* Settings */
@@ -280,6 +374,159 @@ async function saveSettings(){
   };
   try{await api('/api/settings',{method:'PUT',body:JSON.stringify(body)});toast('Settings saved','success');localStorage.setItem('centient_theme',body.theme)}catch(e){toast(e.message,'error')}
 }
+
+/* ── Servers ── */
+async function loadServers(){
+  try{
+    const d=await api('/api/servers');if(!d)return;
+    const tb=document.getElementById('serverTableBody');
+    tb.innerHTML=(d.servers||[]).map(s=>{
+      let flags={};try{flags=typeof s.monitor_flags==='string'?JSON.parse(s.monitor_flags):(s.monitor_flags||{})}catch(e){}
+      const feats=[];if(flags.system!==false)feats.push('SYS');if(flags.pm2)feats.push('PM2');if(flags.services)feats.push('SVC');if(flags.nginx)feats.push('NGX');if(flags.fail2ban)feats.push('F2B');
+      const st=s.live_status||'unknown';
+      const stColor=st==='up'?'var(--green)':st==='down'?'var(--red)':'var(--text2)';
+      return `<tr>
+        <td><strong>${s.name}</strong></td>
+        <td style="font-family:monospace;font-size:12px">${s.hostname}</td>
+        <td>${s.port||22}</td>
+        <td>${s.ssh_user||'—'}</td>
+        <td>${s.ssh_port||22}</td>
+        <td style="font-size:11px">${feats.join(' · ')||'—'}</td>
+        <td style="color:${stColor};font-weight:600">${st}</td>
+        <td class="actions">
+          <button onclick="openServerModal(${s.id})">Edit</button>
+          <button onclick="checkServer(${s.id})">Check</button>
+          <button class="del" onclick="confirmDeleteServer(${s.id})">Delete</button>
+        </td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text2)">No servers configured. Click + Add Server.</td></tr>';
+  }catch(e){toast(e.message,'error')}
+}
+function openServerModal(id=null){
+  editServerId=id;
+  document.getElementById('serverModalTitle').textContent=id?'Edit Server':'Add Server';
+  document.getElementById('serverDeleteBtn').style.display=id?'inline-block':'none';
+  if(!id){
+    ['fsName','fsHostname','fsSshUser','fsSshKeyPath','fsSshPassword','fsSudoPassword'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('fsPort').value='22';document.getElementById('fsSshPort').value='22';
+    document.getElementById('fmSystem').checked=true;
+    ['fmPm2','fmServices','fmNginx','fmFail2ban'].forEach(i=>document.getElementById(i).checked=false);
+  }
+  document.getElementById('serverModalOverlay').classList.add('active');
+  if(id)loadServerEdit(id);
+}
+async function loadServerEdit(id){
+  try{
+    const d=await api('/api/servers');if(!d)return;
+    const s=(d.servers||[]).find(x=>x.id===id);if(!s)return;
+    document.getElementById('fsName').value=s.name||'';
+    document.getElementById('fsHostname').value=s.hostname||'';
+    document.getElementById('fsPort').value=s.port||22;
+    document.getElementById('fsSshUser').value=s.ssh_user||'';
+    document.getElementById('fsSshPort').value=s.ssh_port||22;
+    document.getElementById('fsSshKeyPath').value=s.ssh_key_path||'';
+    document.getElementById('fsSshPassword').value='';
+    document.getElementById('fsSudoPassword').value='';
+    let f={};try{f=typeof s.monitor_flags==='string'?JSON.parse(s.monitor_flags):(s.monitor_flags||{})}catch(e){}
+    document.getElementById('fmSystem').checked=f.system!==false;
+    document.getElementById('fmPm2').checked=!!f.pm2;
+    document.getElementById('fmServices').checked=!!f.services;
+    document.getElementById('fmNginx').checked=!!f.nginx;
+    document.getElementById('fmFail2ban').checked=!!f.fail2ban;
+  }catch(e){}
+}
+function closeServerModal(){document.getElementById('serverModalOverlay').classList.remove('active');editServerId=null}
+async function saveServer(){
+  const body={
+    name:document.getElementById('fsName').value,
+    hostname:document.getElementById('fsHostname').value,
+    port:parseInt(document.getElementById('fsPort').value)||22,
+    ssh_user:document.getElementById('fsSshUser').value||null,
+    ssh_port:parseInt(document.getElementById('fsSshPort').value)||22,
+    ssh_key_path:document.getElementById('fsSshKeyPath').value||null,
+    ssh_password:document.getElementById('fsSshPassword').value||null,
+    sudo_password:document.getElementById('fsSudoPassword').value||null,
+    monitor_flags:{
+      system:document.getElementById('fmSystem').checked,
+      pm2:document.getElementById('fmPm2').checked,
+      services:document.getElementById('fmServices').checked,
+      nginx:document.getElementById('fmNginx').checked,
+      fail2ban:document.getElementById('fmFail2ban').checked
+    }
+  };
+  if(editServerId&&!body.ssh_password)delete body.ssh_password;
+  if(editServerId&&!body.sudo_password)delete body.sudo_password;
+  try{
+    if(editServerId)await api('/api/servers/'+editServerId,{method:'PUT',body:JSON.stringify(body)});
+    else await api('/api/servers',{method:'POST',body:JSON.stringify(body)});
+    toast(editServerId?'Server updated':'Server added','success');
+    closeServerModal();loadServers();
+  }catch(e){toast(e.message,'error')}
+}
+async function checkServer(id){try{const d=await api('/api/servers/'+id+'/check',{method:'POST'});toast('Check: '+(d.status||'done'),'info');loadServers()}catch(e){toast(e.message,'error')}}
+async function confirmDeleteServer(id){if(!confirm('Delete this server?'))return;try{await api('/api/servers/'+id,{method:'DELETE'});toast('Server deleted','success');loadServers()}catch(e){toast(e.message,'error')}}
+async function deleteServer(){if(!editServerId)return;await confirmDeleteServer(editServerId);closeServerModal()}
+
+/* ── Websites ── */
+async function loadWebsites(){
+  try{
+    const d=await api('/api/websites');if(!d)return;
+    const tb=document.getElementById('websiteTableBody');
+    tb.innerHTML=(d.websites||[]).map(w=>{
+      const st=w.live_status||'unknown';
+      const stColor=st==='up'?'var(--green)':st==='down'?'var(--red)':'var(--text2)';
+      return `<tr>
+        <td><strong>${w.name}</strong></td>
+        <td style="font-family:monospace;font-size:12px">${w.url||'—'}</td>
+        <td>${w.expected_status||200}</td>
+        <td>${w.timeout||15}s</td>
+        <td style="color:${stColor};font-weight:600">${st}${w.status_code?' ('+w.status_code+')':''}</td>
+        <td>${w.response_time!=null?w.response_time.toFixed(0)+'ms':'—'}</td>
+        <td class="actions">
+          <button onclick="openWebsiteModal(${w.id})">Edit</button>
+          <button onclick="checkWebsite(${w.id})">Check</button>
+          <button class="del" onclick="confirmDeleteWebsite(${w.id})">Delete</button>
+        </td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--text2)">No websites configured. Click + Add Website.</td></tr>';
+  }catch(e){toast(e.message,'error')}
+}
+function openWebsiteModal(id=null){
+  editWebsiteId=id;
+  document.getElementById('websiteModalTitle').textContent=id?'Edit Website':'Add Website';
+  document.getElementById('websiteDeleteBtn').style.display=id?'inline-block':'none';
+  if(!id){['fwName','fwUrl'].forEach(i=>document.getElementById(i).value='');document.getElementById('fwExpectedStatus').value='200';document.getElementById('fwTimeout').value='15'}
+  document.getElementById('websiteModalOverlay').classList.add('active');
+  if(id)loadWebsiteEdit(id);
+}
+async function loadWebsiteEdit(id){
+  try{
+    const d=await api('/api/websites');if(!d)return;
+    const w=(d.websites||[]).find(x=>x.id===id);if(!w)return;
+    document.getElementById('fwName').value=w.name||'';
+    document.getElementById('fwUrl').value=w.url||'';
+    document.getElementById('fwExpectedStatus').value=w.expected_status||200;
+    document.getElementById('fwTimeout').value=w.timeout||15;
+  }catch(e){}
+}
+function closeWebsiteModal(){document.getElementById('websiteModalOverlay').classList.remove('active');editWebsiteId=null}
+async function saveWebsite(){
+  const body={
+    name:document.getElementById('fwName').value,
+    url:document.getElementById('fwUrl').value,
+    expected_status:parseInt(document.getElementById('fwExpectedStatus').value)||200,
+    timeout:parseInt(document.getElementById('fwTimeout').value)||15
+  };
+  try{
+    if(editWebsiteId)await api('/api/websites/'+editWebsiteId,{method:'PUT',body:JSON.stringify(body)});
+    else await api('/api/websites',{method:'POST',body:JSON.stringify(body)});
+    toast(editWebsiteId?'Website updated':'Website added','success');
+    closeWebsiteModal();loadWebsites();
+  }catch(e){toast(e.message,'error')}
+}
+async function checkWebsite(id){try{const d=await api('/api/websites/'+id+'/check',{method:'POST'});toast('Check: '+(d.status||'done'),'info');loadWebsites()}catch(e){toast(e.message,'error')}}
+async function confirmDeleteWebsite(id){if(!confirm('Delete this website?'))return;try{await api('/api/websites/'+id,{method:'DELETE'});toast('Website deleted','success');loadWebsites()}catch(e){toast(e.message,'error')}}
+async function deleteWebsite(){if(!editWebsiteId)return;await confirmDeleteWebsite(editWebsiteId);closeWebsiteModal()}
 
 /* Users */
 async function loadUsers(){
@@ -375,10 +622,6 @@ async function savePve(){
   }catch(e){toast(e.message,'error')}
 }
 async function deletePve(id){if(!confirm('Delete this Proxmox node?'))return;try{await api('/api/proxmox/'+id,{method:'DELETE'});toast('Node deleted','success');loadPveNodes()}catch(e){toast(e.message,'error')}}
-
-/* Override showPage to load proxmox */
-const _origShowPage=showPage;
-function showPage(p){_origShowPage(p);if(p==='proxmox')loadPveNodes();}
 
 loadSettings();
 updateChannelFields();

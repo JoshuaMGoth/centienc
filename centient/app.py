@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -9,7 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -37,6 +38,44 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 db: Database | None = None
 engine: MonitorEngine | None = None
 
+# WebSocket connection manager
+_ws_clients: set[WebSocket] = set()
+_ws_broadcast_task: asyncio.Task | None = None
+
+
+async def _ws_broadcast_loop() -> None:
+    """Periodically push overview data to all connected WebSocket clients."""
+    while True:
+        try:
+            await asyncio.sleep(5)
+            if not _ws_clients or engine is None or db is None:
+                continue
+            overview = engine.get_overview()
+            settings = await db.get_all_settings()
+            incidents = await db.get_recent_incidents(10)
+            payload = json.dumps({
+                "type": "overview",
+                **overview,
+                "settings": {
+                    "app_title": settings.get("app_title", "¢entien¢"),
+                    "theme": settings.get("theme", "dark"),
+                    "auth_enabled": settings.get("auth_enabled", "false"),
+                    "check_interval": settings.get("check_interval", "60"),
+                },
+                "incidents": incidents,
+            }, default=str)
+            dead: set[WebSocket] = set()
+            for ws in _ws_clients.copy():
+                try:
+                    await ws.send_text(payload)
+                except Exception:
+                    dead.add(ws)
+            _ws_clients.difference_update(dead)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("WS broadcast error: %s", e)
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  Lifespan
@@ -57,8 +96,14 @@ async def lifespan(application: FastAPI):
 
     engine = MonitorEngine(db)
     await engine.start()
+
+    global _ws_broadcast_task
+    _ws_broadcast_task = asyncio.create_task(_ws_broadcast_loop())
+
     logger.info("¢entien¢ v%s started", __version__)
     yield
+    if _ws_broadcast_task:
+        _ws_broadcast_task.cancel()
     await engine.stop()
     logger.info("¢entien¢ shut down")
 
@@ -136,6 +181,9 @@ async def setup_page():
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page():
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled != "true":
+        return RedirectResponse("/")
     return _serve_template("login.html")
 
 
@@ -150,6 +198,70 @@ async def admin_page(request: Request):
         if user is None:
             return RedirectResponse("/login")
     return _serve_template("admin.html")
+
+
+@app.get("/map", response_class=HTMLResponse)
+async def map_page(request: Request):
+    setup_done = await db.get_setting("setup_complete", "false")
+    if setup_done != "true":
+        return RedirectResponse("/setup")
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled == "true":
+        user = await _require_auth(request)
+        if user is None:
+            return RedirectResponse("/login")
+    return _serve_template("map.html")
+
+
+@app.get("/tv", response_class=HTMLResponse)
+async def tv_page(request: Request):
+    setup_done = await db.get_setting("setup_complete", "false")
+    if setup_done != "true":
+        return RedirectResponse("/setup")
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled == "true":
+        user = await _require_auth(request)
+        if user is None:
+            return RedirectResponse("/login")
+    return _serve_template("tv.html")
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  WebSocket endpoint
+# ═══════════════════════════════════════════════════════════════════
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
+    _ws_clients.add(ws)
+    try:
+        # Send initial data immediately
+        if engine and db:
+            overview = engine.get_overview()
+            settings = await db.get_all_settings()
+            incidents = await db.get_recent_incidents(10)
+            await ws.send_text(json.dumps({
+                "type": "overview",
+                **overview,
+                "settings": {
+                    "app_title": settings.get("app_title", "¢entien¢"),
+                    "theme": settings.get("theme", "dark"),
+                    "auth_enabled": settings.get("auth_enabled", "false"),
+                    "check_interval": settings.get("check_interval", "60"),
+                },
+                "incidents": incidents,
+            }, default=str))
+        # Keep alive — client can send pings
+        while True:
+            msg = await ws.receive_text()
+            if msg == "ping":
+                await ws.send_text(json.dumps({"type": "pong"}))
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        _ws_clients.discard(ws)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -254,6 +366,7 @@ async def api_overview(request: Request):
             n["vms"] = cache.get("vms", [])
             n["node_status"] = cache.get("node_status", {})
             n["last_update"] = cache.get("last_update")
+            n["error"] = cache.get("error")
             overview["proxmox_nodes"].append(n)
     return {
         "ok": True,
@@ -276,14 +389,11 @@ async def api_overview(request: Request):
 async def list_servers(request: Request):
     await _require_auth_or_401(request)
     servers = await db.list_servers()
-    # Enrich with live status and SSH metrics from cache
+    # Enrich with live status from cache
     for s in servers:
         cache = engine.status_cache.get(f"server:{s['id']}", {})
         s["live_status"] = cache.get("status", "unknown")
         s["response_time"] = cache.get("response_time")
-        ssh_data = engine.status_cache.get(f"ssh:{s['id']}")
-        if ssh_data:
-            s["ssh"] = ssh_data
     return {"ok": True, "servers": servers}
 
 
@@ -292,14 +402,15 @@ async def add_server(request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
     allowed = {"name", "hostname", "ip_address", "port", "type",
+               "check_interval", "enabled",
                "ssh_user", "ssh_port", "ssh_key_path", "ssh_password",
-               "sudo_password", "monitor_flags", "check_interval", "enabled"}
+               "sudo_password", "monitor_flags"}
     data = {k: v for k, v in body.items() if k in allowed}
-    # Serialize monitor_flags if passed as object
-    if "monitor_flags" in data and isinstance(data["monitor_flags"], dict):
-        data["monitor_flags"] = json.dumps(data["monitor_flags"])
     if not data.get("name") or not data.get("hostname"):
         raise HTTPException(400, "name and hostname are required")
+    # Serialize monitor_flags dict to JSON string
+    if "monitor_flags" in data and isinstance(data["monitor_flags"], dict):
+        data["monitor_flags"] = json.dumps(data["monitor_flags"])
     sid = await db.add_server(data)
     return {"ok": True, "id": sid}
 
@@ -309,10 +420,10 @@ async def update_server(server_id: int, request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
     allowed = {"name", "hostname", "ip_address", "port", "type",
+               "check_interval", "enabled",
                "ssh_user", "ssh_port", "ssh_key_path", "ssh_password",
-               "sudo_password", "monitor_flags", "check_interval", "enabled"}
+               "sudo_password", "monitor_flags"}
     data = {k: v for k, v in body.items() if k in allowed}
-    # Serialize monitor_flags if passed as object
     if "monitor_flags" in data and isinstance(data["monitor_flags"], dict):
         data["monitor_flags"] = json.dumps(data["monitor_flags"])
     ok = await db.update_server(server_id, data)
@@ -329,7 +440,6 @@ async def delete_server(server_id: int, request: Request):
         raise HTTPException(404, "Server not found")
     # Clean cache
     engine.status_cache.pop(f"server:{server_id}", None)
-    engine.status_cache.pop(f"ssh:{server_id}", None)
     return {"ok": True}
 
 
@@ -349,20 +459,6 @@ async def server_history(server_id: int, request: Request):
     return {"ok": True, "history": history, "uptime_pct": round(uptime, 2)}
 
 
-@app.post("/api/servers/{server_id}/ssh-refresh")
-async def refresh_server_ssh(server_id: int, request: Request):
-    """Immediately poll a server's metrics via SSH."""
-    await _require_auth_or_401(request)
-    server = await db.get_server(server_id)
-    if not server:
-        raise HTTPException(404, "Server not found")
-    if not server.get("ssh_user"):
-        raise HTTPException(400, "Server has no SSH user configured")
-    await engine._poll_ssh(server)
-    cache = engine.status_cache.get(f"ssh:{server_id}", {})
-    return {"ok": True, **cache}
-
-
 # ═══════════════════════════════════════════════════════════════════
 #  Proxmox Nodes CRUD API
 # ═══════════════════════════════════════════════════════════════════
@@ -379,6 +475,7 @@ async def list_proxmox_nodes(request: Request):
         n["vms"] = cache.get("vms", [])
         n["node_status"] = cache.get("node_status", {})
         n["last_update"] = cache.get("last_update")
+        n["error"] = cache.get("error")
     return {"ok": True, "nodes": nodes}
 
 
@@ -721,3 +818,95 @@ async def health():
         "version": __version__,
         "product": "¢entien¢",
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Update Check — compares local version against latest GitHub release
+# ═══════════════════════════════════════════════════════════════════
+
+_update_cache: dict[str, Any] = {}
+
+@app.get("/api/update-check")
+async def update_check():
+    """Check GitHub for a newer release. Cached for 1 hour."""
+    import time
+    from packaging.version import Version
+
+    now = time.time()
+    if _update_cache.get("ts", 0) > now - 3600:
+        return _update_cache["data"]
+
+    current = __version__
+    result = {
+        "ok": True,
+        "current_version": current,
+        "latest_version": current,
+        "update_available": False,
+        "release_url": "https://github.com/JoshuaMGoth/centienc/releases",
+    }
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                "https://api.github.com/repos/JoshuaMGoth/centienc/releases/latest",
+                headers={"Accept": "application/vnd.github.v3+json"},
+            )
+            if r.status_code == 200:
+                data = r.json()
+                tag = data.get("tag_name", "").lstrip("v")
+                if tag:
+                    result["latest_version"] = tag
+                    result["release_url"] = data.get("html_url", result["release_url"])
+                    try:
+                        if Version(tag) > Version(current):
+                            result["update_available"] = True
+                    except Exception:
+                        # Fall back to string comparison
+                        if tag != current:
+                            result["update_available"] = True
+    except Exception as exc:
+        logger.debug("Update check failed: %s", exc)
+
+    _update_cache["ts"] = now
+    _update_cache["data"] = result
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  IP Geo-Lookup API
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/ip-lookup")
+async def ip_lookup_api(request: Request):
+    """Return geo/org data for an IP via ipinfo.io."""
+    import httpx
+    ip = request.query_params.get("ip", "").strip()
+    if not ip:
+        raise HTTPException(400, "ip parameter required")
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"https://ipinfo.io/{ip}/json")
+            data = r.json()
+        return {
+            "ok": True,
+            "ip": data.get("ip", ip),
+            "city": data.get("city", ""),
+            "region": data.get("region", ""),
+            "country": data.get("country", ""),
+            "loc": data.get("loc", ""),        # "lat,lng"
+            "org": data.get("org", ""),
+            "hostname": data.get("hostname", ""),
+            "timezone": data.get("timezone", ""),
+        }
+    except Exception as exc:
+        logger.warning("IP lookup failed for %s: %s", ip, exc)
+        return {"ok": False, "ip": ip, "error": str(exc)}
+
+
+@app.get("/ip", response_class=HTMLResponse)
+async def ip_lookup(request: Request):
+    ip = request.query_params.get("ip", "")
+    if ip:
+        return RedirectResponse(f"https://ipinfo.io/{ip}")
+    return HTMLResponse("<h1>IP lookup requires ?ip= parameter</h1>", status_code=400)

@@ -52,12 +52,6 @@ CREATE TABLE IF NOT EXISTS servers (
     ip_address     TEXT,
     port           INTEGER DEFAULT 22,
     type           TEXT DEFAULT 'linux',
-    ssh_user       TEXT DEFAULT 'root',
-    ssh_port       INTEGER DEFAULT 22,
-    ssh_key_path   TEXT,
-    ssh_password   TEXT,
-    sudo_password  TEXT,
-    monitor_flags  TEXT DEFAULT '{"system":true,"nginx":false,"pm2":false,"services":false,"fail2ban":false}',
     check_interval INTEGER DEFAULT 60,
     enabled        INTEGER DEFAULT 1,
     created_at     TEXT DEFAULT (datetime('now'))
@@ -203,6 +197,20 @@ class Database:
                         "INSERT OR IGNORE INTO settings(key, value) VALUES(?, ?)", (k, v)
                     )
                 await conn.commit()
+
+            # Ensure default admin user always exists
+            cursor = await conn.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'")
+            admin_exists = (await cursor.fetchone())[0]
+            if not admin_exists:
+                from .auth import hash_password
+                default_hash = hash_password("changeme")
+                await conn.execute(
+                    "INSERT INTO users(username, password_hash, role) VALUES('admin', ?, 'admin')",
+                    (default_hash,),
+                )
+                await conn.commit()
+                logger.info("Created default admin user (password: changeme)")
+
         logger.info("Database initialised at %s", self.path)
 
     # ── Settings ──────────────────────────────────────────────────

@@ -66,6 +66,8 @@ async function doLogin(e){
     btn.disabled=false;btn.textContent='Sign In';
   }
 }
+// If auth is disabled the server redirects /login -> /, but in case of direct load show hint
+fetch('/api/auth/me').then(r=>{if(r.ok)location.href='/'}).catch(()=>{});
 </script>
 </body>
 </html>

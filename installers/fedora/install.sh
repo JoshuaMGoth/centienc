@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entien¢ — Arch Linux Installer
+#  ¢entien¢ — Fedora / RHEL / CentOS Installer
 #
 #  Installs ¢entien¢ as a systemd service with a Python venv.
 #  Generates SSH keys for remote server monitoring.
@@ -62,6 +62,10 @@ if $UNINSTALL; then
     fi
     userdel "$SERVICE_USER" 2>/dev/null || true
     rm -f /etc/sysctl.d/99-centient.conf 2>/dev/null || true
+    if command -v firewall-cmd &>/dev/null; then
+        firewall-cmd --permanent --remove-port="${PORT}/tcp" 2>/dev/null || true
+        firewall-cmd --reload 2>/dev/null || true
+    fi
     ok "¢entien¢ removed"
     echo ""
     exit 0
@@ -69,19 +73,26 @@ fi
 
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}   ${GREEN}¢entien¢${NC}  Arch Linux Installer v${VERSION}      ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}   ${GREEN}¢entien¢${NC}  Fedora/RHEL Installer v${VERSION}     ${BLUE}║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # ── System Packages ───────────────────────────────────────────
 info "Installing system packages..."
-pacman -Sy --noconfirm --needed python python-pip python-virtualenv \
-    iputils openssh curl base-devel
+if command -v dnf &>/dev/null; then
+    dnf install -y python3 python3-pip python3-devel \
+        gcc libffi-devel iputils openssh-clients curl
+elif command -v yum &>/dev/null; then
+    yum install -y python3 python3-pip python3-devel \
+        gcc libffi-devel iputils openssh-clients curl
+else
+    err "Neither dnf nor yum found"
+fi
 ok "System packages installed"
 
 # ── Service User ──────────────────────────────────────────────
 if ! id "$SERVICE_USER" &>/dev/null; then
-    useradd -r -s /usr/bin/nologin -d "$DATA_DIR" -M "$SERVICE_USER"
+    useradd -r -s /sbin/nologin -d "$DATA_DIR" -M "$SERVICE_USER"
     ok "Created user: ${SERVICE_USER}"
 else
     info "User '${SERVICE_USER}' already exists"
@@ -90,7 +101,7 @@ fi
 # ── Python Venv + Install ────────────────────────────────────
 info "Installing ¢entien¢..."
 mkdir -p "$INSTALL_DIR" "$DATA_DIR"
-python -m venv "$VENV_DIR"
+python3 -m venv "$VENV_DIR"
 source "${VENV_DIR}/bin/activate"
 pip install --upgrade pip setuptools wheel -q
 
@@ -141,6 +152,17 @@ echo "net.ipv4.ping_group_range = 0 2147483647" > /etc/sysctl.d/99-centient.conf
 sysctl -p /etc/sysctl.d/99-centient.conf >/dev/null 2>&1 || true
 ok "ICMP ping enabled"
 
+# ── SELinux (if enforcing) ────────────────────────────────────
+if command -v getenforce &>/dev/null && [[ "$(getenforce)" == "Enforcing" ]]; then
+    # Allow centient to bind to its port and make network connections
+    if command -v semanage &>/dev/null; then
+        semanage port -a -t http_port_t -p tcp "$PORT" 2>/dev/null || true
+        ok "SELinux: port ${PORT} allowed"
+    else
+        warn "SELinux is enforcing but semanage not found. Install policycoreutils-python-utils if needed."
+    fi
+fi
+
 # ── Systemd Service ──────────────────────────────────────────
 cat > /etc/systemd/system/centient.service << EOF
 [Unit]
@@ -179,6 +201,13 @@ if systemctl is-active --quiet centient; then
     ok "Service running"
 else
     warn "Service may not have started — check: journalctl -u centient -n 20"
+fi
+
+# ── Firewall ──────────────────────────────────────────────────
+if command -v firewall-cmd &>/dev/null; then
+    firewall-cmd --permanent --add-port="${PORT}/tcp" 2>/dev/null || true
+    firewall-cmd --reload 2>/dev/null || true
+    ok "firewalld: allowed port ${PORT}"
 fi
 
 # ── Summary ───────────────────────────────────────────────────

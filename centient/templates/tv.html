@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>¢entien¢ — TV Mode</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0a0e1a;color:#fff;min-height:100vh;overflow:hidden;cursor:none}
+body:hover{cursor:default}
+
+.tv-header{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:rgba(0,0,0,.3);border-bottom:2px solid rgba(255,255,255,.06)}
+.tv-header h1{font-size:1.3em;font-weight:600;display:flex;align-items:center;gap:10px}
+.tv-header .logo{width:28px;height:28px;border-radius:6px;object-fit:cover}
+.tv-header-right{display:flex;align-items:center;gap:18px;font-size:.85em;color:rgba(255,255,255,.5)}
+.tv-header-right .ws-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.tv-header-right .ws-dot.connected{background:#4caf50;box-shadow:0 0 8px #4caf50}
+.tv-header-right .ws-dot.disconnected{background:#f44336}
+
+.status-bar{padding:8px 20px;text-align:center;font-size:.88em;font-weight:600}
+.status-bar.ok{background:linear-gradient(90deg,#1b5e20,#2e7d32)}
+.status-bar.warning{background:linear-gradient(90deg,#e65100,#f57c00);color:#000}
+.status-bar.alert{background:linear-gradient(90deg,#b71c1c,#d32f2f);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+
+.tv-metrics{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;padding:14px 24px}
+.tv-mc{background:rgba(255,255,255,.05);border-radius:10px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,.06)}
+.tv-mc .label{font-size:.65em;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.tv-mc .val{font-size:2em;font-weight:700}
+.tv-mc .sub{font-size:.6em;color:rgba(255,255,255,.3);margin-top:2px}
+.g{color:#4caf50}.a{color:#ff9800}.r{color:#f44336}.b{color:#42a5f5}.w{color:#e0e0e0}
+
+.tv-body{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 24px 24px;height:calc(100vh - 230px)}
+
+.tv-panel{background:rgba(255,255,255,.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.06);overflow:hidden;display:flex;flex-direction:column}
+.tv-panel h3{font-size:.85em;color:#64b5f6;margin-bottom:10px;flex-shrink:0}
+
+/* Server pills */
+.tv-servers{display:flex;gap:10px;flex-wrap:wrap;padding:10px 24px}
+.tv-sp{background:rgba(255,255,255,.05);border-radius:10px;padding:12px 16px;flex:1;min-width:220px;border:1px solid rgba(255,255,255,.06)}
+.tv-sp h4{color:#64b5f6;font-size:.8em;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.tv-sp .pill-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:.75em}
+.tv-sp .pv{font-size:1.3em;font-weight:700;text-align:center}
+.tv-sp .pl{font-size:.6em;color:rgba(255,255,255,.35);text-transform:uppercase;text-align:center}
+.pill-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.pill-dot.on{background:#4caf50}.pill-dot.off{background:#f44336}
+
+/* Feed */
+.tv-feed{flex:1;overflow:hidden;font-family:'SF Mono','Fira Code',monospace;font-size:.75em}
+.tv-feed .rr{display:flex;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);align-items:center}
+.rt{color:rgba(255,255,255,.3);width:55px;flex-shrink:0}
+.rm{font-weight:600;width:35px;flex-shrink:0}
+.rm.GET{color:#4caf50}.rm.POST{color:#42a5f5}.rm.PUT{color:#ff9800}.rm.DELETE{color:#f44336}
+.rp{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.6)}
+.rs{width:28px;text-align:right;flex-shrink:0}
+.rs.s2{color:#4caf50}.rs.s3{color:#42a5f5}.rs.s4{color:#ff9800}.rs.s5{color:#f44336}
+.rsite{color:rgba(100,181,246,.6);width:100px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Services/PM2 grid */
+.tv-sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px;flex:1;overflow:hidden;align-content:start}
+.tv-sp-item{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,.2);padding:5px 8px;border-radius:6px;font-size:.75em}
+.tv-sd{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tv-sd.active,.tv-sd.online{background:#4caf50}
+.tv-sd.failed,.tv-sd.stopped{background:#f44336}
+.tv-sd.inactive{background:#9e9e9e}
+
+/* Container cards */
+.tv-ct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;flex:1;overflow:hidden;align-content:start}
+.tv-ct{background:rgba(0,0,0,.2);border-radius:8px;padding:10px;font-size:.78em}
+.tv-ct .ct-head{display:flex;justify-content:space-between;margin-bottom:6px;align-items:center}
+.tv-ct .ct-name{font-weight:700;font-size:.95em}
+.tv-ct .ct-tag{font-size:.7em;color:#64b5f6;background:rgba(100,181,246,.12);padding:1px 6px;border-radius:8px}
+.tv-ct .bar{height:5px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:3px;overflow:hidden}
+.tv-ct .bar .fill{height:100%;border-radius:3px}
+
+/* Site cards inline */
+.tv-sites{display:flex;gap:6px;flex-wrap:wrap;flex:1;overflow:hidden;align-content:start}
+.tv-site{background:rgba(0,0,0,.2);border-radius:8px;padding:10px;font-size:.78em;flex:1;min-width:160px;border-left:3px solid transparent}
+.tv-site.up{border-color:#4caf50}.tv-site.down{border-color:#f44336}
+.tv-site .site-name{font-weight:700;margin-bottom:3px}
+.tv-site .site-stats{display:flex;gap:8px;font-size:.85em;color:rgba(255,255,255,.5)}
+
+@media(max-width:1200px){.tv-body{grid-template-columns:1fr}.tv-metrics{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="tv-header">
+  <h1><img class="logo" src="/static/centienc-logo.png" alt="logo"> <span id="appTitle">¢entien¢</span> <span style="font-size:.55em;color:rgba(255,255,255,.3);font-weight:400">TV MODE</span></h1>
+  <div class="tv-header-right">
+    <span class="ws-dot disconnected" id="wsDot"></span>
+    <span id="clock">--:--:--</span>
+    <a href="/" style="color:rgba(255,255,255,.3);text-decoration:none;font-size:.85em">← Dashboard</a>
+  </div>
+</div>
+
+<div class="status-bar ok" id="statusBar">Connecting…</div>
+
+<div class="tv-servers" id="serverPills"></div>
+
+<div class="tv-metrics">
+  <div class="tv-mc"><div class="label">Req/min</div><div class="val b" id="m-rpm">--</div><div class="sub" id="m-rpm-sub"></div></div>
+  <div class="tv-mc"><div class="label">Visitors</div><div class="val w" id="m-vis">--</div><div class="sub">unique IPs</div></div>
+  <div class="tv-mc"><div class="label">Sites</div><div class="val g" id="m-sites">--</div><div class="sub" id="m-sites-sub"></div></div>
+  <div class="tv-mc"><div class="label">PM2</div><div class="val g" id="m-pm2">--</div><div class="sub" id="m-pm2-sub"></div></div>
+  <div class="tv-mc"><div class="label">Containers</div><div class="val b" id="m-ct">--</div><div class="sub" id="m-ct-sub"></div></div>
+  <div class="tv-mc"><div class="label">Banned</div><div class="val r" id="m-banned">--</div><div class="sub" id="m-banned-sub"></div></div>
+  <div class="tv-mc"><div class="label">Attacks</div><div class="val a" id="m-atk">0</div><div class="sub">last 30m</div></div>
+  <div class="tv-mc"><div class="label">Vulns</div><div class="val g" id="m-vuln">0</div><div class="sub">0 critical</div></div>
+</div>
+
+<div class="tv-body">
+  <div class="tv-panel">
+    <h3>📡 Live Request Feed</h3>
+    <div class="tv-feed" id="feedList"><span style="color:rgba(255,255,255,.3)">Waiting for data…</span></div>
+  </div>
+  <div class="tv-panel">
+    <h3>⚙️ Services &amp; PM2</h3>
+    <div class="tv-sgrid" id="servicesGrid"></div>
+  </div>
+  <div class="tv-panel" id="pvePanel" style="display:none">
+    <h3>🖧 Proxmox Containers</h3>
+    <div class="tv-ct-grid" id="ctGrid"></div>
+  </div>
+  <div class="tv-panel">
+    <h3>🌐 Websites</h3>
+    <div class="tv-sites" id="siteCards"></div>
+  </div>
+</div>
+
+<script>
+let ws=null,wsRetry=null;
+
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:true})}
+setInterval(updateClock,1000);updateClock();
+
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  ws=new WebSocket(proto+'//'+location.host+'/ws');
+  ws.onopen=()=>{document.getElementById('wsDot').className='ws-dot connected';if(wsRetry){clearInterval(wsRetry);wsRetry=null}};
+  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.type==='overview')render(d)}catch(err){}};
+  ws.onclose=()=>{document.getElementById('wsDot').className='ws-dot disconnected';if(!wsRetry)wsRetry=setInterval(connectWS,5000)};
+  ws.onerror=()=>ws.close();
+}
+connectWS();
+(async()=>{try{const r=await fetch('/api/overview');if(r.ok)render(await r.json())}catch(e){}})();
+
+function render(data){
+  const s=data.settings||{},servers=data.servers||[],websites=data.websites||[],
+    pve=data.proxmox_nodes||[],nginx=data.nginx||{},fb=data.fail2ban||{},stats=data.stats||{};
+
+  document.getElementById('appTitle').textContent=s.app_title||'¢entien¢';
+
+  const bar=document.getElementById('statusBar');
+  if(stats.down>0){bar.className='status-bar alert';bar.textContent='🔴 '+stats.down+' DOWN — '+stats.up+'/'+stats.total+' operational'}
+  else if(stats.warning>0){bar.className='status-bar warning';bar.textContent='⚠️ '+stats.warning+' warnings — '+stats.up+'/'+stats.total}
+  else{bar.className='status-bar ok';bar.textContent='🟢 All '+stats.total+' systems operational'}
+
+  /* Server pills */
+  const sp=document.getElementById('serverPills');
+  sp.innerHTML=servers.map(s=>{
+    const ssh=s.ssh||{},m=ssh.metrics||{},st=s.status||s.live_status||'unknown';
+    const dot=st==='up'?'on':'off';
+    const cpu=m.load_1m!=null?m.load_1m.toFixed(2):'--';
+    const cpuC=(m.cpu_pct||0)<50?'g':(m.cpu_pct||0)<80?'a':'r';
+    const mem=m.memory?m.memory.used_pct.toFixed(1)+'%':'--';
+    const memC=(m.memory?.used_pct||0)<50?'g':(m.memory?.used_pct||0)<80?'a':'r';
+    const disk=m.disk?m.disk.used_pct.toFixed(1)+'%':'--';
+    const diskC=(m.disk?.used_pct||0)<50?'g':(m.disk?.used_pct||0)<80?'a':'r';
+    const conns=m.connections!=null?m.connections:'--';
+    return '<div class="tv-sp"><h4><span class="pill-dot '+dot+'"></span> '+esc(s.name)+'</h4><div class="pill-grid"><div><div class="pv '+cpuC+'">'+cpu+'</div><div class="pl">CPU</div></div><div><div class="pv '+memC+'">'+mem+'</div><div class="pl">Mem</div></div><div><div class="pv '+diskC+'">'+disk+'</div><div class="pl">Disk</div></div><div><div class="pv b">'+conns+'</div><div class="pl">Conns</div></div></div></div>';
+  }).join('');
+
+  /* Metrics */
+  const reqs=nginx.recent_requests||[];
+  document.getElementById('m-rpm').textContent=(nginx.total_rpm||0).toFixed(1);
+  document.getElementById('m-rpm-sub').textContent=reqs.length+' recent';
+  document.getElementById('m-vis').textContent=new Set(reqs.map(r=>r.ip)).size;
+  const sitesUp=websites.filter(w=>(w.status||w.live_status)==='up').length;
+  document.getElementById('m-sites').textContent=sitesUp;
+  document.getElementById('m-sites-sub').textContent=websites.length+' total';
+  let pm2T=0,pm2O=0;for(const sv of servers){const p=(sv.ssh||{}).pm2||[];pm2T+=p.length;pm2O+=p.filter(x=>x.status==='online').length}
+  document.getElementById('m-pm2').textContent=pm2O;
+  document.getElementById('m-pm2-sub').textContent=pm2O+'/'+pm2T;
+  let ctT=0,ctR=0;for(const n of pve){const c=n.containers||[];ctT+=c.length;ctR+=c.filter(x=>x.status==='running').length}
+  document.getElementById('m-ct').textContent=ctR;
+  document.getElementById('m-ct-sub').textContent=ctR+'/'+ctT;
+  document.getElementById('m-banned').textContent=fb.total_banned||0;
+  document.getElementById('m-banned-sub').textContent=(fb.active_bans||0)+' active';
+
+  /* Feed */
+  const fl=document.getElementById('feedList');
+  if(reqs.length){
+    fl.innerHTML=reqs.slice(0,30).map(r=>{
+      const ts=r.ts?new Date(r.ts*1000).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
+      const sc=r.status<300?'s2':r.status<400?'s3':r.status<500?'s4':'s5';
+      return '<div class="rr"><span class="rt">'+ts+'</span><span class="rm '+r.method+'">'+r.method+'</span><span class="rp">'+esc(r.path)+'</span><span class="rsite">'+esc(r.server_name||'')+'</span><span class="rs '+sc+'">'+r.status+'</span></div>';
+    }).join('');
+  }
+
+  /* Services */
+  const sg=document.getElementById('servicesGrid');
+  let sh='';const notable=['nginx','ssh','sshd','tailscaled','postfix','postgresql','redis-server','cloudflared','fail2ban','ufw','docker','mariadb','mysql','apache2','certbot.timer','cron'];
+  for(const sv of servers){
+    const ssh=sv.ssh||{},svcs=ssh.services||[],pm2=ssh.pm2||[];
+    const filtered=svcs.filter(x=>notable.includes(x.name)||x.active==='active').slice(0,15);
+    for(const x of filtered)sh+='<div class="tv-sp-item"><div class="tv-sd '+(x.ok?'active':'failed')+'"></div>'+esc(x.name)+'</div>';
+    for(const p of pm2)sh+='<div class="tv-sp-item"><div class="tv-sd '+p.status+'"></div>'+esc(p.name)+'<span style="color:rgba(255,255,255,.3);margin-left:auto;font-size:.85em">'+p.memory_mb+'MB</span></div>';
+  }
+  sg.innerHTML=sh||'<span style="color:rgba(255,255,255,.2)">No services data</span>';
+
+  /* Proxmox */
+  const all=[];for(const n of pve){for(const c of(n.containers||[]))all.push({...c,type:'CT',node:n.name});for(const v of(n.vms||[]))all.push({...v,type:'VM',node:n.name})}
+  if(all.length){
+    document.getElementById('pvePanel').style.display='flex';
+    document.getElementById('ctGrid').innerHTML=all.map(g=>{
+      const cpu=g.cpu_pct||0,mem=g.mem_pct||0;
+      return '<div class="tv-ct"><div class="ct-head"><span class="ct-name">'+esc(g.name)+'</span><span class="ct-tag">'+g.type+' '+g.vmid+'</span></div><div class="bar"><div class="fill" style="width:'+cpu+'%;background:'+fc(cpu)+'"></div></div><div class="bar"><div class="fill" style="width:'+mem+'%;background:'+fc(mem)+'"></div></div></div>';
+    }).join('');
+  }
+
+  /* Sites */
+  const sc=document.getElementById('siteCards');
+  sc.innerHTML=websites.map(w=>{
+    const st=w.status||w.live_status||'unknown';
+    return '<div class="tv-site '+st+'"><div class="site-name">'+esc(w.name)+'</div><div class="site-stats"><span>'+st.toUpperCase()+'</span>'+(w.response_time!=null?'<span>'+w.response_time.toFixed(0)+'ms</span>':'')+'</div></div>';
+  }).join('')||'<span style="color:rgba(255,255,255,.2)">No websites</span>';
+}
+
+function fc(p){return p<50?'#4caf50':p<75?'#ff9800':p<90?'#ff5722':'#f44336'}
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+</script>
+</body>
+</html>

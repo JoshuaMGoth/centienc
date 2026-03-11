@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>¢entien¢ — Server Map</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0a0e1a;color:#fff;height:100vh;overflow:hidden}
+
+.map-header{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;background:rgba(0,0,0,.5);border-bottom:2px solid rgba(255,255,255,.06);position:relative;z-index:1000}
+.map-header h1{font-size:1.2em;font-weight:600;display:flex;align-items:center;gap:8px}
+.map-header .logo{width:26px;height:26px;border-radius:6px;object-fit:cover}
+.map-header-right{display:flex;align-items:center;gap:14px;font-size:.82em;color:rgba(255,255,255,.5)}
+.map-header-right a{color:rgba(255,255,255,.5);text-decoration:none;transition:.2s}
+.map-header-right a:hover{color:#64b5f6}
+.ws-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.ws-dot.connected{background:#4caf50;box-shadow:0 0 6px #4caf50}
+.ws-dot.disconnected{background:#f44336}
+
+#map{height:calc(100vh - 52px);width:100%}
+
+/* Dark map tiles */
+.leaflet-tile-pane{filter:brightness(.7) contrast(1.1) saturate(.8)}
+.leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:rgba(255,255,255,.4)!important;font-size:10px!important}
+.leaflet-control-attribution a{color:rgba(100,181,246,.6)!important}
+
+/* Custom markers */
+.server-marker{background:none;border:none}
+.marker-dot{width:20px;height:20px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 12px rgba(0,0,0,.5);position:relative}
+.marker-dot.up{background:#4caf50;box-shadow:0 0 12px rgba(76,175,80,.5)}
+.marker-dot.down{background:#f44336;box-shadow:0 0 12px rgba(244,67,54,.5);animation:mdpulse 1.5s infinite}
+.marker-dot.unknown{background:#9e9e9e}
+@keyframes mdpulse{0%,100%{box-shadow:0 0 12px rgba(244,67,54,.5)}50%{box-shadow:0 0 24px rgba(244,67,54,.8)}}
+
+.marker-dot::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid currentColor;opacity:.3;animation:ring 2s infinite}
+.marker-dot.up::after{border-color:#4caf50}
+.marker-dot.down::after{border-color:#f44336}
+@keyframes ring{0%{transform:scale(1);opacity:.3}100%{transform:scale(1.8);opacity:0}}
+
+/* Popup override */
+.leaflet-popup-content-wrapper{background:rgba(13,17,23,.95)!important;color:#e6edf3!important;border-radius:10px!important;box-shadow:0 4px 20px rgba(0,0,0,.5)!important;border:1px solid rgba(255,255,255,.1)!important}
+.leaflet-popup-tip{background:rgba(13,17,23,.95)!important}
+.leaflet-popup-content{margin:12px 16px!important;font-family:'Segoe UI',sans-serif!important}
+.popup-title{font-size:14px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.popup-status{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.popup-status.up{background:rgba(76,175,80,.18);color:#4caf50}
+.popup-status.down{background:rgba(244,67,54,.18);color:#f44336}
+.popup-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:12px}
+.popup-metrics .pm{text-align:center;background:rgba(255,255,255,.05);padding:6px;border-radius:6px}
+.popup-metrics .pm-val{font-size:1.2em;font-weight:700}
+.popup-metrics .pm-lbl{font-size:.75em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.popup-host{font-size:11px;color:rgba(255,255,255,.4);font-family:monospace;margin-top:4px}
+
+/* Legend */
+.map-legend{position:fixed;bottom:20px;left:20px;background:rgba(13,17,23,.9);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 16px;z-index:1000;font-size:12px}
+.map-legend h4{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:8px;letter-spacing:.05em}
+.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+
+/* Stats sidebar */
+.map-stats{position:fixed;top:64px;right:12px;width:240px;background:rgba(13,17,23,.9);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;z-index:1000;font-size:12px;max-height:calc(100vh - 80px);overflow-y:auto}
+.map-stats h4{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:10px;letter-spacing:.05em}
+.stat-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.stat-row:last-child{border:none}
+.stat-label{color:rgba(255,255,255,.5)}
+.stat-val{font-weight:700}
+.stat-val.g{color:#4caf50}.stat-val.r{color:#f44336}.stat-val.b{color:#42a5f5}
+</style>
+</head>
+<body>
+
+<div class="map-header">
+  <h1><img class="logo" src="/static/centienc-logo.png" alt="logo"> <span id="appTitle">¢entien¢</span> <span style="font-size:.5em;color:rgba(255,255,255,.25);font-weight:400">MAP</span></h1>
+  <div class="map-header-right">
+    <span class="ws-dot disconnected" id="wsDot"></span>
+    <span id="clock">--:--:--</span>
+    <a href="/">← Dashboard</a>
+    <a href="/tv">📺 TV</a>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<div class="map-legend">
+  <h4>Server Status</h4>
+  <div class="legend-item"><div class="legend-dot" style="background:#4caf50"></div> Online</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f44336"></div> Down</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9e9e9e"></div> Unknown</div>
+</div>
+
+<div class="map-stats" id="statsPanel">
+  <h4>Infrastructure</h4>
+  <div class="stat-row"><span class="stat-label">Servers</span><span class="stat-val b" id="s-total">--</span></div>
+  <div class="stat-row"><span class="stat-label">Online</span><span class="stat-val g" id="s-up">--</span></div>
+  <div class="stat-row"><span class="stat-label">Down</span><span class="stat-val r" id="s-down">--</span></div>
+  <div class="stat-row"><span class="stat-label">Websites</span><span class="stat-val b" id="s-sites">--</span></div>
+  <div class="stat-row"><span class="stat-label">Containers</span><span class="stat-val b" id="s-ct">--</span></div>
+  <div class="stat-row"><span class="stat-label">PM2 Procs</span><span class="stat-val b" id="s-pm2">--</span></div>
+  <div id="serverList" style="margin-top:12px"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* Initialize map centered on US */
+const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([38,-96],4);
+L.control.zoom({position:'bottomright'}).addTo(map);
+
+/* Dark tiles */
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'&copy; <a href="https://www.openstreetmap.org/">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains:'abcd',maxZoom:19
+}).addTo(map);
+
+/* Remove tile filter since we're using dark tiles */
+document.querySelector('.leaflet-tile-pane').style.filter='none';
+
+let ws=null,wsRetry=null,markers={},lastData=null;
+
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:true})}
+setInterval(updateClock,1000);updateClock();
+
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  ws=new WebSocket(proto+'//'+location.host+'/ws');
+  ws.onopen=()=>{document.getElementById('wsDot').className='ws-dot connected';if(wsRetry){clearInterval(wsRetry);wsRetry=null}};
+  ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.type==='overview')render(d)}catch(err){}};
+  ws.onclose=()=>{document.getElementById('wsDot').className='ws-dot disconnected';if(!wsRetry)wsRetry=setInterval(connectWS,5000)};
+  ws.onerror=()=>ws.close();
+}
+connectWS();
+(async()=>{try{const r=await fetch('/api/overview');if(r.ok)render(await r.json())}catch(e){}})();
+
+/* Geo-lookup cache */
+const geoCache={};
+async function geoLookup(hostname){
+  if(geoCache[hostname])return geoCache[hostname];
+  try{
+    /* Try ipinfo.io for IP addresses */
+    const isIP=/^\d+\.\d+\.\d+\.\d+$/.test(hostname);
+    if(isIP){
+      const r=await fetch('https://ipinfo.io/'+hostname+'/json');
+      if(r.ok){const d=await r.json();if(d.loc){const[lat,lng]=d.loc.split(',');geoCache[hostname]={lat:parseFloat(lat),lng:parseFloat(lng),city:d.city,region:d.region,country:d.country};return geoCache[hostname]}}
+    }
+    /* For hostnames, try resolving — fallback to random offset from center */
+  }catch(e){}
+  /* Fallback: spread servers around a default location */
+  const idx=Object.keys(geoCache).length;
+  const offsets=[[0,0],[2,-3],[-1,4],[3,2],[-2,-2],[1,5],[-3,1]];
+  const o=offsets[idx%offsets.length]||[0,0];
+  geoCache[hostname]={lat:38+o[0],lng:-96+o[1],city:'Unknown',region:'',country:''};
+  return geoCache[hostname];
+}
+
+async function render(data){
+  lastData=data;
+  const s=data.settings||{},servers=data.servers||[],websites=data.websites||[],
+    pve=data.proxmox_nodes||[],stats=data.stats||{};
+
+  document.getElementById('appTitle').textContent=s.app_title||'¢entien¢';
+
+  /* Stats panel */
+  document.getElementById('s-total').textContent=servers.length;
+  const up=servers.filter(x=>(x.status||x.live_status)==='up').length;
+  const down=servers.filter(x=>(x.status||x.live_status)==='down').length;
+  document.getElementById('s-up').textContent=up;
+  document.getElementById('s-down').textContent=down;
+  document.getElementById('s-sites').textContent=websites.length;
+  let ctT=0;for(const n of pve)ctT+=(n.containers||[]).length;
+  document.getElementById('s-ct').textContent=ctT;
+  let pm2T=0;for(const sv of servers){pm2T+=((sv.ssh||{}).pm2||[]).length}
+  document.getElementById('s-pm2').textContent=pm2T;
+
+  /* Server list in sidebar */
+  const sl=document.getElementById('serverList');
+  sl.innerHTML='<h4 style="font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:6px;letter-spacing:.05em">Servers</h4>'+
+    servers.map(sv=>{
+      const st=sv.status||sv.live_status||'unknown';
+      const dot=st==='up'?'#4caf50':st==='down'?'#f44336':'#9e9e9e';
+      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;cursor:pointer" onclick="focusServer(\''+esc(sv.hostname)+'\')"><div style="width:7px;height:7px;border-radius:50%;background:'+dot+';flex-shrink:0"></div><span>'+esc(sv.name)+'</span></div>';
+    }).join('');
+
+  /* Place markers */
+  for(const sv of servers){
+    const geo=await geoLookup(sv.hostname);
+    const st=sv.status||sv.live_status||'unknown';
+    const ssh=sv.ssh||{},m=ssh.metrics||{};
+
+    if(markers[sv.id]){
+      /* Update existing marker */
+      const el=markers[sv.id].getElement();
+      if(el){const d=el.querySelector('.marker-dot');if(d)d.className='marker-dot '+st}
+      markers[sv.id].setLatLng([geo.lat,geo.lng]);
+    }else{
+      /* Create new marker */
+      const icon=L.divIcon({className:'server-marker',html:'<div class="marker-dot '+st+'"></div>',iconSize:[20,20],iconAnchor:[10,10]});
+      const marker=L.marker([geo.lat,geo.lng],{icon}).addTo(map);
+      markers[sv.id]=marker;
+    }
+
+    /* Update popup */
+    const cpu=m.load_1m!=null?m.load_1m.toFixed(2):'--';
+    const mem=m.memory?m.memory.used_pct.toFixed(1)+'%':'--';
+    const disk=m.disk?m.disk.used_pct.toFixed(1)+'%':'--';
+    const conns=m.connections!=null?m.connections:'--';
+    const popup='<div class="popup-title">'+esc(sv.name)+' <span class="popup-status '+st+'">'+st.toUpperCase()+'</span></div>'+
+      '<div class="popup-host">'+esc(sv.hostname)+(geo.city?' — '+geo.city+(geo.region?', '+geo.region:''):'')+'</div>'+
+      '<div class="popup-metrics"><div class="pm"><div class="pm-val">'+cpu+'</div><div class="pm-lbl">CPU</div></div><div class="pm"><div class="pm-val">'+mem+'</div><div class="pm-lbl">Memory</div></div><div class="pm"><div class="pm-val">'+disk+'</div><div class="pm-lbl">Disk</div></div><div class="pm"><div class="pm-val">'+conns+'</div><div class="pm-lbl">Conns</div></div></div>';
+    markers[sv.id].bindPopup(popup,{maxWidth:280});
+  }
+
+  /* Fit bounds if first render */
+  if(!render._fitted&&servers.length>1){
+    const bounds=[];for(const sv of servers){const g=geoCache[sv.hostname];if(g)bounds.push([g.lat,g.lng])}
+    if(bounds.length>1)map.fitBounds(bounds,{padding:[60,60]});
+    render._fitted=true;
+  }
+}
+
+function focusServer(hostname){
+  const geo=geoCache[hostname];
+  if(geo)map.flyTo([geo.lat,geo.lng],8,{duration:1});
+}
+
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):''}
+</script>
+</body>
+</html>
