@@ -324,7 +324,7 @@ info "Installing system packages inside container..."
 pct exec "$CTID" -- bash -c "
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq python3 python3-venv python3-pip build-essential iputils-ping curl
+    apt-get install -y -qq python3 python3-venv python3-pip build-essential iputils-ping curl git
 " 2>&1 | tail -5
 ok "System packages installed"
 
