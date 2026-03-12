@@ -352,6 +352,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 <div id="updateBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(90deg,#1565c0,#1e88e5);padding:10px 20px;text-align:center;font-size:.88em;z-index:900;border-top:1px solid rgba(255,255,255,.15);box-shadow:0 -4px 20px rgba(0,0,0,.3)">
     <span id="updateMsg"></span>
     <a id="updateLink" href="#" target="_blank" style="color:#fff;text-decoration:underline;margin-left:8px;font-weight:600">View Release</a>
+    <button id="updateBtn" onclick="doUpdate()" style="background:#fff;color:#1565c0;border:none;border-radius:4px;padding:4px 14px;margin-left:10px;font-weight:700;cursor:pointer;font-size:.92em;transition:all .2s">⬆ Update Now</button>
     <button onclick="document.getElementById('updateBanner').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;margin-left:12px;font-size:1.1em">&times;</button>
 </div>
 
@@ -371,12 +372,68 @@ async function checkForUpdate(){
             document.getElementById('updateMsg').textContent='CentienC '+d.latest_version+' is available (you have '+d.current_version+')';
             document.getElementById('updateLink').href=d.release_url||'https://github.com/JoshuaMGoth/centienc/releases';
             document.getElementById('updateBanner').style.display='block';
+            const btn=document.getElementById('updateBtn');
+            if(btn){btn.style.display='inline-block';btn.disabled=false;btn.textContent='⬆ Update Now'}
         }
         if(d.ok&&d.current_version){document.getElementById('cVersion').textContent=d.current_version}
     }catch(e){}
 }
 checkForUpdate();
 setInterval(checkForUpdate,6*3600*1000);
+
+/* One-Click Updater */
+async function doUpdate(){
+    const btn=document.getElementById('updateBtn');
+    const msg=document.getElementById('updateMsg');
+    if(!confirm('Update CentienC to the latest version? The dashboard will restart automatically.')) return;
+    btn.disabled=true; btn.textContent='⏳ Updating…'; btn.style.opacity='.7';
+    msg.textContent='Downloading and installing update…';
+    try{
+        const r=await fetch('/api/update-install',{method:'POST',headers:{'Content-Type':'application/json'}});
+        const d=await r.json();
+        if(d.ok){
+            msg.textContent='✅ '+d.message;
+            btn.textContent='✅ Done'; btn.style.background='#4caf50'; btn.style.color='#fff';
+            // Poll until the service restarts, then reload the page
+            setTimeout(()=>{
+                msg.textContent='Waiting for restart…';
+                let attempts=0;
+                const poll=setInterval(async()=>{
+                    attempts++;
+                    try{
+                        const h=await fetch('/api/health');
+                        const hd=await h.json();
+                        if(hd.ok){
+                            clearInterval(poll);
+                            msg.textContent='✅ Updated to v'+hd.version+'! Reloading…';
+                            setTimeout(()=>location.reload(),1000);
+                        }
+                    }catch(e){
+                        if(attempts>60){clearInterval(poll);msg.textContent='Service restarting — please refresh manually.';}
+                    }
+                },2000);
+            },3000);
+        }else{
+            msg.textContent='❌ Update failed: '+(d.error||'Unknown error');
+            btn.textContent='⬆ Retry'; btn.disabled=false; btn.style.opacity='1';
+        }
+    }catch(e){
+        msg.textContent='❌ Network error — the service may be restarting.';
+        btn.textContent='⬆ Retry'; btn.disabled=false; btn.style.opacity='1';
+        // Could be mid-restart, poll for recovery
+        setTimeout(()=>{
+            let attempts=0;
+            const poll=setInterval(async()=>{
+                attempts++;
+                try{
+                    const h=await fetch('/api/health');
+                    const hd=await h.json();
+                    if(hd.ok){clearInterval(poll);location.reload();}
+                }catch(e2){if(attempts>30)clearInterval(poll);}
+            },3000);
+        },5000);
+    }
+}
 
 /* WebSocket */
 function connectWS(){

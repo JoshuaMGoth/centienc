@@ -918,6 +918,97 @@ async def update_check():
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  One-Click Updater — upgrade CentienC from GitHub
+# ═══════════════════════════════════════════════════════════════════
+
+_update_lock = asyncio.Lock()
+_update_progress: dict[str, Any] = {"status": "idle"}
+
+
+@app.get("/api/update-progress")
+async def update_progress():
+    """Poll this to see how the update is progressing."""
+    return {"ok": True, **_update_progress}
+
+
+@app.post("/api/update-install")
+async def update_install(request: Request):
+    """Download & install the latest CentienC release, then restart.
+
+    This runs pip install --upgrade in a subprocess, waits for it
+    to finish, then signals the process to restart via systemd.
+    """
+    global _update_progress
+
+    if _update_lock.locked():
+        return {"ok": False, "error": "Update already in progress"}
+
+    async with _update_lock:
+        import subprocess
+        import sys
+        import time
+
+        _update_progress = {"status": "checking", "step": "Checking for updates…"}
+
+        # 1. Verify an update is actually available
+        check = await update_check()
+        if not check.get("update_available"):
+            _update_progress = {"status": "idle"}
+            return {"ok": False, "error": "Already running the latest version",
+                    "current_version": check.get("current_version")}
+
+        latest = check.get("latest_version", "unknown")
+        _update_progress = {"status": "downloading", "step": f"Downloading CentienC v{latest}…",
+                            "latest_version": latest}
+
+        # 2. pip install --upgrade from GitHub
+        pip_exe = os.path.join(os.path.dirname(sys.executable), "pip")
+        if not os.path.exists(pip_exe):
+            pip_exe = sys.executable + " -m pip"
+        cmd = [
+            sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir",
+            "centient @ git+https://github.com/JoshuaMGoth/centienc.git",
+        ]
+        logger.info("Update: running %s", " ".join(cmd))
+
+        try:
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=300,
+            )
+            if proc.returncode != 0:
+                logger.error("pip upgrade failed: %s", proc.stderr)
+                _update_progress = {"status": "error", "step": "pip install failed",
+                                    "detail": proc.stderr[-500:] if proc.stderr else ""}
+                return {"ok": False, "error": "pip install failed",
+                        "detail": proc.stderr[-500:] if proc.stderr else ""}
+        except subprocess.TimeoutExpired:
+            _update_progress = {"status": "error", "step": "pip install timed out"}
+            return {"ok": False, "error": "pip install timed out after 5 minutes"}
+
+        _update_progress = {"status": "restarting", "step": f"Installed v{latest} — restarting service…",
+                            "latest_version": latest}
+
+        # 3. Clear the update cache so the next check is fresh
+        _update_cache.clear()
+
+        # 4. Schedule a graceful restart
+        #    Try systemd first, fall back to SIGHUP self-restart
+        async def _do_restart():
+            await asyncio.sleep(1)  # give time for the response to be sent
+            try:
+                subprocess.run(["systemctl", "restart", "centient"], timeout=10)
+            except Exception:
+                # Not running under systemd — send SIGHUP to ourselves
+                import signal
+                os.kill(os.getpid(), signal.SIGHUP)
+
+        asyncio.create_task(_do_restart())
+
+        return {"ok": True, "message": f"Update to v{latest} installed. Restarting…",
+                "new_version": latest}
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  IP Geo-Lookup API
 # ═══════════════════════════════════════════════════════════════════
 
