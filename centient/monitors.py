@@ -568,9 +568,17 @@ class MonitorEngine:
             r'(?P<status>\d+)\s+(?P<bytes>\d+)\s+'
             r'"(?P<ref>[^"]*)"\s+"(?P<ua>[^"]*)"'
         )
+        # When tail reads multiple files it emits "==> /path/to/file <=="
+        # headers. Extract a site name from the filename to use as fallback.
+        file_header_re = re.compile(r'^==> .*/(?P<fname>[^/]+?)(?:\.access)?\.log <==$')
+        current_file_site: str | None = None
 
         from datetime import datetime
         for line in raw.strip().split("\n"):
+            fh = file_header_re.match(line.strip())
+            if fh:
+                current_file_site = fh.group("fname")
+                continue
             m = log_re.search(line)
             if not m:
                 continue
@@ -589,7 +597,7 @@ class MonitorEngine:
             method = m.group("method")
             path = m.group("path")
 
-            site_name = m.group("vhost") or "default"
+            site_name = m.group("vhost") or current_file_site or "default"
             site = sites.setdefault(site_name, {
                 "total_requests": 0,
                 "status_codes": {},
