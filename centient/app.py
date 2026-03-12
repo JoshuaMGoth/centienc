@@ -996,7 +996,8 @@ async def update_install(request: Request):
         async def _do_restart():
             await asyncio.sleep(1)  # give time for the response to be sent
             try:
-                subprocess.run(["systemctl", "restart", "centient"], timeout=10)
+                # Try sudo first (for unprivileged service user with sudoers rule)
+                subprocess.run(["sudo", "systemctl", "restart", "centient"], timeout=10)
             except Exception:
                 # Not running under systemd — send SIGHUP to ourselves
                 import signal
