@@ -545,7 +545,7 @@ class MonitorEngine:
 
     async def _ssh_nginx(self, conn: asyncssh.SSHClientConnection, sudo_pass: str | None = None) -> dict[str, Any]:
         """Parse recent nginx access logs via SSH."""
-        cmd = "tail -5000 /var/log/nginx/*access*.log 2>/dev/null || tail -5000 /var/log/nginx/*.log 2>/dev/null || echo ''"
+        cmd = "tail -n 5000 /var/log/nginx/*access*.log 2>/dev/null || tail -n 5000 /var/log/nginx/*.log 2>/dev/null || echo ''"
         if sudo_pass:
             raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass)
         else:
