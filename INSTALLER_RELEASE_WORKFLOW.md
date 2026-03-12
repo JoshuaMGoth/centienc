@@ -1,4 +1,4 @@
-# ¢entien¢ Installer Release Workflow
+# CentienC Installer Release Workflow
 
 This workflow keeps installer files in one source repo and syncs them to your Hugo site downloads section.
 

@@ -1,4 +1,4 @@
-"""¢entien¢ — SQLite database layer with async support."""
+"""CentienC — SQLite database layer with async support."""
 
 from __future__ import annotations
 
@@ -146,7 +146,7 @@ CREATE INDEX IF NOT EXISTS idx_incidents_target ON incidents(target_type, target
 # ═══════════════════════════════════════════════════════════════════
 
 class Database:
-    """Async SQLite database wrapper for ¢entien¢."""
+    """Async SQLite database wrapper for CentienC."""
 
     def __init__(self, path: str | None = None):
         self.path = path or db_path()
@@ -189,7 +189,7 @@ class Database:
                     "theme": "dark",
                     "check_interval": "60",
                     "retention_days": "30",
-                    "app_title": "¢entien¢",
+                    "app_title": "CentienC",
                     "notifications_enabled": "false",
                 }
                 for k, v in defaults.items():

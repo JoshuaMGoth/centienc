@@ -1,7 +1,7 @@
 # ══════════════════════════════════════════════════════════════════
-#  ¢entien¢ — Windows Installer (PowerShell)
+#  CentienC — Windows Installer (PowerShell)
 #
-#  Installs ¢entien¢ as a tray app or headless service using
+#  Installs CentienC as a tray app or headless service using
 #  Windows Task Scheduler. Generates SSH keys for remote
 #  server monitoring.
 #

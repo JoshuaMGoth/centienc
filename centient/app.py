@@ -1,4 +1,4 @@
-"""¢entien¢ — Main FastAPI application."""
+"""CentienC — Main FastAPI application."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ async def _ws_broadcast_loop() -> None:
                 "type": "overview",
                 **overview,
                 "settings": {
-                    "app_title": settings.get("app_title", "¢entien¢"),
+                    "app_title": settings.get("app_title", "CentienC"),
                     "theme": settings.get("theme", "dark"),
                     "auth_enabled": settings.get("auth_enabled", "false"),
                     "check_interval": settings.get("check_interval", "60"),
@@ -100,15 +100,15 @@ async def lifespan(application: FastAPI):
     global _ws_broadcast_task
     _ws_broadcast_task = asyncio.create_task(_ws_broadcast_loop())
 
-    logger.info("¢entien¢ v%s started", __version__)
+    logger.info("CentienC v%s started", __version__)
     yield
     if _ws_broadcast_task:
         _ws_broadcast_task.cancel()
     await engine.stop()
-    logger.info("¢entien¢ shut down")
+    logger.info("CentienC shut down")
 
 
-app = FastAPI(title="¢entien¢", version=__version__, lifespan=lifespan)
+app = FastAPI(title="CentienC", version=__version__, lifespan=lifespan)
 
 # Static files
 if STATIC_DIR.exists():
@@ -226,6 +226,19 @@ async def tv_page(request: Request):
     return _serve_template("tv.html")
 
 
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request):
+    setup_done = await db.get_setting("setup_complete", "false")
+    if setup_done != "true":
+        return RedirectResponse("/setup")
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled == "true":
+        user = await _require_auth(request)
+        if user is None:
+            return RedirectResponse("/login")
+    return _serve_template("analytics.html")
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  WebSocket endpoint
 # ═══════════════════════════════════════════════════════════════════
@@ -244,7 +257,7 @@ async def websocket_endpoint(ws: WebSocket):
                 "type": "overview",
                 **overview,
                 "settings": {
-                    "app_title": settings.get("app_title", "¢entien¢"),
+                    "app_title": settings.get("app_title", "CentienC"),
                     "theme": settings.get("theme", "dark"),
                     "auth_enabled": settings.get("auth_enabled", "false"),
                     "check_interval": settings.get("check_interval", "60"),
@@ -289,7 +302,7 @@ async def do_setup(request: Request):
         await db.set_setting("auth_enabled", "false")
 
     # Apply optional settings from wizard
-    title = body.get("title", "¢entien¢")
+    title = body.get("title", "CentienC")
     theme = body.get("theme", "dark")
     interval = str(body.get("check_interval", 60))
 
@@ -372,7 +385,7 @@ async def api_overview(request: Request):
         "ok": True,
         **overview,
         "settings": {
-            "app_title": settings.get("app_title", "¢entien¢"),
+            "app_title": settings.get("app_title", "CentienC"),
             "theme": settings.get("theme", "dark"),
             "auth_enabled": settings.get("auth_enabled", "false"),
             "check_interval": settings.get("check_interval", "60"),
@@ -808,6 +821,37 @@ async def list_incidents(request: Request):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  Web Analytics API
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/analytics")
+async def api_analytics(request: Request):
+    """Deep nginx log parse for web analytics.
+
+    Query params:
+        server_id (int, required) – ID of the SSH-monitored server to read logs from
+        days      (int, default 30) – How many days of history to analyse
+    """
+    await _require_auth_or_401(request)
+    server_id_str = request.query_params.get("server_id", "").strip()
+    if not server_id_str:
+        raise HTTPException(400, "server_id is required")
+    try:
+        server_id_int = int(server_id_str)
+    except ValueError:
+        raise HTTPException(400, "server_id must be an integer")
+    days = max(1, min(int(request.query_params.get("days", "30")), 365))
+
+    servers = await db.list_servers()
+    server = next((s for s in servers if s["id"] == server_id_int), None)
+    if not server:
+        raise HTTPException(404, "Server not found")
+
+    result = await engine.get_analytics(server, days=days)
+    return {"ok": True, **result}
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  Health check (no auth)
 # ═══════════════════════════════════════════════════════════════════
 
@@ -816,7 +860,7 @@ async def health():
     return {
         "ok": True,
         "version": __version__,
-        "product": "¢entien¢",
+        "product": "CentienC",
     }
 
 

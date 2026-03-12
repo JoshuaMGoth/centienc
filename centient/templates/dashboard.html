@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>¢entien¢ — Dashboard</title>
+<title>CentienC — Dashboard</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="shortcut icon" href="/static/favicon.ico">
 <link rel="apple-touch-icon" href="/static/centienc-logo.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <meta property="og:type" content="website">
-<meta property="og:title" content="¢entien¢ — Infrastructure Dashboard">
+<meta property="og:title" content="CentienC — Infrastructure Dashboard">
 <meta property="og:description" content="Monitor your servers, services, and websites in real-time.">
 <meta property="og:image" content="/static/centienc-og.png">
 <style>
@@ -207,11 +207,11 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 
 <div class="header">
     <div>
-        <h1><img class="logo" src="/static/centienc-logo.png" alt="¢entien¢ logo"> <span id="appTitle">¢entien¢</span></h1>
+        <h1><img class="logo" src="/static/centienc-logo.png" alt="CentienC logo"> <span id="appTitle">CentienC</span></h1>
         <div class="header-sub" id="headerSub">Loading…</div>
     </div>
     <div class="header-right">
-        <div class="header-links"><a href="/map">🗺️ Map</a><a href="/tv">📺 TV</a></div>
+        <div class="header-links"><a href="/map">🗺️ Map</a><a href="/tv">📺 TV</a><a href="/analytics">📊 Analytics</a></div>
         <div class="uptime-badge" id="pm2Badge">⚙ PM2: --</div>
         <span class="ws-dot disconnected" id="wsDot" title="WebSocket"></span>
         <div id="clock">--:--:--</div>
@@ -342,7 +342,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 
 <div class="footer">
     Last updated: <span id="lastUp">connecting…</span><br>
-    Powered by <strong>¢entien¢</strong> v<span id="cVersion">1.0.0</span> ·
+    Powered by <strong>CentienC</strong> v<span id="cVersion">1.0.0</span> ·
     <a href="https://github.com/JoshuaMGoth/centienc" style="color:rgba(255,255,255,.45);text-decoration:none" target="_blank">GitHub</a> ·
     <a href="https://joshuagoth.com" style="color:rgba(255,255,255,.45);text-decoration:none" target="_blank">JoshuaGoth.com</a><br>
     <span style="font-size:.9em">A <strong>JoshuaGoth</strong> Software · Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(100,181,246,.6);text-decoration:none" target="_blank">GNU GPL-3.0</a></span>
@@ -368,7 +368,7 @@ async function checkForUpdate(){
         const r=await fetch('/api/update-check');
         const d=await r.json();
         if(d.ok&&d.update_available){
-            document.getElementById('updateMsg').textContent='¢entien¢ '+d.latest_version+' is available (you have '+d.current_version+')';
+            document.getElementById('updateMsg').textContent='CentienC '+d.latest_version+' is available (you have '+d.current_version+')';
             document.getElementById('updateLink').href=d.release_url||'https://github.com/JoshuaMGoth/centienc/releases';
             document.getElementById('updateBanner').style.display='block';
         }
@@ -406,7 +406,7 @@ function renderDashboard(data){
     const s=data.settings||{},servers=data.servers||[],websites=data.websites||[],
         proxmox=data.proxmox_nodes||[],nginx=data.nginx||{},fb=data.fail2ban||{},stats=data.stats||{};
 
-    const title=s.app_title||'¢entien¢';
+    const title=s.app_title||'CentienC';
     document.getElementById('appTitle').textContent=title;
     document.title=title+' — Dashboard';
 

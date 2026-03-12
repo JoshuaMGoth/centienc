@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — ¢entien¢</title>
+<title>Admin — CentienC</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="shortcut icon" href="/static/favicon.ico">
 <link rel="apple-touch-icon" href="/static/centienc-logo.png">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Admin — ¢entien¢">
-<meta property="og:description" content="Manage settings, users, and alerts in ¢entien¢.">
+<meta property="og:title" content="Admin — CentienC">
+<meta property="og:description" content="Manage settings, users, and alerts in CentienC.">
 <meta property="og:image" content="/static/centienc-og.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Admin — ¢entien¢">
-<meta name="twitter:description" content="Manage settings, users, and alerts in ¢entien¢.">
+<meta name="twitter:title" content="Admin — CentienC">
+<meta name="twitter:description" content="Manage settings, users, and alerts in CentienC.">
 <meta name="twitter:image" content="/static/centienc-og.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -88,7 +88,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 <body>
 <div class="shell">
   <div class="sidebar">
-    <div class="brand"><img class="logo" src="/static/centienc-logo.png" alt="¢entien¢ logo"> Admin</div>
+    <div class="brand"><img class="logo" src="/static/centienc-logo.png" alt="CentienC logo"> Admin</div>
     <nav>
       <a href="#" onclick="showPage('general')" class="active" data-page="general">🔧 General</a>
       <a href="#" onclick="showPage('servers')" data-page="servers">🖥 Servers</a>
@@ -106,7 +106,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <h2>General Settings</h2>
       <div class="panel">
         <h3>🏷 Application</h3>
-        <div class="row"><label>App Title</label><input id="sTitle" placeholder="¢entien¢"></div>
+        <div class="row"><label>App Title</label><input id="sTitle" placeholder="CentienC"></div>
         <div class="row"><label>Theme</label><select id="sTheme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
         <div class="row"><label>Check Interval (s)</label><input id="sInterval" type="number" value="60"></div>
         <div class="row"><label>Data Retention (days)</label><input id="sRetention" type="number" value="30"></div>
@@ -134,7 +134,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       </div>
       <div class="panel" style="border-color:#58a6ff22;background:rgba(88,166,255,.05)">
         <h3>🔑 SSH-Based Monitoring</h3>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">¢entien¢ connects to your servers via SSH — no agents to install. Configure SSH credentials and monitoring features per server.</p>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">CentienC connects to your servers via SSH — no agents to install. Configure SSH credentials and monitoring features per server.</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px;color:var(--text2);margin-top:10px">
           <div><strong style="color:var(--text)">System Metrics</strong> — CPU, memory, disk, uptime, network</div>
           <div><strong style="color:var(--text)">PM2 Processes</strong> — Status, memory, restarts for Node.js apps</div>
@@ -209,7 +209,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       </div>
       <div class="panel" style="border-color:#58a6ff22;background:rgba(88,166,255,.05)">
         <h3>� SSH-Based Monitoring</h3>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">¢entien¢ connects to your servers via SSH — no agents to install. Configure SSH credentials and select monitoring options when adding a server in the dashboard.</p>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">CentienC connects to your servers via SSH — no agents to install. Configure SSH credentials and select monitoring options when adding a server in the dashboard.</p>
         <p style="font-size:12px;color:var(--text2)"><strong>Tip:</strong> For passwordless access, ensure your SSH public key (<code>~/.ssh/id_rsa.pub</code>) is in <code>~/.ssh/authorized_keys</code> on your monitored servers.</p>
       </div>
     </div>
@@ -350,7 +350,7 @@ async function loadSettings(){
   try{
     const d=await api('/api/settings');if(!d)return;
     settings=d.settings||{};
-    document.getElementById('sTitle').value=settings.app_title||'¢entien¢';
+    document.getElementById('sTitle').value=settings.app_title||'CentienC';
     document.getElementById('sTheme').value=settings.theme||'dark';
     document.getElementById('sInterval').value=settings.check_interval||60;
     document.getElementById('sRetention').value=settings.retention_days||30;

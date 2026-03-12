@@ -1,4 +1,4 @@
-"""¢entien¢ — CLI entry point.
+"""CentienC — CLI entry point.
 
 Modes:
   --tray      Run with a system tray icon (desktop use, binds 127.0.0.1)
@@ -21,7 +21,7 @@ logger = logging.getLogger("centient")
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="centient",
-        description="¢entien¢ — Lightweight server monitoring",
+        description="CentienC — Lightweight server monitoring",
     )
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument(
@@ -41,7 +41,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--version", action="version",
-        version=f"¢entien¢ {__import__('centient').__version__}",
+        version=f"CentienC {__import__('centient').__version__}",
     )
     args = parser.parse_args()
 
@@ -126,7 +126,7 @@ def _run_tray_mode(host: str, port: int, auto_open: bool = False) -> None:
 
     # Wait for server to finish
     server_thread.join(timeout=5)
-    logger.info("¢entien¢ shut down")
+    logger.info("CentienC shut down")
 
 
 if __name__ == "__main__":

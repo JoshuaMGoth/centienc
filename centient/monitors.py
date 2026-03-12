@@ -1,4 +1,4 @@
-"""¢entien¢ — Background monitoring workers.
+"""CentienC — Background monitoring workers.
 
 Agentless monitoring: ping/TCP, services (TCP port), websites (HTTP),
 and Proxmox nodes (API).  Nothing is installed on monitored hosts.
@@ -629,6 +629,207 @@ class MonitorEngine:
             "sites": serialized_sites,
             "totals": {"rpm": round(rpm, 1), "total_requests": total_requests},
             "recent_requests": recent_requests[:50],
+        }
+
+    # ══════════════════════════════════════════════════════════════
+    #  Web Analytics (deep nginx log parse)
+    # ══════════════════════════════════════════════════════════════
+
+    _BOT_PATTERNS = re.compile(
+        r'bot|spider|crawler|scrapy|curl|wget|python-requests|python-urllib|'
+        r'go-http|java/|perl/|libwww|nmap|masscan|zgrab|censys|shodan|'
+        r'dataforseo|semrush|ahrefs|mj12bot|dotbot|blexbot|yandexbot|'
+        r'bingbot|googlebot|duckduckbot|baiduspider|slurp|facebot|'
+        r'twitterbot|applebot|linkedinbot|headlesschrome|phantom|selenium|'
+        r'scaninfo|nuclei|nikto|sqlmap',
+        re.IGNORECASE,
+    )
+    _STATIC_EXTS = re.compile(
+        r'\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|webp|'
+        r'mp4|mp3|pdf|zip|gz|tar|exe|dmg|deb|apk|xml|txt|json|webmanifest|'
+        r'otf|avif)(\?.*)?$',
+        re.IGNORECASE,
+    )
+    _MOBILE_UA = re.compile(r'Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini', re.IGNORECASE)
+
+    async def get_analytics(self, server: dict[str, Any], days: int = 30) -> dict[str, Any]:
+        """Public method: fetch analytics from a server via SSH."""
+        empty: dict[str, Any] = {
+            "pages": [], "topics": [], "sections": [], "traffic_by_day": [],
+            "traffic_by_hour": [0] * 24, "status_codes": {},
+            "top_ips": [], "referrers": [], "devices": {"mobile": 0, "desktop": 0, "bot": 0},
+            "totals": {"views": 0, "unique_visitors": 0, "avg_daily": 0},
+            "error": None,
+        }
+        try:
+            conn = await self._get_ssh_conn(server)
+            sudo_pass = server.get("sudo_password")
+            return await self._ssh_analytics(conn, sudo_pass, days=days)
+        except Exception as exc:
+            logger.warning("Analytics SSH error for server %s: %s", server.get("id"), exc)
+            empty["error"] = str(exc)
+            return empty
+
+    async def _ssh_analytics(
+        self,
+        conn: asyncssh.SSHClientConnection,
+        sudo_pass: str | None,
+        days: int = 30,
+    ) -> dict[str, Any]:
+        """Deep-read nginx logs and return structured analytics data."""
+        from datetime import datetime, timezone
+
+        # Read current + rotated logs (including gzip-compressed)
+        cmd = (
+            "(zcat /var/log/nginx/*.gz 2>/dev/null; "
+            "cat /var/log/nginx/*access*.log 2>/dev/null) "
+            "| tail -n 2000000 || echo ''"
+        )
+        if sudo_pass:
+            raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass, timeout=120)
+        else:
+            raw = await self._ssh_cmd(conn, cmd, timeout=120)
+
+        cutoff = time.time() - days * 86400
+
+        log_re = re.compile(
+            r'(?:(?P<vhost>[a-zA-Z0-9._-]+)\s+)?'
+            r'(?P<ip>[\d.a-fA-F:]+)\s+\S+\s+\S+\s+'
+            r'\[(?P<ts>[^\]]+)\]\s+'
+            r'"(?P<method>\S+)\s+(?P<path>\S+)\s+\S+"\s+'
+            r'(?P<status>\d+)\s+\S+\s+'
+            r'"(?P<ref>[^"]*)"\s+"(?P<ua>[^"]*)"'
+        )
+
+        page_counts: dict[str, int] = {}
+        section_counts: dict[str, int] = {}
+        topic_counts: dict[str, int] = {}
+        day_counts: dict[str, int] = {}
+        hour_counts: list[int] = [0] * 24
+        status_codes: dict[str, int] = {}
+        ip_counts: dict[str, int] = {}
+        referrer_counts: dict[str, int] = {}
+        unique_ips: set[str] = set()
+        devices = {"mobile": 0, "desktop": 0, "bot": 0}
+
+        for line in raw.split("\n"):
+            m = log_re.search(line)
+            if not m:
+                continue
+
+            ua = m.group("ua")
+            method = m.group("method")
+            path = m.group("path").split("?")[0]  # strip query string
+            status = m.group("status")
+            ip = m.group("ip")
+            ref = m.group("ref")
+
+            # Parse timestamp
+            try:
+                dt = datetime.strptime(m.group("ts"), "%d/%b/%Y:%H:%M:%S %z")
+                ts = dt.timestamp()
+            except (ValueError, TypeError):
+                continue
+
+            if ts < cutoff:
+                continue
+
+            # Classify device / bot
+            if self._BOT_PATTERNS.search(ua):
+                devices["bot"] += 1
+                continue  # exclude bots from all counts
+
+            # Skip non-GET requests for page analytics
+            if method not in ("GET", "HEAD"):
+                pass  # still count status/ip for non-GET
+
+            # Skip static assets for page/topic counts
+            is_static = bool(self._STATIC_EXTS.search(path))
+
+            day_key = dt.strftime("%Y-%m-%d")
+            day_counts[day_key] = day_counts.get(day_key, 0) + 1
+            hour_counts[dt.hour] += 1
+
+            status_bucket = f"{status[0]}xx"
+            status_codes[status_bucket] = status_codes.get(status_bucket, 0) + 1
+
+            ip_counts[ip] = ip_counts.get(ip, 0) + 1
+            unique_ips.add(ip)
+
+            # Device type
+            if self._MOBILE_UA.search(ua):
+                devices["mobile"] += 1
+            else:
+                devices["desktop"] += 1
+
+            # Referrer (skip empty, self, and common noise)
+            if ref and ref != "-" and not ref.startswith("/"):
+                try:
+                    from urllib.parse import urlparse
+                    parsed_ref = urlparse(ref)
+                    ref_host = parsed_ref.netloc.lower().replace("www.", "")
+                    if ref_host and len(ref_host) > 3:
+                        referrer_counts[ref_host] = referrer_counts.get(ref_host, 0) + 1
+                except Exception:
+                    pass
+
+            if is_static:
+                continue
+
+            # Normalize path
+            clean_path = path.rstrip("/") or "/"
+            if not clean_path:
+                clean_path = "/"
+
+            page_counts[clean_path] = page_counts.get(clean_path, 0) + 1
+
+            # Section: first path segment
+            parts = [p for p in clean_path.split("/") if p]
+            if parts:
+                section = "/" + parts[0]
+            else:
+                section = "/"
+            section_counts[section] = section_counts.get(section, 0) + 1
+
+            # Topics: extract slug from 2nd segment (blog posts, tools, etc.)
+            if len(parts) >= 2:
+                slug = parts[1]
+                # Convert slug to readable topic name
+                topic = slug.replace("-", " ").replace("_", " ").title()
+                if topic and len(topic) > 1:
+                    topic_counts[topic] = topic_counts.get(topic, 0) + 1
+
+        # Sort and limit results
+        def top_n(d: dict[str, int], n: int = 20) -> list[dict[str, Any]]:
+            return [{"name": k, "count": v} for k, v in sorted(d.items(), key=lambda x: -x[1])[:n]]
+
+        total_views = sum(day_counts.values())
+        avg_daily = round(total_views / max(days, 1), 1)
+
+        # Build daily traffic ordered by date
+        from datetime import timedelta
+        end_dt = datetime.now(tz=timezone.utc)
+        traffic_by_day = []
+        for i in range(days - 1, -1, -1):
+            dk = (end_dt - timedelta(days=i)).strftime("%Y-%m-%d")
+            traffic_by_day.append({"date": dk, "count": day_counts.get(dk, 0)})
+
+        return {
+            "pages": top_n(page_counts, 25),
+            "topics": top_n(topic_counts, 20),
+            "sections": top_n(section_counts, 15),
+            "traffic_by_day": traffic_by_day,
+            "traffic_by_hour": hour_counts,
+            "status_codes": status_codes,
+            "top_ips": top_n(ip_counts, 15),
+            "referrers": top_n(referrer_counts, 15),
+            "devices": devices,
+            "totals": {
+                "views": total_views,
+                "unique_visitors": len(unique_ips),
+                "avg_daily": avg_daily,
+            },
+            "error": None,
         }
 
     async def _ssh_fail2ban(self, conn: asyncssh.SSHClientConnection, sudo_pass: str | None = None) -> dict[str, Any]:

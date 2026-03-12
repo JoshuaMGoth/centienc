@@ -1,4 +1,4 @@
-"""¢entien¢ — System tray icon (cross-platform via pystray).
+"""CentienC — System tray icon (cross-platform via pystray).
 
 Provides a lightweight tray icon that shows monitoring status,
 lets you open the dashboard in a browser, and quit the service.
@@ -47,10 +47,10 @@ def _create_icon_image(color: tuple[int, int, int] = COLOR_GREEN):
         radius=14,
         fill=COLOR_BG,
     )
-    # "¢" letter
+    # "C" letter
     draw.text(
         (ICON_SIZE // 2, ICON_SIZE // 2 - 8),
-        "¢",
+        "C",
         fill=COLOR_ACCENT,
         anchor="mm",
     )
@@ -62,7 +62,7 @@ def _create_icon_image(color: tuple[int, int, int] = COLOR_GREEN):
 
 
 class CentientTray:
-    """System tray icon for ¢entien¢."""
+    """System tray icon for CentienC."""
 
     def __init__(self, port: int = 9090, host: str = "127.0.0.1"):
         self.port = port
@@ -115,9 +115,9 @@ class CentientTray:
         )
 
         self._icon = pystray.Icon(
-            name="¢entien¢",
+            name="CentienC",
             icon=_create_icon_image(),
-            title="¢entien¢",
+            title="CentienC",
             menu=menu,
         )
 

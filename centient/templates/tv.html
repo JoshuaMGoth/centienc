@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>¢entien¢ — TV Mode</title>
+<title>CentienC — TV Mode</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -87,7 +87,7 @@ body:hover{cursor:default}
 <body>
 
 <div class="tv-header">
-  <h1><img class="logo" src="/static/centienc-logo.png" alt="logo"> <span id="appTitle">¢entien¢</span> <span style="font-size:.55em;color:rgba(255,255,255,.3);font-weight:400">TV MODE</span></h1>
+  <h1><img class="logo" src="/static/centienc-logo.png" alt="logo"> <span id="appTitle">CentienC</span> <span style="font-size:.55em;color:rgba(255,255,255,.3);font-weight:400">TV MODE</span></h1>
   <div class="tv-header-right">
     <span class="ws-dot disconnected" id="wsDot"></span>
     <span id="clock">--:--:--</span>
@@ -150,7 +150,7 @@ function render(data){
   const s=data.settings||{},servers=data.servers||[],websites=data.websites||[],
     pve=data.proxmox_nodes||[],nginx=data.nginx||{},fb=data.fail2ban||{},stats=data.stats||{};
 
-  document.getElementById('appTitle').textContent=s.app_title||'¢entien¢';
+  document.getElementById('appTitle').textContent=s.app_title||'CentienC';
 
   const bar=document.getElementById('statusBar');
   if(stats.down>0){bar.className='status-bar alert';bar.textContent='🔴 '+stats.down+' DOWN — '+stats.up+'/'+stats.total+' operational'}

@@ -3,17 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Setup — ¢entien¢</title>
+<title>Setup — CentienC</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="shortcut icon" href="/static/favicon.ico">
 <link rel="apple-touch-icon" href="/static/centienc-logo.png">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Setup — ¢entien¢">
-<meta property="og:description" content="Configure your ¢entien¢ monitoring dashboard.">
+<meta property="og:title" content="Setup — CentienC">
+<meta property="og:description" content="Configure your CentienC monitoring dashboard.">
 <meta property="og:image" content="/static/centienc-og.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Setup — ¢entien¢">
-<meta name="twitter:description" content="Configure your ¢entien¢ monitoring dashboard.">
+<meta name="twitter:title" content="Setup — CentienC">
+<meta name="twitter:description" content="Configure your CentienC monitoring dashboard.">
 <meta name="twitter:image" content="/static/centienc-og.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -62,8 +62,8 @@ select option{background:#1e3c72;color:#fff}
 </head>
 <body>
 <div class="wizard">
-  <img class="logo" src="/static/centienc-logo.png" alt="¢entien¢ logo">
-  <h1>Welcome to ¢entien¢</h1>
+  <img class="logo" src="/static/centienc-logo.png" alt="CentienC logo">
+  <h1>Welcome to CentienC</h1>
   <div class="sub">Let's get your monitoring dashboard set up in under a minute.</div>
 
   <div class="progress">
@@ -101,7 +101,7 @@ select option{background:#1e3c72;color:#fff}
   <div class="step" id="step2">
     <h2>Step 2 — Customize</h2>
     <label>Dashboard Title</label>
-    <input id="sTitle" value="¢entien¢" placeholder="My Monitoring">
+    <input id="sTitle" value="CentienC" placeholder="My Monitoring">
     <label>Default Check Interval (seconds)</label>
     <input id="sCheckInterval" type="number" value="60">
     <div class="actions">
@@ -118,7 +118,7 @@ select option{background:#1e3c72;color:#fff}
     <div class="err" id="setupErr"></div>
     <div class="actions">
       <button class="btn" onclick="goStep(2)">← Back</button>
-      <button class="btn btn-primary" id="finishBtn" onclick="finishSetup()">🚀 Launch ¢entien¢</button>
+      <button class="btn btn-primary" id="finishBtn" onclick="finishSetup()">🚀 Launch CentienC</button>
     </div>
   </div>
 </div>
@@ -150,7 +150,7 @@ function goStep(n){
 }
 
 function buildReview(){
-  const title=document.getElementById('sTitle').value||'¢entien¢';
+  const title=document.getElementById('sTitle').value||'CentienC';
   const interval=document.getElementById('sCheckInterval').value||'60';
   let html=`<strong>Mode:</strong> ${mode==='secured'?'🔒 Secured (admin account)':'🌐 Open Access'}<br>`;
   if(mode==='secured')html+=`<strong>Admin User:</strong> ${document.getElementById('sUsername').value}<br>`;
@@ -164,7 +164,7 @@ async function finishSetup(){
   btn.disabled=true;btn.textContent='Setting up…';
   const body={
     mode,
-    title:document.getElementById('sTitle').value||'¢entien¢',
+    title:document.getElementById('sTitle').value||'CentienC',
     theme:'dark',
     check_interval:parseInt(document.getElementById('sCheckInterval').value)||60,
   };
@@ -179,7 +179,7 @@ async function finishSetup(){
     location.href='/';
   }catch(e){
     document.getElementById('setupErr').textContent=e.message;
-    btn.disabled=false;btn.textContent='🚀 Launch ¢entien¢';
+    btn.disabled=false;btn.textContent='🚀 Launch CentienC';
   }
 }
 </script>

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="centienc-logo.png" alt="¢entien¢ logo" width="120">
+  <img src="centienc-logo.png" alt="CentienC logo" width="120">
 </p>
 
-<h1 align="center">¢entien¢</h1>
+<h1 align="center">CentienC</h1>
 
 <p align="center">
   <strong>Lightweight, self-hosted server &amp; infrastructure monitoring dashboard</strong><br>
@@ -29,9 +29,9 @@
 
 ## About
 
-**¢entien¢** is a professional-grade, self-hosted monitoring dashboard that tracks your servers, services, websites, and Proxmox infrastructure — all from a single lightweight process. Inspired by the power of **Grafana** and **Prometheus**, ¢entien¢ was designed to deliver real-time infrastructure visibility without the complexity of deploying and configuring multiple services.
+**CentienC** is a professional-grade, self-hosted monitoring dashboard that tracks your servers, services, websites, and Proxmox infrastructure — all from a single lightweight process. Inspired by the power of **Grafana** and **Prometheus**, CentienC was designed to deliver real-time infrastructure visibility without the complexity of deploying and configuring multiple services.
 
-There are no separate agents to install on your monitored machines. ¢entien¢ connects to your servers via SSH to collect system metrics (CPU, RAM, disk, network, nginx, PM2, systemd, fail2ban) in real time. For Proxmox users, API token integration gives you container and VM stats alongside your servers.
+There are no separate agents to install on your monitored machines. CentienC connects to your servers via SSH to collect system metrics (CPU, RAM, disk, network, nginx, PM2, systemd, fail2ban) in real time. For Proxmox users, API token integration gives you container and VM stats alongside your servers.
 
 ### Key Features
 
@@ -130,7 +130,7 @@ All installers are also available at **[joshuagoth.com/downloads/centienc](https
 
 ## Configuration
 
-¢entien¢ stores its data in `~/.centient` (user mode) or `/var/lib/centient` (system install). The database and all settings are managed through the web UI.
+CentienC stores its data in `~/.centient` (user mode) or `/var/lib/centient` (system install). The database and all settings are managed through the web UI.
 
 ### CLI Options
 
@@ -232,7 +232,7 @@ Found a bug or have a feature request? We use **[GitHub Issues](https://github.c
 
 1. Go to [Issues → New Issue](https://github.com/JoshuaMGoth/centienc/issues/new/choose)
 2. Select the **Bug Report** template
-3. Include your OS, Python version, and ¢entien¢ version (`centient --version`)
+3. Include your OS, Python version, and CentienC version (`centient --version`)
 4. Attach relevant logs: `journalctl -u centient -n 50` (Linux) or check the admin panel
 5. Describe the expected vs. actual behavior
 
@@ -256,7 +256,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 
 ## Updates
 
-¢entien¢ checks for updates automatically by comparing your installed version against the latest GitHub release. When a new version is available, a notification banner appears on your dashboard with a link to the release notes and upgrade instructions.
+CentienC checks for updates automatically by comparing your installed version against the latest GitHub release. When a new version is available, a notification banner appears on your dashboard with a link to the release notes and upgrade instructions.
 
 ### Manual Update
 
@@ -277,7 +277,7 @@ pip install -e ".[tray]"
 
 ## License
 
-¢entien¢ is free software distributed under the **[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html)**.
+CentienC is free software distributed under the **[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html)**.
 
 ```
 Copyright (C) 2026 Joshua Goth

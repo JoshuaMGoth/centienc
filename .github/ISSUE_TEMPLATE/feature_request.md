@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a new feature or enhancement for ¢entien¢
+about: Suggest a new feature or enhancement for CentienC
 title: "[Feature] "
 labels: enhancement
 assignees: JoshuaMGoth

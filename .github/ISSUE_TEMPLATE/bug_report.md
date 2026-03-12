@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help improve ¢entien¢
+about: Report a bug to help improve CentienC
 title: "[Bug] "
 labels: bug
 assignees: JoshuaMGoth
@@ -31,7 +31,7 @@ If applicable, add screenshots to help explain the problem.
 
 ## Environment
 
-- **¢entien¢ Version**: [e.g., 1.0.0 — run `centient --version`]
+- **CentienC Version**: [e.g., 1.0.0 — run `centient --version`]
 - **OS**: [e.g., Ubuntu 24.04, macOS 15, Windows 11]
 - **Python Version**: [e.g., 3.12 — run `python3 --version`]
 - **Install Method**: [e.g., Debian installer, manual, Proxmox LXC]

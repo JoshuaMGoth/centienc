@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entien¢ — Debian / Ubuntu Installer
+#  CentienC — Debian / Ubuntu Installer
 #
-#  Installs ¢entien¢ as a systemd service with a Python venv.
+#  Installs CentienC as a systemd service with a Python venv.
 #  Generates SSH keys for remote server monitoring.
 #
 #  Repository: https://github.com/JoshuaMGoth/centienc
@@ -13,7 +13,7 @@
 #    sudo bash install.sh                   # Service mode (default)
 #    sudo bash install.sh --tray            # Desktop tray mode
 #    sudo bash install.sh --port 8080       # Custom port
-#    sudo bash install.sh --uninstall       # Remove ¢entien¢
+#    sudo bash install.sh --uninstall       # Remove CentienC
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -49,7 +49,7 @@ done
 
 # ── Uninstall ─────────────────────────────────────────────────
 if $UNINSTALL; then
-    echo -e "\n${YELLOW}¢entien¢${NC} — Uninstalling...\n"
+    echo -e "\n${YELLOW}CentienC${NC} — Uninstalling...\n"
     systemctl stop centient 2>/dev/null || true
     systemctl disable centient 2>/dev/null || true
     rm -f /etc/systemd/system/centient.service
@@ -63,14 +63,14 @@ if $UNINSTALL; then
     userdel "$SERVICE_USER" 2>/dev/null || true
     rm -f /etc/sysctl.d/99-centient.conf 2>/dev/null || true
     ufw delete allow "${PORT}/tcp" 2>/dev/null || true
-    ok "¢entien¢ removed"
+    ok "CentienC removed"
     echo ""
     exit 0
 fi
 
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}   ${GREEN}¢entien¢${NC}  Debian/Ubuntu Installer v${VERSION}    ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}   ${GREEN}CentienC${NC}  Debian/Ubuntu Installer v${VERSION}    ${BLUE}║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -90,7 +90,7 @@ else
 fi
 
 # ── Python Venv + Install ────────────────────────────────────
-info "Installing ¢entien¢..."
+info "Installing CentienC..."
 mkdir -p "$INSTALL_DIR" "$DATA_DIR"
 python3 -m venv "$VENV_DIR"
 source "${VENV_DIR}/bin/activate"
@@ -110,7 +110,7 @@ fi
 deactivate
 
 chown -R "${SERVICE_USER}:${SERVICE_USER}" "$INSTALL_DIR" "$DATA_DIR"
-ok "¢entien¢ installed to ${INSTALL_DIR}"
+ok "CentienC installed to ${INSTALL_DIR}"
 
 # ── SSH Keypair ───────────────────────────────────────────────
 SSH_DIR="${DATA_DIR}/.ssh"
@@ -146,7 +146,7 @@ ok "ICMP ping enabled"
 # ── Systemd Service ──────────────────────────────────────────
 cat > /etc/systemd/system/centient.service << EOF
 [Unit]
-Description=¢entien¢ — Server Monitoring Dashboard
+Description=CentienC — Server Monitoring Dashboard
 After=network-online.target
 Wants=network-online.target
 
@@ -194,7 +194,7 @@ IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║${NC}          ${BOLD}${GREEN}✓ ¢entien¢ Installed Successfully${NC}           ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}          ${BOLD}${GREEN}✓ CentienC Installed Successfully${NC}           ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Dashboard${NC}     ${BLUE}http://${IP}:${PORT}${NC}"

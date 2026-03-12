@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entien¢ — Proxmox LXC Container Installer
+#  CentienC — Proxmox LXC Container Installer
 #
 #  Creates a lightweight LXC container on a Proxmox VE host,
-#  installs ¢entien¢ inside it, and starts the service.
+#  installs CentienC inside it, and starts the service.
 #
 #  Repository: https://github.com/JoshuaMGoth/centienc
 #  Website:    https://joshuagoth.com
@@ -22,7 +22,7 @@
 #    --bridge  STR    Network bridge      (default: vmbr0)
 #    --ip      CIDR   Static IP/CIDR      (default: dhcp)
 #    --gw      IP     Gateway IP          (default: auto from bridge)
-#    --port    NUM    ¢entien¢ port      (default: 9090)
+#    --port    NUM    CentienC port      (default: 9090)
 #    --vlan    NUM    VLAN tag            (optional)
 #    --template STR   OS template         (default: auto-download debian-12)
 #    --start         Start after creation (default: yes)
@@ -142,7 +142,7 @@ fi
 
 echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║${NC}  ${BOLD}¢entien¢${NC} — Proxmox LXC Container Creator   ${BOLD}${GREEN}║${NC}"
+echo -e "${BOLD}${GREEN}║${NC}  ${BOLD}CentienC${NC} — Proxmox LXC Container Creator   ${BOLD}${GREEN}║${NC}"
 echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 
 # ── Determine next available CTID ────────────────────────────
@@ -195,7 +195,7 @@ if [[ "$INTERACTIVE" == "true" ]]; then
     DISK_SIZE=$(prompt_default "Disk size (GB)" "$DISK_SIZE")
     STORAGE=$(prompt_default "Storage pool" "$STORAGE")
     BRIDGE=$(prompt_default "Network bridge" "$BRIDGE")
-    PORT=$(prompt_default "¢entien¢ port" "$PORT")
+    PORT=$(prompt_default "CentienC port" "$PORT")
 
     require_num "$CORES" "CPU cores"
     require_num "$MEMORY" "RAM"
@@ -316,8 +316,8 @@ for i in $(seq 1 30); do
 done
 ok "Container is running"
 
-# ── Install ¢entien¢ inside the container ────────────────────────
-header "Installing ¢entien¢"
+# ── Install CentienC inside the container ────────────────────────
+header "Installing CentienC"
 
 # Update packages and install Python + build tools
 info "Installing system packages inside container..."
@@ -347,12 +347,12 @@ pct exec "$CTID" -- bash -c "
 "
 ok "Environment ready"
 
-# ── Install ¢entien¢ ─────────────────────────────────────────
+# ── Install CentienC ─────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." 2>/dev/null && pwd || echo "")"
 
 if [[ -n "$PROJECT_ROOT" && -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
-    info "Bundling ¢entien¢ from local source..."
+    info "Bundling CentienC from local source..."
 
     # Build a clean tarball on the host, then push a single file
     BUILD_TMP=$(mktemp -d /tmp/centient-build-XXXXXX)
@@ -377,14 +377,14 @@ if [[ -n "$PROJECT_ROOT" && -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
         /opt/centient/venv/bin/pip install /tmp/centient-src/ --no-cache-dir
         rm -rf /tmp/centient-src.tar.gz /tmp/centient-src/
     "
-    ok "¢entien¢ installed from local source"
+    ok "CentienC installed from local source"
 else
-    info "No local source found — installing ¢entien¢ from GitHub..."
+    info "No local source found — installing CentienC from GitHub..."
     pct exec "$CTID" -- bash -c "
         set -e
         /opt/centient/venv/bin/pip install 'centient @ git+https://github.com/JoshuaMGoth/centienc.git' --no-cache-dir
-    " || err "Failed to install ¢entien¢. Verify this Proxmox host can reach https://github.com"
-    ok "¢entien¢ installed from GitHub"
+    " || err "Failed to install CentienC. Verify this Proxmox host can reach https://github.com"
+    ok "CentienC installed from GitHub"
 fi
 
 # Fix ownership now that pip install is done
@@ -411,7 +411,7 @@ header "Verifying Installation"
 pct exec "$CTID" -- /opt/centient/venv/bin/python -m centient --help > /dev/null \
     || err "Installation check failed — \"python -m centient\" is not runnable. The pip install likely failed above."
 
-ok "¢entien¢ is runnable — using /opt/centient/venv/bin/python -m centient"
+ok "CentienC is runnable — using /opt/centient/venv/bin/python -m centient"
 
 # ── Create systemd service inside container ──────────────────
 header "Configuring Service"
@@ -419,7 +419,7 @@ header "Configuring Service"
 pct exec "$CTID" -- bash -c "
 cat > /etc/systemd/system/centient.service << 'SVCEOF'
 [Unit]
-Description=¢entien¢ — Server Monitoring Dashboard
+Description=CentienC — Server Monitoring Dashboard
 After=network.target
 
 [Service]
@@ -449,22 +449,22 @@ if ! systemctl is-active --quiet centient; then
     exit 1
 fi
 "
-ok "¢entien¢ service started"
+ok "CentienC service started"
 
 # ── Wait for service to be ready ─────────────────────────────
-info "Waiting for ¢entien¢ to be ready..."
+info "Waiting for CentienC to be ready..."
 APP_READY=false
 for i in $(seq 1 20); do
     if pct exec "$CTID" -- curl -s -o /dev/null -w '%{http_code}' "http://localhost:${PORT}/api/health" 2>/dev/null | grep -q 200; then
         APP_READY=true
-        ok "¢entien¢ is responding on port ${PORT}"
+        ok "CentienC is responding on port ${PORT}"
         break
     fi
     sleep 1
 done
 
 if [[ "$APP_READY" != "true" ]]; then
-    err "¢entien¢ did not respond after 20 seconds. Check logs with:\n  pct exec ${CTID} -- journalctl -u centient -n 30 --no-pager"
+    err "CentienC did not respond after 20 seconds. Check logs with:\n  pct exec ${CTID} -- journalctl -u centient -n 30 --no-pager"
 fi
 
 # ── Get container IP ─────────────────────────────────────────
@@ -473,7 +473,7 @@ CT_IP=$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "
 # ── Summary ──────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║${NC}    ${BOLD}${GREEN}✓ ¢entien¢ LXC Container Ready!${NC}                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}    ${BOLD}${GREEN}✓ CentienC LXC Container Ready!${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Container:${NC}"
@@ -483,7 +483,7 @@ echo -e "    IP Address:   ${CYAN}${CT_IP}${NC}"
 echo -e "    Cores/RAM:    ${CORES} core(s) / ${MEMORY} MB"
 echo -e "    Disk:         ${DISK_SIZE} GB (${STORAGE})"
 echo ""
-echo -e "  ${BOLD}¢entien¢:${NC}"
+echo -e "  ${BOLD}CentienC:${NC}"
 echo -e "    Dashboard:    ${BLUE}http://${CT_IP}:${PORT}${NC}"
 echo -e "    Data Dir:     /var/lib/centient"
 echo -e "    Root Pass:    ${YELLOW}${ROOT_PASS}${NC}"

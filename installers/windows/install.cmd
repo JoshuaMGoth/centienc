@@ -1,5 +1,5 @@
 @echo off
-:: ¢entien¢ — Windows Installer Launcher
+:: CentienC — Windows Installer Launcher
 :: Elevates to admin and runs install.ps1
 
 :: Check admin

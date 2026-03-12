@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entien¢ — Universal Installer (Linux / macOS)
+#  CentienC — Universal Installer (Linux / macOS)
 #
-#  Installs ¢entien¢ as a background service with systemd (Linux)
+#  Installs CentienC as a background service with systemd (Linux)
 #  or launchd (macOS). Sets up Python venv, generates SSH keys for
 #  remote server monitoring, and configures firewall rules.
 #
@@ -14,7 +14,7 @@
 #    sudo bash install.sh                   # Headless service mode
 #    sudo bash install.sh --tray            # Desktop tray mode
 #    sudo bash install.sh --port 8080       # Custom port
-#    sudo bash install.sh --uninstall       # Remove ¢entien¢
+#    sudo bash install.sh --uninstall       # Remove CentienC
 #
 #  After install, open the dashboard URL to run the setup wizard.
 # ══════════════════════════════════════════════════════════════════
@@ -92,7 +92,7 @@ fi
 # ══════════════════════════════════════════════════════════════
 if $UNINSTALL; then
     echo ""
-    echo -e "${YELLOW}¢entien¢${NC} — Uninstaller"
+    echo -e "${YELLOW}CentienC${NC} — Uninstaller"
     echo ""
 
     if $IS_MACOS; then
@@ -100,7 +100,7 @@ if $UNINSTALL; then
         launchctl unload "$PLIST_PATH" 2>/dev/null || true
         rm -f "$PLIST_PATH"
         rm -rf "$M_INSTALL_DIR"
-        ok "¢entien¢ removed (macOS)"
+        ok "CentienC removed (macOS)"
     else
         [[ $EUID -ne 0 ]] && err "Run as root: sudo bash $0 --uninstall"
         systemctl stop centient 2>/dev/null || true
@@ -128,7 +128,7 @@ if $UNINSTALL; then
             firewall-cmd --permanent --remove-port="${PORT}/tcp" 2>/dev/null || true
             firewall-cmd --reload 2>/dev/null || true
         fi
-        ok "¢entien¢ removed (Linux)"
+        ok "CentienC removed (Linux)"
     fi
     echo ""
     exit 0
@@ -145,7 +145,7 @@ fi
 
 echo ""
 echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}      ${GREEN}¢entien¢${NC}  Installer v${VERSION}               ${BLUE}║${NC}"
+echo -e "${BLUE}║${NC}      ${GREEN}CentienC${NC}  Installer v${VERSION}               ${BLUE}║${NC}"
 echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  OS:     ${OS_NAME}"
@@ -200,9 +200,9 @@ create_user() {
     fi
 }
 
-# ── Install ¢entien¢ ─────────────────────────────────────────
+# ── Install CentienC ─────────────────────────────────────────
 install_centient() {
-    info "Installing ¢entien¢ into ${INSTALL_DIR}..."
+    info "Installing CentienC into ${INSTALL_DIR}..."
 
     mkdir -p "$INSTALL_DIR" "$DATA_DIR"
 
@@ -233,7 +233,7 @@ install_centient() {
         chown -R "${SERVICE_USER}:${SERVICE_USER}" "$INSTALL_DIR" "$DATA_DIR"
     fi
 
-    ok "¢entien¢ installed"
+    ok "CentienC installed"
 }
 
 # ── Generate SSH keypair for remote monitoring ───────────────
@@ -261,7 +261,7 @@ generate_ssh_key() {
     if [[ ! -f "$SSH_CONFIG" ]] || ! grep -q "centient" "$SSH_CONFIG" 2>/dev/null; then
         cat >> "$SSH_CONFIG" << 'SSHCONF'
 
-# ¢entien¢ monitoring connections
+# CentienC monitoring connections
 Host *
     StrictHostKeyChecking accept-new
     ConnectTimeout 10
@@ -297,7 +297,7 @@ install_systemd() {
 
     cat > /etc/systemd/system/centient.service << EOF
 [Unit]
-Description=¢entien¢ — Server Monitoring Dashboard
+Description=CentienC — Server Monitoring Dashboard
 After=network-online.target
 Wants=network-online.target
 
@@ -451,7 +451,7 @@ print_summary() {
 
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║${NC}          ${BOLD}${GREEN}✓ ¢entien¢ Installed Successfully${NC}           ${GREEN}║${NC}"
+    echo -e "${GREEN}║${NC}          ${BOLD}${GREEN}✓ CentienC Installed Successfully${NC}           ${GREEN}║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
     echo -e "  ${BOLD}Dashboard${NC}     ${BLUE}http://${IP}:${PORT}${NC}"

@@ -1,4 +1,4 @@
-"""¢entien¢ — Professional server, service & website monitoring dashboard."""
+"""CentienC — Professional server, service & website monitoring dashboard."""
 
 __version__ = "1.0.0"
-__product__ = "¢entien¢"
+__product__ = "CentienC"

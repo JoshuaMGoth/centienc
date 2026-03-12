@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in ¢entien¢, **please do not open a public issue**.
+If you discover a security vulnerability in CentienC, **please do not open a public issue**.
 
 ### How to Report
 
@@ -44,7 +44,7 @@ If you discover a security vulnerability in ¢entien¢, **please do not open a p
 - Use strong, unique passwords
 
 ### Network
-- Place ¢entien¢ behind a reverse proxy (nginx, Caddy) with HTTPS
+- Place CentienC behind a reverse proxy (nginx, Caddy) with HTTPS
 - Restrict access to the dashboard port (9090) via firewall rules
 - Use SSH key-based authentication for monitored servers — avoid storing passwords
 
@@ -55,8 +55,8 @@ If you discover a security vulnerability in ¢entien¢, **please do not open a p
 
 ## Scope
 
-This security policy applies to the ¢entien¢ application code in this repository. Third-party dependencies are managed via `pip` and should be kept up to date.
+This security policy applies to the CentienC application code in this repository. Third-party dependencies are managed via `pip` and should be kept up to date.
 
 ---
 
-Thank you for helping keep ¢entien¢ and its users safe.
+Thank you for helping keep CentienC and its users safe.

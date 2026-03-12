@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entien¢ — macOS Installer
+#  CentienC — macOS Installer
 #
-#  Installs ¢entien¢ as a tray app or headless service using
+#  Installs CentienC as a tray app or headless service using
 #  launchd. Generates SSH keys for remote server monitoring.
 #
 #  Repository: https://github.com/JoshuaMGoth/centienc
@@ -13,7 +13,7 @@
 #    bash install.sh                         # Tray mode (default)
 #    bash install.sh --service               # Headless service
 #    bash install.sh --port 8080             # Custom port
-#    bash install.sh --uninstall             # Remove ¢entien¢
+#    bash install.sh --uninstall             # Remove CentienC
 # ══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -47,7 +47,7 @@ done
 
 # ── Uninstall ─────────────────────────────────────────────────
 if $UNINSTALL; then
-    echo -e "\n${YELLOW}¢entien¢${NC} — Uninstalling...\n"
+    echo -e "\n${YELLOW}CentienC${NC} — Uninstalling...\n"
     launchctl unload "$PLIST_PATH" 2>/dev/null || true
     rm -f "$PLIST_PATH"
     if [[ -d "$INSTALL_DIR" ]]; then
@@ -55,13 +55,13 @@ if $UNINSTALL; then
         read -r REPLY
         [[ "$REPLY" =~ ^[Yy]$ ]] && rm -rf "$INSTALL_DIR" && ok "Removed" || info "Data preserved at ${INSTALL_DIR}"
     fi
-    ok "¢entien¢ removed"
+    ok "CentienC removed"
     echo ""
     exit 0
 fi
 
 echo ""
-echo -e "${GREEN}¢entien¢${NC} — macOS Installer v${VERSION} (${MODE} mode)"
+echo -e "${GREEN}CentienC${NC} — macOS Installer v${VERSION} (${MODE} mode)"
 echo ""
 
 # ── Check Python ─────────────────────────────────────────────
@@ -93,7 +93,7 @@ else
     pip install "centient[tray] @ git+https://github.com/JoshuaMGoth/centienc.git" -q
 fi
 deactivate
-ok "¢entien¢ installed"
+ok "CentienC installed"
 
 # ── SSH Keypair ───────────────────────────────────────────────
 SSH_DIR="$HOME/.ssh"
@@ -177,7 +177,7 @@ IP=$(ipconfig getifaddr en0 2>/dev/null || echo "127.0.0.1")
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║${NC}          ${BOLD}${GREEN}✓ ¢entien¢ Installed Successfully${NC}           ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}          ${BOLD}${GREEN}✓ CentienC Installed Successfully${NC}           ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Dashboard${NC}     ${BLUE}http://${IP}:${PORT}${NC}"
@@ -202,7 +202,7 @@ echo -e "    tail -f ${INSTALL_DIR}/centient.log"
 echo -e "    bash install.sh --uninstall"
 echo ""
 if [[ "$MODE" == "tray" ]]; then
-    echo -e "  Look for the ${GREEN}¢${NC} icon in your menu bar!"
+    echo -e "  Look for the ${GREEN}C${NC} icon in your menu bar!"
     echo ""
 fi
 echo -e "  Open ${BLUE}http://${IP}:${PORT}${NC} to run the setup wizard."

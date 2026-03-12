@@ -1,5 +1,5 @@
 ; ══════════════════════════════════════════════════════════════════
-;  ¢entien¢ — Inno Setup Installer Script
+;  CentienC — Inno Setup Installer Script
 ;
 ;  Builds a standard Windows Setup .exe that bundles the PowerShell
 ;  installer and runs it with admin privileges.

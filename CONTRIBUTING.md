@@ -1,6 +1,6 @@
-# Contributing to ¢entien¢
+# Contributing to CentienC
 
-Thank you for your interest in contributing to ¢entien¢! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to CentienC! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
@@ -13,7 +13,7 @@ By participating in this project, you agree to maintain a respectful and constru
 1. Check [existing issues](https://github.com/JoshuaMGoth/centienc/issues) to avoid duplicates
 2. Open a new issue using the **Bug Report** template
 3. Include:
-   - ¢entien¢ version (`centient --version`)
+   - CentienC version (`centient --version`)
    - Operating system and version
    - Python version (`python3 --version`)
    - Steps to reproduce the bug
@@ -86,7 +86,7 @@ centient --port 9199
 
 ### General
 - Don't introduce new runtime dependencies without discussion
-- Keep the RAM footprint low — ¢entien¢ targets ~30 MB
+- Keep the RAM footprint low — CentienC targets ~30 MB
 - All features must work in both tray and service modes
 - Test on at least one Linux distribution before submitting
 
@@ -114,7 +114,7 @@ Both must be updated together for a release.
 
 ## License
 
-By contributing to ¢entien¢, you agree that your contributions will be licensed under the [GNU General Public License v3.0](LICENSE).
+By contributing to CentienC, you agree that your contributions will be licensed under the [GNU General Public License v3.0](LICENSE).
 
 ---
 

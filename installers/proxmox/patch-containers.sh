@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ══════════════════════════════════════════════════════════════════
-#  ¢entien¢ — Patch running LXC container(s)
+#  CentienC — Patch running LXC container(s)
 #
 #  Run this on the Proxmox HOST to push updated centient files
 #  and the ICMP sysctl fix into an existing container.
@@ -89,7 +89,7 @@ fi
 CT_IP=$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "unknown")
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║${NC}    ${BOLD}${GREEN}✓ ¢entien¢ patched and restarted${NC}                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}    ${BOLD}${GREEN}✓ CentienC patched and restarted${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  Dashboard: ${BLUE}http://${CT_IP}:9090${NC}"
