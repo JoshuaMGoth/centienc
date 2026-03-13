@@ -1,205 +1,361 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CentienC — Live Demo</title>
-  <link rel="icon" type="image/png" href="./favicon.png">
-  <link rel="shortcut icon" href="./favicon.ico">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="CentienC — Live Demo">
-  <meta property="og:description" content="Interactive infrastructure monitoring demo with simulated real-time data.">
-  <meta property="og:image" content="./centienc-og.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="CentienC — Live Demo">
-  <meta name="twitter:description" content="Interactive infrastructure monitoring demo with simulated real-time data.">
-  <meta name="twitter:image" content="./centienc-og.png">
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:#fff;min-height:100vh;overflow-x:hidden}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CentienC — Interactive Demo</title>
+<link rel="icon" type="image/png" href="./favicon.png">
+<link rel="shortcut icon" href="./favicon.ico">
+<meta property="og:type" content="website">
+<meta property="og:title" content="CentienC — Interactive Demo">
+<meta property="og:description" content="Explore the full CentienC monitoring experience — dashboard, map, TV mode, analytics, and admin.">
+<meta property="og:image" content="./centienc-og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="CentienC — Interactive Demo">
+<meta name="twitter:description" content="Explore the full CentienC monitoring experience — dashboard, map, TV mode, analytics, and admin.">
+<meta name="twitter:image" content="./centienc-og.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;color:#fff;min-height:100vh;overflow-x:hidden}
 
-        /* ── Demo Banner ── */
-        .demo-banner{background:rgba(255,255,255,.12);text-align:center;padding:10px 24px;font-size:12px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.08)}
-        .demo-banner .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4caf50;animation:dpulse 2s infinite}
-        @keyframes dpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+/* ── Demo Banner ── */
+.demo-banner{background:rgba(88,166,255,.12);text-align:center;padding:10px 24px;font-size:12px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:12px;border-bottom:1px solid rgba(88,166,255,.15);color:rgba(255,255,255,.85)}
+.demo-banner .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#58a6ff;animation:dpulse 2s infinite}
+@keyframes dpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
 
-        /* ── Header ── */
-        .header{background:rgba(0,0,0,.3);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.1)}
-        .header h1{font-size:1.5em;font-weight:600;text-shadow:1px 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px}
-        .header .logo{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
-        .header-sub{color:rgba(255,255,255,.55);font-size:.82em;margin-top:2px}
-        .header-right{display:flex;align-items:center;gap:16px;font-size:.82em;color:rgba(255,255,255,.65)}
-        .uptime-badge{background:rgba(255,255,255,.1);padding:4px 12px;border-radius:20px}
+/* ── Header ── */
+.header{background:rgba(0,0,0,.4);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.07);flex-wrap:wrap;gap:10px}
+.header h1{font-size:1.4em;font-weight:600;display:flex;align-items:center;gap:10px}
+.header .logo{width:30px;height:30px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
+.header-sub{color:rgba(255,255,255,.45);font-size:.78em;margin-top:2px}
+.header-right{display:flex;align-items:center;gap:14px;font-size:.82em;color:rgba(255,255,255,.65)}
 
-        /* ── Status Banner ── */
-        .status-banner{padding:10px 20px;text-align:center;font-size:.92em;font-weight:600;transition:all .3s}
-        .status-banner.ok{background:#28a745}
-        .status-banner.warning{background:#ffc107;color:#000}
-        .status-banner.alert{background:#dc3545;animation:sbpulse 2s infinite}
-        @keyframes sbpulse{0%,100%{opacity:1}50%{opacity:.7}}
+/* ── Nav Tabs ── */
+.nav-tabs{display:flex;gap:4px}
+.nav-tab{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);border-radius:8px;color:rgba(255,255,255,.65);padding:6px 14px;font-size:.82em;cursor:pointer;transition:.2s;font-family:inherit}
+.nav-tab:hover{background:rgba(255,255,255,.08);border-color:rgba(88,166,255,.4);color:#fff}
+.nav-tab.active{background:rgba(88,166,255,.18);border-color:rgba(88,166,255,.5);color:#fff;font-weight:600}
 
-        /* ── Section Title ── */
-        .section-title{padding:4px 22px 8px;max-width:1500px;margin:0 auto;color:rgba(255,255,255,.45);font-size:.78em;text-transform:uppercase;letter-spacing:.06em}
+/* ── View system ── */
+.view{display:none}.view.active{display:block}
 
-        /* ── Metric Strip ── */
-        .metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 22px;max-width:1500px;margin:0 auto}
-        .mc{background:rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;text-align:center;border:1px solid rgba(255,255,255,.1);transition:transform .2s}
-        .mc:hover{transform:translateY(-2px)}
-        .mc-label{font-size:.7em;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
-        .mc-val{font-size:1.7em;font-weight:700}
-        .mc-sub{font-size:.68em;color:rgba(255,255,255,.4);margin-top:2px}
-        .g{color:#4caf50}.a{color:#ff9800}.r{color:#f44336}.b{color:#42a5f5}.w{color:#e0e0e0}
+/* ── Status Banner ── */
+.status-banner{padding:10px 20px;text-align:center;font-size:.92em;font-weight:600;transition:all .3s}
+.status-banner.ok{background:#28a745}
+.status-banner.warning{background:#ffc107;color:#000}
+.status-banner.alert{background:#dc3545;animation:sbpulse 2s infinite}
+@keyframes sbpulse{0%,100%{opacity:1}50%{opacity:.7}}
 
-        /* ── Server pills ── */
-        .server-pills{display:flex;gap:12px;padding:0 22px 10px;max-width:1500px;margin:0 auto;flex-wrap:wrap}
-        .server-pill{background:rgba(255,255,255,.07);border-radius:10px;padding:14px 18px;flex:1;min-width:280px;border:1px solid rgba(255,255,255,.08)}
-        .server-pill h4{color:#64b5f6;font-size:.85em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-        .server-pill .pill-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.78em}
-        .server-pill .pill-item{text-align:center}
-        .server-pill .pill-val{font-size:1.2em;font-weight:700}
-        .server-pill .pill-lbl{font-size:.65em;color:rgba(255,255,255,.4);text-transform:uppercase}
-        .pill-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-        .pill-dot.on{background:#4caf50}
-        .pill-dot.off{background:#f44336}
+/* ── Section Title ── */
+.section-title{padding:4px 22px 8px;max-width:1500px;margin:0 auto;color:rgba(255,255,255,.45);font-size:.78em;text-transform:uppercase;letter-spacing:.06em}
 
-        /* ── Grid ── */
-        .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 22px 22px;max-width:1500px;margin:0 auto}
-        .card{background:rgba(255,255,255,.08);border-radius:12px;padding:18px;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1)}
-        .card h3{margin-bottom:10px;color:#64b5f6;font-size:1.05em}
-        .card.full{grid-column:1/-1}
+/* ── Metric Strip ── */
+.metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 22px;max-width:1500px;margin:0 auto}
+.mc{background:rgba(255,255,255,.05);border-radius:10px;padding:12px 14px;text-align:center;border:1px solid rgba(255,255,255,.07);transition:transform .2s}
+.mc:hover{transform:translateY(-2px)}
+.mc-label{font-size:.7em;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.mc-val{font-size:1.7em;font-weight:700}
+.mc-sub{font-size:.68em;color:rgba(255,255,255,.4);margin-top:2px}
+.g{color:#4caf50}.a{color:#ff9800}.r{color:#f44336}.b{color:#42a5f5}.w{color:#e0e0e0}
 
-        /* ── Scrollable lists ── */
-        .slist{max-height:170px;overflow-y:auto;background:rgba(0,0,0,.15);border-radius:6px;padding:8px;font-family:'SF Mono','Fira Code',monospace;font-size:.8em}
-        .slist::-webkit-scrollbar{width:4px}
-        .slist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px}
+/* ── Server pills ── */
+.server-pills{display:flex;gap:12px;padding:0 22px 10px;max-width:1500px;margin:0 auto;flex-wrap:wrap}
+.server-pill{background:rgba(255,255,255,.04);border-radius:10px;padding:14px 18px;flex:1;min-width:280px;border:1px solid rgba(255,255,255,.05);transition:all .25s}
+.server-pill:hover{border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.07)}
+.server-pill h4{color:#58a6ff;font-size:.85em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.server-pill .pill-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.78em}
+.server-pill .pill-item{text-align:center}
+.server-pill .pill-val{font-size:1.2em;font-weight:700}
+.server-pill .pill-lbl{font-size:.65em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.pill-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.pill-dot.on{background:#4caf50}.pill-dot.off{background:#f44336}
 
-        /* ── Request feed ── */
-        .rr{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:center}
-        .rr:last-child{border:none}
-        .rt{color:rgba(255,255,255,.35);flex-shrink:0;width:60px}
-        .rm{font-weight:600;flex-shrink:0;width:38px}
-        .rm.GET{color:#4caf50}.rm.POST{color:#42a5f5}.rm.PUT{color:#ff9800}.rm.DELETE{color:#f44336}
-        .rp{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.75)}
-        .rs{flex-shrink:0;width:28px;text-align:right}
-        .rs.s2{color:#4caf50}.rs.s3{color:#42a5f5}.rs.s4{color:#ff9800}.rs.s5{color:#f44336}
-        .rsite{color:rgba(100,181,246,.7);flex-shrink:0;width:110px;text-align:right;font-size:.85em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .ri{color:rgba(255,255,255,.35);flex-shrink:0;width:120px;text-align:right;font-size:.85em}
+/* ── Grid ── */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 22px 22px;max-width:1500px;margin:0 auto}
+.card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
+.card h3{margin-bottom:10px;color:#58a6ff;font-size:1.05em}
+.card.full{grid-column:1/-1}
 
-        /* ── Status codes bar ── */
-        .sc-bar{display:flex;gap:10px;margin-top:8px}
-        .sc-item{text-align:center;flex:1}
-        .sc-val{font-size:1.3em;font-weight:700}
-        .sc-lbl{font-size:.65em;color:rgba(255,255,255,.45);text-transform:uppercase}
+/* ── Scrollable lists ── */
+.slist{max-height:170px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:6px;padding:8px;font-family:'SF Mono','Fira Code',monospace;font-size:.8em}
+.slist::-webkit-scrollbar{width:4px}
+.slist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px}
 
-        /* ── Services / PM2 ── */
-        .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:6px}
-        .sp{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.15);padding:7px 10px;border-radius:7px;font-size:.8em}
-        .sd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-        .sd.active,.sd.online{background:#4caf50}
-        .sd.failed,.sd.stopped{background:#f44336}
-        .sd.inactive{background:#9e9e9e}
-        .sn{flex:1}
-        .smem{color:rgba(255,255,255,.45);font-size:.85em}
-        .stag{color:rgba(255,255,255,.3);font-size:.75em;flex-shrink:0}
+/* ── Request feed ── */
+.rr{display:flex;gap:8px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:center}
+.rr:last-child{border:none}
+.rt{color:rgba(255,255,255,.35);flex-shrink:0;width:60px}
+.rm{font-weight:600;flex-shrink:0;width:38px}
+.rm.GET{color:#4caf50}.rm.POST{color:#42a5f5}.rm.PUT{color:#ff9800}.rm.DELETE{color:#f44336}
+.rp{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.75)}
+.rs{flex-shrink:0;width:28px;text-align:right}
+.rs.s2{color:#4caf50}.rs.s3{color:#42a5f5}.rs.s4{color:#ff9800}.rs.s5{color:#f44336}
+.rsite{color:rgba(88,166,255,.7);flex-shrink:0;width:110px;text-align:right;font-size:.85em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ri{color:rgba(255,255,255,.35);flex-shrink:0;width:120px;text-align:right;font-size:.85em}
 
-        /* ── Site cards ── */
-        .site-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
-        .site-card{background:rgba(255,255,255,.08);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.1);transition:all .25s;position:relative;overflow:hidden}
-        .site-card:hover{transform:translateY(-3px);border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.12)}
-        .site-card .sc-name{font-size:1em;font-weight:700;margin-bottom:4px}
-        .site-card .sc-server{font-size:.7em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
-        .site-card .sc-stats{display:flex;gap:12px;font-size:.82em}
-        .site-card .sc-stat{text-align:center}
-        .site-card .sc-stat-val{font-size:1.4em;font-weight:700}
-        .site-card .sc-stat-lbl{font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase}
-        .site-card .sc-bar-mini{display:flex;gap:6px;margin-top:8px;font-size:.72em}
-        .site-card .sc-bar-mini span{padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.06)}
+/* ── Status codes bar ── */
+.sc-bar{display:flex;gap:10px;margin-top:8px}
+.sc-item{text-align:center;flex:1}
+.sc-val{font-size:1.3em;font-weight:700}
+.sc-lbl{font-size:.65em;color:rgba(255,255,255,.45);text-transform:uppercase}
 
-        /* ── Proxmox containers ── */
-        .ct-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
-        .ct-card{background:rgba(255,255,255,.08);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.1);transition:all .25s}
-        .ct-card:hover{transform:translateY(-2px);border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.12)}
-        .ct-card .ct-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-        .ct-card .ct-name{font-size:1em;font-weight:700}
-        .ct-card .ct-id{font-size:.72em;color:#64b5f6;font-weight:600;background:rgba(100,181,246,.12);padding:2px 8px;border-radius:10px}
-        .ct-card .ct-os{font-size:.72em;color:rgba(255,255,255,.4);margin-bottom:10px}
-        .ct-card .ct-bars{display:flex;flex-direction:column;gap:6px}
-        .ct-bar{display:flex;align-items:center;gap:8px}
-        .ct-bar .cb-label{width:32px;font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase;font-weight:600;flex-shrink:0}
-        .ct-bar .cb-track{flex:1;height:8px;background:rgba(0,0,0,.25);border-radius:4px;overflow:hidden}
-        .ct-bar .cb-fill{height:100%;border-radius:4px;transition:width .6s ease}
-        .ct-bar .cb-val{width:36px;text-align:right;font-size:.72em;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
-        .ct-card .ct-meta{display:flex;gap:14px;margin-top:8px;font-size:.75em;color:rgba(255,255,255,.4)}
-        .ct-card .ct-status{font-size:.72em;font-weight:600;padding:2px 8px;border-radius:10px}
-        .ct-card .ct-status.running{background:rgba(76,175,80,.18);color:#4caf50}
-        .ct-card .ct-status.stopped{background:rgba(244,67,54,.18);color:#f44336}
+/* ── Services / PM2 ── */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:6px}
+.sp{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.35);padding:7px 10px;border-radius:7px;font-size:.8em}
+.sd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sd.active,.sd.online{background:#4caf50}
+.sd.failed,.sd.stopped{background:#f44336}
+.sd.inactive{background:#9e9e9e}
+.sn{flex:1}
+.smem{color:rgba(255,255,255,.45);font-size:.85em}
+.stag{color:rgba(255,255,255,.3);font-size:.75em;flex-shrink:0}
 
-        /* ── Ban / attack ── */
-        .ban{background:rgba(244,67,54,.18);border-left:3px solid #f44336;padding:4px 10px;margin:3px 0;border-radius:0 4px 4px 0}
-        .atk{border-left:3px solid #ff9800;padding:4px 10px;margin:3px 0}
+/* ── Site cards ── */
+.site-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
+.site-card{background:rgba(255,255,255,.05);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.07);transition:all .25s;position:relative;overflow:hidden}
+.site-card:hover{transform:translateY(-3px);border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.08)}
+.site-card .sc-name{font-size:1em;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.site-card .sc-server{font-size:.7em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.site-card .sc-stats{display:flex;gap:12px;font-size:.82em}
+.site-card .sc-stat{text-align:center}
+.site-card .sc-stat-val{font-size:1.4em;font-weight:700}
+.site-card .sc-stat-lbl{font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase}
+.site-card .sc-bar-mini{display:flex;gap:6px;margin-top:8px;font-size:.72em}
+.site-card .sc-bar-mini span{padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.04)}
+.ssh-badge{background:rgba(88,166,255,.15);color:#58a6ff;padding:2px 6px;border-radius:4px;font-size:.7em;font-weight:600}
 
-        .footer{text-align:center;padding:14px;color:rgba(255,255,255,.25);font-size:.72em}
-        .muted{color:rgba(255,255,255,.35)}
+/* ── Proxmox containers ── */
+.ct-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
+.ct-card{background:rgba(255,255,255,.05);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.07);transition:all .25s}
+.ct-card:hover{transform:translateY(-2px);border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.08)}
+.ct-card .ct-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.ct-card .ct-name{font-size:1em;font-weight:700}
+.ct-card .ct-id{font-size:.72em;color:#58a6ff;font-weight:600;background:rgba(88,166,255,.12);padding:2px 8px;border-radius:10px}
+.ct-card .ct-os{font-size:.72em;color:rgba(255,255,255,.4);margin-bottom:10px}
+.ct-card .ct-bars{display:flex;flex-direction:column;gap:6px}
+.ct-bar{display:flex;align-items:center;gap:8px}
+.ct-bar .cb-label{width:32px;font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase;font-weight:600;flex-shrink:0}
+.ct-bar .cb-track{flex:1;height:8px;background:rgba(0,0,0,.35);border-radius:4px;overflow:hidden}
+.ct-bar .cb-fill{height:100%;border-radius:4px;transition:width .6s ease}
+.ct-bar .cb-val{width:36px;text-align:right;font-size:.72em;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
+.ct-card .ct-meta{display:flex;gap:14px;margin-top:8px;font-size:.75em;color:rgba(255,255,255,.4)}
+.ct-card .ct-status{font-size:.72em;font-weight:600;padding:2px 8px;border-radius:10px}
+.ct-card .ct-status.running{background:rgba(76,175,80,.18);color:#4caf50}
+.ct-card .ct-status.stopped{background:rgba(244,67,54,.18);color:#f44336}
 
-        @media(max-width:900px){.grid{grid-template-columns:1fr}.header{flex-direction:column;gap:8px;text-align:center}.site-cards{grid-template-columns:1fr 1fr}.server-pills{flex-direction:column}.ct-cards{grid-template-columns:1fr}}
-        @media(max-width:600px){.site-cards{grid-template-columns:1fr}.metrics-strip{grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;padding:10px 12px}.mc{padding:8px 6px}.mc-val{font-size:1.3em}.header{padding:12px 14px}.header h1{font-size:1.15em}.grid{padding:0 12px 14px;gap:10px}.card{padding:12px}.server-pill{min-width:0;padding:10px 12px}.ri{display:none}.rsite{width:70px;font-size:.72em}.rt{width:44px;font-size:.72em}.rm{width:28px;font-size:.72em}.rp{font-size:.75em}.sgrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px}.sp{padding:5px 8px;font-size:.72em}.sc-val{font-size:1em}.slist{max-height:140px;font-size:.72em}}
-    </style>
+/* ── Ban / attack ── */
+.ban{background:rgba(244,67,54,.18);border-left:3px solid #f44336;padding:4px 10px;margin:3px 0;border-radius:0 4px 4px 0;font-size:.82em}
+
+.footer{text-align:center;padding:14px;color:rgba(255,255,255,.25);font-size:.72em}
+.muted{color:rgba(255,255,255,.35)}
+
+/* ═══════════════════════════════════════════════
+   MAP VIEW
+   ═══════════════════════════════════════════════ */
+#demoMap{height:calc(100vh - 180px);min-height:500px;width:100%}
+.leaflet-tile-pane{filter:none}
+.leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:rgba(255,255,255,.4)!important;font-size:10px!important}
+.leaflet-control-attribution a{color:rgba(88,166,255,.6)!important}
+.server-marker{background:none;border:none}
+.marker-dot{width:20px;height:20px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 12px rgba(0,0,0,.5);position:relative}
+.marker-dot.up{background:#4caf50;box-shadow:0 0 12px rgba(76,175,80,.5)}
+.marker-dot.down{background:#f44336;box-shadow:0 0 12px rgba(244,67,54,.5);animation:mdpulse 1.5s infinite}
+@keyframes mdpulse{0%,100%{box-shadow:0 0 12px rgba(244,67,54,.5)}50%{box-shadow:0 0 24px rgba(244,67,54,.8)}}
+.marker-dot::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid currentColor;opacity:.3;animation:ring 2s infinite}
+.marker-dot.up::after{border-color:#4caf50}
+@keyframes ring{0%{transform:scale(1);opacity:.3}100%{transform:scale(1.8);opacity:0}}
+.leaflet-popup-content-wrapper{background:rgba(13,17,23,.95)!important;color:#e6edf3!important;border-radius:10px!important;box-shadow:0 4px 20px rgba(0,0,0,.5)!important;border:1px solid rgba(255,255,255,.1)!important}
+.leaflet-popup-tip{background:rgba(13,17,23,.95)!important}
+.leaflet-popup-content{margin:12px 16px!important;font-family:'Segoe UI',sans-serif!important}
+.popup-title{font-size:14px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.popup-status{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.popup-status.up{background:rgba(76,175,80,.18);color:#4caf50}
+.popup-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;font-size:12px}
+.popup-metrics .pm{text-align:center;background:rgba(255,255,255,.05);padding:6px;border-radius:6px}
+.popup-metrics .pm-val{font-size:1.2em;font-weight:700}
+.popup-metrics .pm-lbl{font-size:.75em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.popup-host{font-size:11px;color:rgba(255,255,255,.4);font-family:monospace;margin-top:4px}
+
+.map-layout{position:relative}
+.map-legend{position:absolute;bottom:20px;left:20px;background:rgba(13,17,23,.9);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 16px;z-index:1000;font-size:12px}
+.map-legend h4{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:8px;letter-spacing:.05em}
+.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+.map-stats{position:absolute;top:12px;right:12px;width:220px;background:rgba(13,17,23,.9);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;z-index:1000;font-size:12px}
+.map-stats h4{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:10px;letter-spacing:.05em}
+.stat-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.stat-row:last-child{border:none}
+.stat-label{color:rgba(255,255,255,.5)}
+.stat-val{font-weight:700}
+.stat-val.g{color:#4caf50}.stat-val.r{color:#f44336}.stat-val.b{color:#42a5f5}
+
+/* ═══════════════════════════════════════════════
+   TV VIEW
+   ═══════════════════════════════════════════════ */
+.tv-header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:rgba(0,0,0,.3);border-bottom:2px solid rgba(255,255,255,.06)}
+.tv-header h1{font-size:1.2em;font-weight:600;display:flex;align-items:center;gap:10px}
+.tv-status{padding:8px 20px;text-align:center;font-size:.88em;font-weight:600;background:linear-gradient(90deg,#1b5e20,#2e7d32)}
+
+.tv-metrics{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;padding:14px 24px}
+.tv-mc{background:rgba(255,255,255,.05);border-radius:10px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,.06)}
+.tv-mc .label{font-size:.65em;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.tv-mc .val{font-size:2em;font-weight:700}
+.tv-mc .sub{font-size:.6em;color:rgba(255,255,255,.3);margin-top:2px}
+
+.tv-body{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 24px 24px;min-height:400px}
+.tv-panel{background:rgba(255,255,255,.04);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.06);overflow:hidden;display:flex;flex-direction:column}
+.tv-panel h3{font-size:.85em;color:#58a6ff;margin-bottom:10px;flex-shrink:0}
+.tv-feed{flex:1;overflow:hidden;font-family:'SF Mono','Fira Code',monospace;font-size:.75em}
+.tv-sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:4px;flex:1;overflow:hidden;align-content:start}
+.tv-sp-item{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,.2);padding:5px 8px;border-radius:6px;font-size:.75em}
+.tv-sd{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tv-sd.active,.tv-sd.online{background:#4caf50}
+.tv-sd.failed{background:#f44336}
+.tv-ct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;flex:1;overflow:hidden;align-content:start}
+.tv-ct{background:rgba(0,0,0,.2);border-radius:8px;padding:10px;font-size:.78em}
+.tv-ct .ct-head{display:flex;justify-content:space-between;margin-bottom:6px;align-items:center}
+.tv-ct .ct-name{font-weight:700;font-size:.95em}
+.tv-ct .ct-tag{font-size:.7em;color:#58a6ff;background:rgba(88,166,255,.12);padding:1px 6px;border-radius:8px}
+.tv-ct .bar{height:5px;background:rgba(255,255,255,.08);border-radius:3px;margin-top:3px;overflow:hidden}
+.tv-ct .bar .fill{height:100%;border-radius:3px}
+.tv-sites{display:flex;gap:6px;flex-wrap:wrap;flex:1;overflow:hidden;align-content:start}
+.tv-site{background:rgba(0,0,0,.2);border-radius:8px;padding:10px;font-size:.78em;flex:1;min-width:160px;border-left:3px solid #4caf50}
+.tv-site .site-name{font-weight:700;margin-bottom:3px}
+.tv-site .site-stats{display:flex;gap:8px;font-size:.85em;color:rgba(255,255,255,.5)}
+
+/* ═══════════════════════════════════════════════
+   ANALYTICS VIEW
+   ═══════════════════════════════════════════════ */
+.an-controls{background:rgba(0,0,0,.3);padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.04)}
+.an-controls label{font-size:.82em;color:rgba(255,255,255,.55);margin-right:4px}
+.an-controls select{border:1px solid rgba(255,255,255,.2);border-radius:8px;background:rgba(255,255,255,.05);color:#fff;padding:6px 14px;font-size:.85em;outline:none}
+.an-controls select option{background:#0d1117;color:#e6edf3}
+.days-pills{display:flex;gap:6px}
+.days-pill{border:1px solid rgba(255,255,255,.07);border-radius:20px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);padding:4px 14px;font-size:.82em;cursor:pointer;transition:.2s}
+.days-pill:hover{background:rgba(255,255,255,.08)}
+.days-pill.active{background:rgba(88,166,255,.22);border-color:rgba(88,166,255,.5);color:#fff;font-weight:600}
+
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
+.chart-card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
+.chart-card h3{margin-bottom:14px;color:#58a6ff;font-size:1em;font-weight:600;display:flex;align-items:center;gap:7px}
+.chart-card.full{grid-column:1/-1}
+.chart-wrap{position:relative;max-height:280px}
+.chart-wrap-tall{position:relative;max-height:340px}
+
+.tables-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
+.table-card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
+.table-card h3{margin-bottom:12px;color:#58a6ff;font-size:1em;font-weight:600}
+.tbl{width:100%;border-collapse:collapse;font-size:.82em}
+.tbl th{color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase;font-size:.72em;letter-spacing:.04em;padding:4px 6px;text-align:left}
+.tbl td{padding:5px 6px;border-top:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.tbl .rank{color:rgba(255,255,255,.3);font-size:.8em;width:24px}
+.tbl .name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:.9em}
+.tbl .count{text-align:right;font-variant-numeric:tabular-nums;color:#58a6ff;font-weight:600}
+.bar-mini{height:4px;border-radius:2px;background:rgba(88,166,255,.25);margin-top:3px;overflow:hidden}
+.bar-fill{height:100%;background:#58a6ff;border-radius:2px;transition:width .6s ease}
+.device-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 24px 24px;max-width:1500px;margin:0 auto}
+.dev-pill{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:6px 16px;font-size:.82em;display:flex;align-items:center;gap:6px}
+.dev-num{font-weight:700;color:#58a6ff}
+
+/* ═══════════════════════════════════════════════
+   ADMIN VIEW
+   ═══════════════════════════════════════════════ */
+.admin-shell{display:flex;min-height:calc(100vh - 160px)}
+.admin-sidebar{width:200px;background:rgba(0,0,0,.3);border-right:1px solid rgba(255,255,255,.07);flex-shrink:0}
+.admin-sidebar .brand{padding:16px;font-weight:700;font-size:14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:8px}
+.admin-sidebar .brand img{width:22px;height:22px;border-radius:5px}
+.admin-sidebar nav{padding:10px 0}
+.admin-sidebar nav a{display:flex;align-items:center;gap:10px;padding:9px 16px;color:rgba(255,255,255,.5);text-decoration:none;font-size:13px;border-left:3px solid transparent;transition:.15s;cursor:pointer}
+.admin-sidebar nav a:hover,.admin-sidebar nav a.active{color:#fff;background:rgba(255,255,255,.04);border-left-color:#58a6ff}
+.admin-content{flex:1;padding:28px 32px;overflow-y:auto}
+.admin-content h2{font-size:18px;margin-bottom:20px;font-weight:600}
+.admin-page{display:none}.admin-page.active{display:block}
+.panel{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:20px 24px;margin-bottom:20px}
+.panel h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel .row{display:flex;gap:16px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.panel label{font-size:12px;color:rgba(255,255,255,.5);min-width:130px;flex-shrink:0}
+.panel input,.panel select{padding:7px 12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#fff;font-size:13px;outline:none;flex:1;min-width:180px}
+.panel input:focus{border-color:#58a6ff}
+.toggle{position:relative;width:36px;height:20px;background:rgba(255,255,255,.15);border-radius:10px;cursor:pointer;transition:.2s}
+.toggle.on{background:#4caf50}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.toggle.on::after{left:18px}
+.admin-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.admin-tbl th{text-align:left;padding:8px 12px;font-weight:600;font-size:11px;text-transform:uppercase;color:rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.07)}
+.admin-tbl td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+.demo-badge{display:inline-block;background:rgba(88,166,255,.12);color:#58a6ff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-left:6px}
+
+/* ── Responsive ── */
+@media(max-width:900px){.grid{grid-template-columns:1fr}.header{flex-direction:column;gap:8px;text-align:center}.site-cards{grid-template-columns:1fr 1fr}.server-pills{flex-direction:column}.ct-cards{grid-template-columns:1fr}.charts-grid{grid-template-columns:1fr}.tables-grid{grid-template-columns:1fr}.tv-body{grid-template-columns:1fr}.tv-metrics{grid-template-columns:repeat(4,1fr)}.admin-shell{flex-direction:column}.admin-sidebar{width:100%;border-right:none;border-bottom:1px solid rgba(255,255,255,.07)}.admin-sidebar nav{display:flex;flex-wrap:wrap;padding:8px}.admin-sidebar nav a{padding:6px 12px;border-left:none;border-bottom:2px solid transparent}.admin-sidebar nav a.active{border-bottom-color:#58a6ff}}
+@media(max-width:600px){.site-cards{grid-template-columns:1fr}.metrics-strip{grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;padding:10px 12px}.mc{padding:8px 6px}.mc-val{font-size:1.3em}.header{padding:12px 14px}.header h1{font-size:1.15em}.grid{padding:0 12px 14px;gap:10px}.card{padding:12px}.server-pill{min-width:0;padding:10px 12px}.ri{display:none}.rsite{width:70px;font-size:.72em}.rt{width:44px;font-size:.72em}.rm{width:28px;font-size:.72em}.rp{font-size:.75em}.sgrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px}.sp{padding:5px 8px;font-size:.72em}.sc-val{font-size:1em}.slist{max-height:140px;font-size:.72em}.nav-tabs{gap:2px}.nav-tab{padding:4px 8px;font-size:.72em}}
+</style>
 </head>
 <body>
 
 <div class="demo-banner">
-    <span class="pulse"></span>
-    INTERACTIVE DEMO — This dashboard is running with simulated data
-    <span class="pulse"></span>
+  <span class="pulse"></span>
+  INTERACTIVE DEMO — Simulated data · Switch views to explore all features
+  <span class="pulse"></span>
 </div>
 
 <div class="header">
-    <div>
+  <div>
     <h1><img class="logo" src="./centienc-logo.png" alt="CentienC logo"> CentienC</h1>
-        <div class="header-sub">Infrastructure Monitoring · all servers · real-time</div>
+    <div class="header-sub">Infrastructure Monitoring · all servers · real-time</div>
+  </div>
+  <div class="header-right">
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchView('dashboard',this)">🏠 Dashboard</button>
+      <button class="nav-tab" onclick="switchView('map',this)">🗺️ Map</button>
+      <button class="nav-tab" onclick="switchView('tv',this)">📺 TV</button>
+      <button class="nav-tab" onclick="switchView('analytics',this)">📊 Analytics</button>
+      <button class="nav-tab" onclick="switchView('admin',this)">⚙️ Admin</button>
     </div>
-    <div class="header-right">
-        <div class="uptime-badge">⚙ PM2: 14/14</div>
-        <div id="clock">--:--:--</div>
-    </div>
+    <div id="clock">--:--:--</div>
+  </div>
 </div>
 
-<div class="status-banner ok" id="statusBanner">🟢 All systems operational — 847 IPs blocked historically</div>
+<!-- ═══════════════════════════════════════════════
+     DASHBOARD VIEW
+     ═══════════════════════════════════════════════ -->
+<div class="view active" id="view-dashboard">
+  <div class="status-banner ok" id="statusBanner">🟢 All systems operational — 847 IPs blocked historically</div>
 
-<!-- Server pills -->
-<div class="section-title" style="padding-top:14px">Servers</div>
-<div class="server-pills">
+  <div class="section-title" style="padding-top:14px">Servers</div>
+  <div class="server-pills">
     <div class="server-pill">
-        <h4><span class="pill-dot on"></span> Web Server</h4>
-        <div class="pill-grid">
-            <div class="pill-item"><div class="pill-val g" id="ws-cpu">0.24</div><div class="pill-lbl">CPU</div></div>
-            <div class="pill-item"><div class="pill-val g" id="ws-mem">34.2%</div><div class="pill-lbl">Memory</div></div>
-            <div class="pill-item"><div class="pill-val g" id="ws-disk">28.1%</div><div class="pill-lbl">Disk</div></div>
-            <div class="pill-item"><div class="pill-val b" id="ws-conn">18</div><div class="pill-lbl">Conns</div></div>
-        </div>
+      <h4><span class="pill-dot on"></span> Web Server</h4>
+      <div class="pill-grid">
+        <div class="pill-item"><div class="pill-val g" id="ws-cpu">0.24</div><div class="pill-lbl">CPU</div></div>
+        <div class="pill-item"><div class="pill-val g" id="ws-mem">34.2%</div><div class="pill-lbl">Memory</div></div>
+        <div class="pill-item"><div class="pill-val g" id="ws-disk">28.1%</div><div class="pill-lbl">Disk</div></div>
+        <div class="pill-item"><div class="pill-val b" id="ws-conn">18</div><div class="pill-lbl">Conns</div></div>
+      </div>
     </div>
     <div class="server-pill">
-        <h4><span class="pill-dot on"></span> Database Server</h4>
-        <div class="pill-grid">
-            <div class="pill-item"><div class="pill-val g" id="db-cpu">0.08</div><div class="pill-lbl">CPU</div></div>
-            <div class="pill-item"><div class="pill-val g" id="db-mem">52.6%</div><div class="pill-lbl">Memory</div></div>
-            <div class="pill-item"><div class="pill-val g" id="db-disk">41.3%</div><div class="pill-lbl">Disk</div></div>
-            <div class="pill-item"><div class="pill-val b" id="db-conn">6</div><div class="pill-lbl">Conns</div></div>
-        </div>
+      <h4><span class="pill-dot on"></span> Database Server</h4>
+      <div class="pill-grid">
+        <div class="pill-item"><div class="pill-val g" id="db-cpu">0.08</div><div class="pill-lbl">CPU</div></div>
+        <div class="pill-item"><div class="pill-val g" id="db-mem">52.6%</div><div class="pill-lbl">Memory</div></div>
+        <div class="pill-item"><div class="pill-val g" id="db-disk">41.3%</div><div class="pill-lbl">Disk</div></div>
+        <div class="pill-item"><div class="pill-val b" id="db-conn">6</div><div class="pill-lbl">Conns</div></div>
+      </div>
     </div>
     <div class="server-pill">
-        <h4><span class="pill-dot on"></span> Proxmox Node (pve-01)</h4>
-        <div class="pill-grid">
-            <div class="pill-item"><div class="pill-val g" id="pve-cpu">0.38</div><div class="pill-lbl">CPU</div></div>
-            <div class="pill-item"><div class="pill-val g" id="pve-mem">61.4%</div><div class="pill-lbl">Memory</div></div>
-            <div class="pill-item"><div class="pill-val g" id="pve-disk">22.7%</div><div class="pill-lbl">Disk</div></div>
-            <div class="pill-item"><div class="pill-val b" id="pve-conn">3</div><div class="pill-lbl">Conns</div></div>
-        </div>
+      <h4><span class="pill-dot on"></span> Proxmox Node (pve-01)</h4>
+      <div class="pill-grid">
+        <div class="pill-item"><div class="pill-val g" id="pve-cpu">0.38</div><div class="pill-lbl">CPU</div></div>
+        <div class="pill-item"><div class="pill-val g" id="pve-mem">61.4%</div><div class="pill-lbl">Memory</div></div>
+        <div class="pill-item"><div class="pill-val g" id="pve-disk">22.7%</div><div class="pill-lbl">Disk</div></div>
+        <div class="pill-item"><div class="pill-val b" id="pve-conn">3</div><div class="pill-lbl">Conns</div></div>
+      </div>
     </div>
-</div>
+  </div>
 
-<!-- Metrics strip -->
-<div class="metrics-strip">
+  <div class="metrics-strip">
     <div class="mc"><div class="mc-label">Total Req/min</div><div class="mc-val b" id="m-rpm">42.0</div><div class="mc-sub" id="m-rpm-sub">210 total (5m)</div></div>
     <div class="mc"><div class="mc-label">Visitors</div><div class="mc-val w" id="m-vis">18</div><div class="mc-sub">unique IPs (5m)</div></div>
     <div class="mc"><div class="mc-label">Sites Online</div><div class="mc-val g" id="m-sites">5</div><div class="mc-sub">5 monitored</div></div>
@@ -208,91 +364,470 @@
     <div class="mc"><div class="mc-label">Banned IPs</div><div class="mc-val r" id="m-banned">847</div><div class="mc-sub">0 active / 847 total</div></div>
     <div class="mc"><div class="mc-label">Attacks</div><div class="mc-val a" id="m-atk">0</div><div class="mc-sub">last 30m</div></div>
     <div class="mc"><div class="mc-label">Vulnerabilities</div><div class="mc-val g" id="m-vuln">0</div><div class="mc-sub">0 critical</div></div>
+  </div>
+
+  <div class="section-title">Proxmox Containers — pve-01</div>
+  <div class="ct-cards" id="ctCards"></div>
+
+  <div class="section-title">Websites & Services</div>
+  <div class="site-cards" id="siteCards"></div>
+
+  <div class="grid">
+    <div class="card full">
+      <h3>📡 Live Request Feed <span class="muted" style="font-size:.75em;font-weight:400">(all sites)</span></h3>
+      <div id="feedList" class="slist" style="max-height:260px"></div>
+    </div>
+    <div class="card">
+      <h3>📈 Response Codes (5 min)</h3>
+      <div class="sc-bar">
+        <div class="sc-item"><div class="sc-val g" id="sc2">210</div><div class="sc-lbl">2xx OK</div></div>
+        <div class="sc-item"><div class="sc-val b" id="sc3">3</div><div class="sc-lbl">3xx Redirect</div></div>
+        <div class="sc-item"><div class="sc-val a" id="sc4">2</div><div class="sc-lbl">4xx Client</div></div>
+        <div class="sc-item"><div class="sc-val r" id="sc5">0</div><div class="sc-lbl">5xx Server</div></div>
+      </div>
+      <div style="margin-top:14px">
+        <strong style="color:#ff6b6b;font-size:.85em">Banned IPs</strong>
+        <div class="slist" style="max-height:80px;margin-top:4px">
+          <div class="ban">185.220.101.34 — brute-force SSH — 2h ago</div>
+          <div class="ban">45.148.10.72 — wp-login spam — 5h ago</div>
+          <div class="ban">193.106.191.50 — directory traversal — 1d ago</div>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <strong style="color:#ffa726;font-size:.85em">Attack Log</strong>
+        <div class="slist" style="max-height:80px;margin-top:4px"><span class="muted">No recent attacks</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>⚙️ Services & PM2</h3>
+      <div style="margin-bottom:10px">
+        <strong style="font-size:.78em;color:rgba(255,255,255,.45)">SYSTEMD — Web Server</strong>
+        <div class="sgrid" style="margin-top:5px" id="svcWeb"></div>
+      </div>
+      <div style="margin-bottom:10px">
+        <strong style="font-size:.78em;color:rgba(255,255,255,.45)">SYSTEMD — Database Server</strong>
+        <div class="sgrid" style="margin-top:5px" id="svcDB"></div>
+      </div>
+      <div>
+        <strong style="font-size:.78em;color:rgba(255,255,255,.45)">PM2 PROCESSES <span class="muted">(14)</span></strong>
+        <div class="sgrid" style="margin-top:5px;max-height:250px;overflow-y:auto" id="pm2List"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- Proxmox Containers -->
-<div class="section-title">Proxmox Containers — pve-01</div>
-<div class="ct-cards" id="ctCards"></div>
-
-<!-- Site cards -->
-<div class="section-title">Websites & Services</div>
-<div class="site-cards" id="siteCards"></div>
-
-<!-- Grid -->
-<div class="grid">
-    <!-- Live feed -->
-    <div class="card full">
-        <h3>📡 Live Request Feed <span class="muted" style="font-size:.75em;font-weight:400">(all sites)</span></h3>
-        <div id="feedList" class="slist" style="max-height:260px"></div>
+<!-- ═══════════════════════════════════════════════
+     MAP VIEW
+     ═══════════════════════════════════════════════ -->
+<div class="view" id="view-map">
+  <div class="map-layout">
+    <div id="demoMap"></div>
+    <div class="map-legend">
+      <h4>Server Status</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#4caf50"></div> Online</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f44336"></div> Down</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#9e9e9e"></div> Unknown</div>
     </div>
+    <div class="map-stats">
+      <h4>Infrastructure</h4>
+      <div class="stat-row"><span class="stat-label">Servers</span><span class="stat-val b">3</span></div>
+      <div class="stat-row"><span class="stat-label">Online</span><span class="stat-val g">3</span></div>
+      <div class="stat-row"><span class="stat-label">Down</span><span class="stat-val r">0</span></div>
+      <div class="stat-row"><span class="stat-label">Websites</span><span class="stat-val b">5</span></div>
+      <div class="stat-row"><span class="stat-label">Containers</span><span class="stat-val b">3</span></div>
+      <div class="stat-row"><span class="stat-label">PM2 Procs</span><span class="stat-val b">14</span></div>
+      <h4 style="margin-top:14px">Servers</h4>
+      <div style="font-size:11px">
+        <div style="display:flex;align-items:center;gap:6px;padding:3px 0"><div style="width:7px;height:7px;border-radius:50%;background:#4caf50"></div> Web Server</div>
+        <div style="display:flex;align-items:center;gap:6px;padding:3px 0"><div style="width:7px;height:7px;border-radius:50%;background:#4caf50"></div> Database Server</div>
+        <div style="display:flex;align-items:center;gap:6px;padding:3px 0"><div style="width:7px;height:7px;border-radius:50%;background:#4caf50"></div> Proxmox Node</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-    <!-- Response codes -->
-    <div class="card">
-        <h3>📈 Response Codes (5 min)</h3>
-        <div class="sc-bar">
-            <div class="sc-item"><div class="sc-val g" id="sc2">210</div><div class="sc-lbl">2xx OK</div></div>
-            <div class="sc-item"><div class="sc-val b" id="sc3">3</div><div class="sc-lbl">3xx Redirect</div></div>
-            <div class="sc-item"><div class="sc-val a" id="sc4">2</div><div class="sc-lbl">4xx Client</div></div>
-            <div class="sc-item"><div class="sc-val r" id="sc5">0</div><div class="sc-lbl">5xx Server</div></div>
+<!-- ═══════════════════════════════════════════════
+     TV VIEW
+     ═══════════════════════════════════════════════ -->
+<div class="view" id="view-tv">
+  <div class="tv-header">
+    <h1><img class="logo" src="./centienc-logo.png" alt="logo" style="width:28px;height:28px;border-radius:6px"> CentienC <span style="font-size:.55em;color:rgba(255,255,255,.3);font-weight:400">TV MODE</span></h1>
+    <div style="display:flex;align-items:center;gap:14px;font-size:.85em;color:rgba(255,255,255,.5)">
+      <span style="width:8px;height:8px;border-radius:50%;background:#4caf50;box-shadow:0 0 6px #4caf50;display:inline-block"></span>
+      <span id="tvClock">--:--:--</span>
+    </div>
+  </div>
+  <div class="tv-status">🟢 All 8 systems operational</div>
+
+  <div class="server-pills" style="padding:12px 24px">
+    <div class="server-pill">
+      <h4><span class="pill-dot on"></span> Web Server</h4>
+      <div class="pill-grid">
+        <div class="pill-item"><div class="pill-val g" id="tv-ws-cpu">0.24</div><div class="pill-lbl">CPU</div></div>
+        <div class="pill-item"><div class="pill-val g" id="tv-ws-mem">34.2%</div><div class="pill-lbl">Mem</div></div>
+        <div class="pill-item"><div class="pill-val g" id="tv-ws-disk">28.1%</div><div class="pill-lbl">Disk</div></div>
+        <div class="pill-item"><div class="pill-val b">18</div><div class="pill-lbl">Conns</div></div>
+      </div>
+    </div>
+    <div class="server-pill">
+      <h4><span class="pill-dot on"></span> Database Server</h4>
+      <div class="pill-grid">
+        <div class="pill-item"><div class="pill-val g" id="tv-db-cpu">0.08</div><div class="pill-lbl">CPU</div></div>
+        <div class="pill-item"><div class="pill-val g" id="tv-db-mem">52.6%</div><div class="pill-lbl">Mem</div></div>
+        <div class="pill-item"><div class="pill-val g" id="tv-db-disk">41.3%</div><div class="pill-lbl">Disk</div></div>
+        <div class="pill-item"><div class="pill-val b">6</div><div class="pill-lbl">Conns</div></div>
+      </div>
+    </div>
+    <div class="server-pill">
+      <h4><span class="pill-dot on"></span> Proxmox Node</h4>
+      <div class="pill-grid">
+        <div class="pill-item"><div class="pill-val g" id="tv-pve-cpu">0.38</div><div class="pill-lbl">CPU</div></div>
+        <div class="pill-item"><div class="pill-val g" id="tv-pve-mem">61.4%</div><div class="pill-lbl">Mem</div></div>
+        <div class="pill-item"><div class="pill-val g" id="tv-pve-disk">22.7%</div><div class="pill-lbl">Disk</div></div>
+        <div class="pill-item"><div class="pill-val b">3</div><div class="pill-lbl">Conns</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tv-metrics">
+    <div class="tv-mc"><div class="label">Req/min</div><div class="val b" id="tv-rpm">42.0</div><div class="sub">210 recent</div></div>
+    <div class="tv-mc"><div class="label">Visitors</div><div class="val w">18</div><div class="sub">unique IPs</div></div>
+    <div class="tv-mc"><div class="label">Sites</div><div class="val g">5</div><div class="sub">5 total</div></div>
+    <div class="tv-mc"><div class="label">PM2</div><div class="val g">14</div><div class="sub">14/14</div></div>
+    <div class="tv-mc"><div class="label">Containers</div><div class="val b">3</div><div class="sub">3/3</div></div>
+    <div class="tv-mc"><div class="label">Banned</div><div class="val r">847</div><div class="sub">0 active</div></div>
+    <div class="tv-mc"><div class="label">Attacks</div><div class="val a">0</div><div class="sub">last 30m</div></div>
+    <div class="tv-mc"><div class="label">Vulns</div><div class="val g">0</div><div class="sub">0 critical</div></div>
+  </div>
+
+  <div class="tv-body">
+    <div class="tv-panel">
+      <h3>📡 Live Request Feed</h3>
+      <div class="tv-feed" id="tvFeed"></div>
+    </div>
+    <div class="tv-panel">
+      <h3>⚙️ Services & PM2</h3>
+      <div class="tv-sgrid" id="tvServices"></div>
+    </div>
+    <div class="tv-panel">
+      <h3>🖧 Proxmox Containers</h3>
+      <div class="tv-ct-grid" id="tvContainers"></div>
+    </div>
+    <div class="tv-panel">
+      <h3>🌐 Websites</h3>
+      <div class="tv-sites" id="tvSites"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ANALYTICS VIEW
+     ═══════════════════════════════════════════════ -->
+<div class="view" id="view-analytics">
+  <div class="an-controls">
+    <div>
+      <label>Server:</label>
+      <select id="anServer"><option>Web Server (5.183.9.216)</option></select>
+    </div>
+    <div>
+      <label>Period:</label>
+      <div class="days-pills">
+        <span class="days-pill" data-days="7">7d</span>
+        <span class="days-pill active" data-days="30">30d</span>
+        <span class="days-pill" data-days="90">90d</span>
+        <span class="days-pill" data-days="180">180d</span>
+      </div>
+    </div>
+    <span style="font-size:.78em;color:rgba(255,255,255,.35);margin-left:auto" id="anUpdated"></span>
+  </div>
+
+  <div class="section-title" style="margin-top:10px">Summary</div>
+  <div class="metrics-strip">
+    <div class="mc"><div class="mc-label">Total Pageviews</div><div class="mc-val b">8.7k</div><div class="mc-sub">30-day window</div></div>
+    <div class="mc"><div class="mc-label">Unique Visitors</div><div class="mc-val g">1.2k</div><div class="mc-sub">unique IPs</div></div>
+    <div class="mc"><div class="mc-label">Avg / Day</div><div class="mc-val a">290</div><div class="mc-sub">pageviews per day</div></div>
+    <div class="mc"><div class="mc-label">Top Page</div><div class="mc-val" style="font-size:.9em;color:#58a6ff">/blog/homelab-setup</div><div class="mc-sub">1.4k views</div></div>
+    <div class="mc"><div class="mc-label">Top Topic</div><div class="mc-val" style="font-size:.9em;color:#ab47bc">Homelab</div><div class="mc-sub">2.1k views</div></div>
+    <div class="mc"><div class="mc-label">Mobile Share</div><div class="mc-val" style="color:#26c6da">38%</div><div class="mc-sub">456 mobile visitors</div></div>
+  </div>
+
+  <div class="section-title">Traffic Over Time</div>
+  <div class="charts-grid">
+    <div class="chart-card full"><h3>📈 Daily Pageviews (last 30 days)</h3><div class="chart-wrap-tall"><canvas id="chartTraffic"></canvas></div></div>
+  </div>
+
+  <div class="section-title">Pages & Content</div>
+  <div class="charts-grid">
+    <div class="chart-card"><h3>📄 Top Pages</h3><div class="chart-wrap-tall"><canvas id="chartPages"></canvas></div></div>
+    <div class="chart-card"><h3>🗂️ Site Sections</h3><div class="chart-wrap"><canvas id="chartSections"></canvas></div></div>
+  </div>
+
+  <div class="section-title">Health & Sources</div>
+  <div class="charts-grid">
+    <div class="chart-card"><h3>🔢 HTTP Status Codes</h3><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div>
+    <div class="chart-card"><h3>🕐 Traffic by Hour of Day</h3><div class="chart-wrap"><canvas id="chartHour"></canvas></div></div>
+  </div>
+
+  <div class="section-title">Top Content</div>
+  <div class="tables-grid">
+    <div class="table-card">
+      <h3>🏆 Focus Topics</h3>
+      <table class="tbl" id="topicsTable"></table>
+    </div>
+    <div class="table-card">
+      <h3>🔗 Top Referrers</h3>
+      <table class="tbl" id="referrersTable"></table>
+    </div>
+    <div class="table-card">
+      <h3>🌐 Top IP Addresses</h3>
+      <table class="tbl" id="ipsTable"></table>
+    </div>
+  </div>
+
+  <div class="section-title">Devices</div>
+  <div class="device-row">
+    <div class="dev-pill">💻 Desktop <span class="dev-num">744</span> <span style="color:rgba(255,255,255,.4);font-size:.85em">62%</span></div>
+    <div class="dev-pill">📱 Mobile <span class="dev-num">456</span> <span style="color:rgba(255,255,255,.4);font-size:.85em">38%</span></div>
+    <div class="dev-pill">🤖 Bots (excluded) <span class="dev-num">3.2k</span></div>
+    <div class="dev-pill" style="margin-left:auto;opacity:.5;font-size:.78em">Bots are excluded from all metrics above</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ADMIN VIEW
+     ═══════════════════════════════════════════════ -->
+<div class="view" id="view-admin">
+  <div class="admin-shell">
+    <div class="admin-sidebar">
+      <div class="brand"><img src="./centienc-logo.png" alt="logo"> Admin</div>
+      <nav>
+        <a class="active" onclick="showAdminPage('general',this)">🔧 General</a>
+        <a onclick="showAdminPage('servers',this)">🖥 Servers</a>
+        <a onclick="showAdminPage('websites',this)">🌐 Websites</a>
+        <a onclick="showAdminPage('users',this)">👤 Users</a>
+        <a onclick="showAdminPage('notifications',this)">🔔 Notifications</a>
+        <a onclick="showAdminPage('data',this)">🗄 Data</a>
+        <a onclick="showAdminPage('proxmox',this)">🖧 Proxmox</a>
+        <a onclick="showAdminPage('about',this)">ℹ️ About</a>
+      </nav>
+    </div>
+    <div class="admin-content">
+      <!-- General -->
+      <div class="admin-page active" id="ap-general">
+        <h2>General Settings</h2>
+        <div class="panel">
+          <h3>🏷 Application</h3>
+          <div class="row"><label>App Title</label><input value="CentienC" readonly></div>
+          <div class="row"><label>Theme</label><select disabled><option>Dark</option></select></div>
+          <div class="row"><label>Check Interval (s)</label><input value="60" readonly></div>
+          <div class="row"><label>Data Retention (days)</label><input value="30" readonly></div>
         </div>
-        <div style="margin-top:14px">
-            <strong style="color:#ff6b6b;font-size:.85em">Banned IPs</strong>
-            <div class="slist" style="max-height:80px;margin-top:4px">
-                <div class="ban">185.220.101.34 — brute-force SSH — 2h ago</div>
-                <div class="ban">45.148.10.72 — wp-login spam — 5h ago</div>
-                <div class="ban">193.106.191.50 — directory traversal — 1d ago</div>
+        <div class="panel">
+          <h3>🔒 Authentication</h3>
+          <div class="row"><label>Require Login</label><div class="toggle on"></div></div>
+        </div>
+      </div>
+      <!-- Servers -->
+      <div class="admin-page" id="ap-servers">
+        <h2>Server Management</h2>
+        <div class="panel">
+          <h3>🖥 Servers <span class="demo-badge">DEMO</span></h3>
+          <table class="admin-tbl">
+            <thead><tr><th>Name</th><th>Hostname</th><th>Port</th><th>SSH User</th><th>Monitoring</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Web Server</strong></td><td style="font-family:monospace;font-size:12px">5.183.9.216</td><td>22</td><td>deploy</td><td style="font-size:11px">SYS · PM2 · SVC · NGX · F2B</td><td style="color:#4caf50;font-weight:600">up</td></tr>
+              <tr><td><strong>Database Server</strong></td><td style="font-family:monospace;font-size:12px">10.10.10.20</td><td>22</td><td>root</td><td style="font-size:11px">SYS · SVC</td><td style="color:#4caf50;font-weight:600">up</td></tr>
+              <tr><td><strong>Proxmox Node</strong></td><td style="font-family:monospace;font-size:12px">10.10.10.5</td><td>22</td><td>root</td><td style="font-size:11px">SYS · SVC</td><td style="color:#4caf50;font-weight:600">up</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel" style="border-color:rgba(88,166,255,.12);background:rgba(88,166,255,.03)">
+          <h3>🔑 SSH-Based Monitoring</h3>
+          <p style="font-size:13px;color:rgba(255,255,255,.5)">CentienC connects to your servers via SSH — no agents to install. Configure SSH credentials and monitoring features per server.</p>
+        </div>
+      </div>
+      <!-- Websites -->
+      <div class="admin-page" id="ap-websites">
+        <h2>Website Monitoring</h2>
+        <div class="panel">
+          <h3>🌐 Websites <span class="demo-badge">DEMO</span></h3>
+          <table class="admin-tbl">
+            <thead><tr><th>Name</th><th>URL</th><th>Expected</th><th>SSH Link</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><strong>MainSite.com</strong></td><td style="font-family:monospace;font-size:12px">https://mainsite.com</td><td>200</td><td style="color:#58a6ff">📊 Web Server</td><td style="color:#4caf50;font-weight:600">up (200)</td></tr>
+              <tr><td><strong>API Gateway</strong></td><td style="font-family:monospace;font-size:12px">https://api.mainsite.com</td><td>200</td><td style="color:#58a6ff">📊 Web Server</td><td style="color:#4caf50;font-weight:600">up (200)</td></tr>
+              <tr><td><strong>Documentation</strong></td><td style="font-family:monospace;font-size:12px">https://docs.mainsite.com</td><td>200</td><td style="color:rgba(255,255,255,.3)">— basic</td><td style="color:#4caf50;font-weight:600">up (200)</td></tr>
+              <tr><td><strong>Blog</strong></td><td style="font-family:monospace;font-size:12px">https://blog.mainsite.com</td><td>200</td><td style="color:#58a6ff">📊 Web Server</td><td style="color:#4caf50;font-weight:600">up (200)</td></tr>
+              <tr><td><strong>Admin Panel</strong></td><td style="font-family:monospace;font-size:12px">https://admin.mainsite.com</td><td>200</td><td style="color:rgba(255,255,255,.3)">— basic</td><td style="color:#4caf50;font-weight:600">up (200)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Users -->
+      <div class="admin-page" id="ap-users">
+        <h2>User Management</h2>
+        <div class="panel">
+          <h3>👤 Admin Users <span class="demo-badge">DEMO</span></h3>
+          <table class="admin-tbl">
+            <thead><tr><th>Username</th><th>Role</th><th>Created</th></tr></thead>
+            <tbody><tr><td>admin</td><td>Admin</td><td>2024-01-15</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Notifications -->
+      <div class="admin-page" id="ap-notifications">
+        <h2>Notification Channels</h2>
+        <div class="panel">
+          <h3>📡 Channels <span class="demo-badge">DEMO</span></h3>
+          <table class="admin-tbl">
+            <thead><tr><th>Name</th><th>Type</th><th>Enabled</th></tr></thead>
+            <tbody>
+              <tr><td>Server Alerts</td><td>Email</td><td>✅</td></tr>
+              <tr><td>Team Notifications</td><td>Discord</td><td>✅</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Data -->
+      <div class="admin-page" id="ap-data">
+        <h2>Data Management</h2>
+        <div class="panel">
+          <h3>📊 Database Info</h3>
+          <div class="row"><label>Database Path</label><span style="font-size:13px;color:rgba(255,255,255,.5)">~/.config/centient/centient.db</span></div>
+        </div>
+        <div class="panel">
+          <h3>🔄 Export / Import</h3>
+          <p style="font-size:13px;color:rgba(255,255,255,.5)">Export your monitoring configuration and history.</p>
+        </div>
+      </div>
+      <!-- Proxmox -->
+      <div class="admin-page" id="ap-proxmox">
+        <h2>Proxmox Nodes</h2>
+        <div class="panel">
+          <h3>🖧 Nodes <span class="demo-badge">DEMO</span></h3>
+          <table class="admin-tbl">
+            <thead><tr><th>Name</th><th>Host</th><th>Node</th><th>User</th><th>Status</th></tr></thead>
+            <tbody><tr><td>pve-01</td><td>10.10.10.5:8006</td><td>pve</td><td>root@pam</td><td style="color:#4caf50;font-weight:600">up</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- About -->
+      <div class="admin-page" id="ap-about">
+        <h2>About</h2>
+        <div class="panel" style="text-align:center;padding:40px 24px">
+          <img src="./centienc-logo.png" alt="CentienC" style="width:72px;height:72px;border-radius:16px;margin-bottom:16px">
+          <h3 style="font-size:22px;margin-bottom:2px">CentienC</h3>
+          <p style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px">Lightweight infrastructure monitoring — no agents required</p>
+          <span style="display:inline-block;background:rgba(88,166,255,.12);color:#58a6ff;padding:4px 16px;border-radius:20px;font-size:13px;font-weight:600;border:1px solid rgba(88,166,255,.2)">v1.5.0</span>
+        </div>
+        <div class="panel">
+          <h3>📬 Get in Touch</h3>
+          <div style="display:grid;gap:16px;font-size:13px;margin-top:6px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="color:rgba(255,255,255,.5);width:100px;flex-shrink:0">GitHub</span>
+              <a href="https://github.com/JoshuaMGoth/centienc" target="_blank" style="color:#58a6ff;text-decoration:none">github.com/JoshuaMGoth/centienc</a>
             </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="color:rgba(255,255,255,.5);width:100px;flex-shrink:0">Website</span>
+              <a href="https://joshuagoth.com" target="_blank" style="color:#58a6ff;text-decoration:none">joshuagoth.com</a>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="color:rgba(255,255,255,.5);width:100px;flex-shrink:0">Bugs / Requests</span>
+              <a href="mailto:me@joshuagoth.com" style="color:#58a6ff;text-decoration:none">me@joshuagoth.com</a>
+            </div>
+          </div>
         </div>
-        <div style="margin-top:10px">
-            <strong style="color:#ffa726;font-size:.85em">Attack Log</strong>
-            <div class="slist" style="max-height:80px;margin-top:4px"><span class="muted">No recent attacks</span></div>
+        <div class="panel">
+          <h3>📜 License</h3>
+          <p style="font-size:13px;color:rgba(255,255,255,.5);line-height:1.6">CentienC is open-source software licensed under the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" style="color:#58a6ff;text-decoration:none">GNU General Public License v3.0</a>.<br>Contributions welcome — see the <a href="https://github.com/JoshuaMGoth/centienc/blob/main/CONTRIBUTING.md" target="_blank" style="color:#58a6ff;text-decoration:none">Contributing Guide</a>.</p>
         </div>
+      </div>
     </div>
-
-    <!-- Services & PM2 -->
-    <div class="card">
-        <h3>⚙️ Services & PM2</h3>
-        <div style="margin-bottom:10px">
-            <strong style="font-size:.78em;color:rgba(255,255,255,.45)">SYSTEMD — Web Server</strong>
-            <div class="sgrid" style="margin-top:5px" id="svcWeb"></div>
-        </div>
-        <div style="margin-bottom:10px">
-            <strong style="font-size:.78em;color:rgba(255,255,255,.45)">SYSTEMD — Database Server</strong>
-            <div class="sgrid" style="margin-top:5px" id="svcDB"></div>
-        </div>
-        <div>
-            <strong style="font-size:.78em;color:rgba(255,255,255,.45)">PM2 PROCESSES <span class="muted">(14)</span></strong>
-            <div class="sgrid" style="margin-top:5px;max-height:250px;overflow-y:auto" id="pm2List"></div>
-        </div>
-    </div>
+  </div>
 </div>
 
 <div class="footer">
-    Last updated: <span id="lastUp">just now</span><br>
-    A <a href="https://github.com/JoshuaMGoth" style="color:rgba(255,255,255,.45);text-decoration:none;">JoshuaGoth</a> Software · Powered by <strong>Project CloudStrap</strong><br>
-    <span style="font-size:.9em;">Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GNU GPL-3.0</a> · <a href="https://github.com/JoshuaMGoth/centienc" style="color:rgba(100,181,246,.6);text-decoration:none;" target="_blank">GitHub</a></span>
+  Last updated: <span id="lastUp">just now</span><br>
+  A <a href="https://github.com/JoshuaMGoth" style="color:rgba(255,255,255,.45);text-decoration:none;">JoshuaGoth</a> Software · Powered by <strong>Project CloudStrap</strong><br>
+  <span style="font-size:.9em;">Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(88,166,255,.6);text-decoration:none;" target="_blank">GNU GPL-3.0</a> · <a href="https://github.com/JoshuaMGoth/centienc" style="color:rgba(88,166,255,.6);text-decoration:none;" target="_blank">GitHub</a></span>
 </div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════
-   CentienC Demo — Full infrastructure dashboard with fake data
+   CentienC Demo — Full interactive demo with all views
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Clock ── */
 function updateClock(){
-  const d=new Date();
-  document.getElementById('clock').textContent=d.toLocaleTimeString('en-US',{hour12:true});
+  const t=new Date().toLocaleTimeString('en-US',{hour12:true});
+  document.getElementById('clock').textContent=t;
+  const tvc=document.getElementById('tvClock');
+  if(tvc)tvc.textContent=t;
 }
 setInterval(updateClock,1000);updateClock();
 
-/* ── Containers ── */
+/* ═══════════════════════════════════════════════
+   VIEW SWITCHING
+   ═══════════════════════════════════════════════ */
+let mapInited=false, chartsInited=false;
+
+function switchView(name,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+
+  if(name==='map'&&!mapInited){initMap();mapInited=true}
+  if(name==='map'&&window.demoMap){setTimeout(()=>window.demoMap.invalidateSize(),100)}
+  if(name==='analytics'&&!chartsInited){buildAnalyticsCharts();chartsInited=true}
+}
+
+/* ═══════════════════════════════════════════════
+   ADMIN PAGE SWITCHING
+   ═══════════════════════════════════════════════ */
+function showAdminPage(page,btn){
+  document.querySelectorAll('.admin-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('ap-'+page).classList.add('active');
+  document.querySelectorAll('.admin-sidebar nav a').forEach(a=>a.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════
+   SHARED DATA
+   ═══════════════════════════════════════════════ */
 const containers=[
   {ctid:100,name:'CentienC',os:'Debian 12',ip:'10.10.10.50',status:'running',cpu:6,ram:24,disk:11,uptime:'43d 7h 12m'},
   {ctid:101,name:'nginx-proxy',os:'Debian 12',ip:'10.10.10.51',status:'running',cpu:18,ram:38,disk:32,uptime:'43d 7h 12m'},
   {ctid:102,name:'pihole-dns',os:'Ubuntu 22.04',ip:'10.10.10.52',status:'running',cpu:4,ram:15,disk:7,uptime:'43d 7h 12m'},
 ];
 
+const sites=[
+  {name:'MainSite.com',server:'WEB',rpm:12.4,visitors:6,reqs:62,s2:60,s3:1,s4:1,s5:0,ssh:true},
+  {name:'API Gateway',server:'WEB',rpm:18.2,visitors:4,reqs:91,s2:89,s3:2,s4:0,s5:0,ssh:true},
+  {name:'Documentation',server:'WEB',rpm:3.8,visitors:3,reqs:19,s2:19,s3:0,s4:0,s5:0,ssh:false},
+  {name:'Blog',server:'WEB',rpm:5.6,visitors:4,reqs:28,s2:27,s3:0,s4:1,s5:0,ssh:true},
+  {name:'Admin Panel',server:'WEB',rpm:2.0,visitors:1,reqs:10,s2:10,s3:0,s4:0,s5:0,ssh:false},
+];
+
+const svcWebData=['nginx','ssh','tailscaled','postfix','certbot.timer','ufw'];
+const svcDBData=['postgresql','redis-server','pgbouncer'];
+const pm2Data=[
+  {name:'api-gateway',mem:'82MB'},{name:'auth-service',mem:'45MB'},{name:'blog-backend',mem:'63MB'},
+  {name:'cms-api',mem:'54MB'},{name:'docs-builder',mem:'38MB'},{name:'email-worker',mem:'26MB'},
+  {name:'file-upload',mem:'41MB'},{name:'image-processor',mem:'92MB'},{name:'notification-svc',mem:'33MB'},
+  {name:'payment-api',mem:'57MB'},{name:'search-indexer',mem:'71MB'},{name:'scheduler',mem:'28MB'},
+  {name:'websocket-srv',mem:'44MB'},{name:'admin-dashboard',mem:'36MB'},
+];
+
+const feedPaths=['/','about','/api/v1/users','/api/v1/posts','/docs/getting-started','/blog/new-release','/login','/api/auth/token','/api/v1/search?q=test','/static/app.js','/css/main.css','/images/logo.png','/api/v1/health','/admin/settings','/api/v1/notifications','/sitemap.xml','/robots.txt','/api/v1/upload','/blog/rss.xml','/api/v1/comments'];
+const feedSites=['MainSite.com','API Gateway','Documentation','Blog','Admin Panel'];
+const feedIPs=['142.250.80.46','151.101.1.140','104.26.10.78','172.67.182.31','93.184.216.34','185.199.108.133','76.76.21.21','13.107.42.14','35.186.224.25','198.51.100.42'];
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD
+   ═══════════════════════════════════════════════ */
 function fillColor(pct){return pct<50?'#4caf50':pct<75?'#ff9800':pct<90?'#ff5722':'#f44336'}
+
 function renderContainers(){
   document.getElementById('ctCards').innerHTML=containers.map(c=>`
     <div class="ct-card">
@@ -314,20 +849,11 @@ function renderContainers(){
   `).join('');
 }
 
-/* ── Websites ── */
-const sites=[
-  {name:'MainSite.com',server:'WEB',rpm:12.4,visitors:6,reqs:62,s2:60,s3:1,s4:1,s5:0},
-  {name:'API Gateway',server:'WEB',rpm:18.2,visitors:4,reqs:91,s2:89,s3:2,s4:0,s5:0},
-  {name:'Documentation',server:'WEB',rpm:3.8,visitors:3,reqs:19,s2:19,s3:0,s4:0,s5:0},
-  {name:'Blog',server:'WEB',rpm:5.6,visitors:4,reqs:28,s2:27,s3:0,s4:1,s5:0},
-  {name:'Admin Panel',server:'WEB',rpm:2.0,visitors:1,reqs:10,s2:10,s3:0,s4:0,s5:0},
-];
-
 function renderSites(){
   document.getElementById('siteCards').innerHTML=sites.map(s=>`
     <div class="site-card">
-      <div class="sc-name">${s.name}</div>
-      <div class="sc-server">${s.server}</div>
+      <div class="sc-name">${s.ssh?'<span class="ssh-badge">📊</span> ':''}${s.name}</div>
+      <div class="sc-server">${s.server}${s.ssh?' · SSH linked':''}</div>
       <div class="sc-stats">
         <div class="sc-stat"><div class="sc-stat-val b">${s.rpm.toFixed(1)}</div><div class="sc-stat-lbl">Req/m</div></div>
         <div class="sc-stat"><div class="sc-stat-val w">${s.visitors}</div><div class="sc-stat-lbl">Visitors</div></div>
@@ -342,17 +868,6 @@ function renderSites(){
   `).join('');
 }
 
-/* ── Systemd services ── */
-const svcWebData=['nginx','ssh','tailscaled','postfix','certbot.timer','ufw'];
-const svcDBData=['postgresql','redis-server','pgbouncer'];
-const pm2Data=[
-  {name:'api-gateway',mem:'82MB'},{name:'auth-service',mem:'45MB'},{name:'blog-backend',mem:'63MB'},
-  {name:'cms-api',mem:'54MB'},{name:'docs-builder',mem:'38MB'},{name:'email-worker',mem:'26MB'},
-  {name:'file-upload',mem:'41MB'},{name:'image-processor',mem:'92MB'},{name:'notification-svc',mem:'33MB'},
-  {name:'payment-api',mem:'57MB'},{name:'search-indexer',mem:'71MB'},{name:'scheduler',mem:'28MB'},
-  {name:'websocket-srv',mem:'44MB'},{name:'admin-dashboard',mem:'36MB'},
-];
-
 function renderServices(){
   document.getElementById('svcWeb').innerHTML=svcWebData.map(s=>`<div class="sp"><div class="sd active"></div><span class="sn">${s}</span></div>`).join('');
   document.getElementById('svcDB').innerHTML=svcDBData.map(s=>`<div class="sp"><div class="sd active"></div><span class="sn">${s}</span></div>`).join('');
@@ -360,10 +875,6 @@ function renderServices(){
 }
 
 /* ── Live request feed ── */
-const feedPaths=['/','about','/api/v1/users','/api/v1/posts','/docs/getting-started','/blog/new-release','/login','/api/auth/token','/api/v1/search?q=test','/static/app.js','/css/main.css','/images/logo.png','/api/v1/health','/admin/settings','/api/v1/notifications','/sitemap.xml','/robots.txt','/api/v1/upload','/blog/rss.xml','/api/v1/comments'];
-const feedSites=['MainSite.com','API Gateway','Documentation','Blog','Admin Panel'];
-const feedIPs=['142.250.80.46','151.101.1.140','104.26.10.78','172.67.182.31','93.184.216.34','185.199.108.133','76.76.21.21','13.107.42.14','35.186.224.25','198.51.100.42'];
-
 function genFeedRow(){
   const now=new Date();
   const time=now.toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -387,8 +898,8 @@ function initFeed(){
 
 function addFeedRow(){
   const el=document.getElementById('feedList');
+  if(!el)return;
   el.innerHTML=genFeedRow()+el.innerHTML;
-  // Trim to 50
   const rows=el.querySelectorAll('.rr');
   if(rows.length>50) rows[rows.length-1].remove();
 }
@@ -400,7 +911,7 @@ function jitter(val,pct){
 }
 
 function simulateTick(){
-  // Server pills
+  // Dashboard server pills
   document.getElementById('ws-cpu').textContent=jitter(0.24,.3).toFixed(2);
   document.getElementById('ws-mem').textContent=jitter(34.2,.05).toFixed(1)+'%';
   document.getElementById('ws-conn').textContent=Math.round(jitter(18,.2));
@@ -409,6 +920,17 @@ function simulateTick(){
   document.getElementById('db-conn').textContent=Math.round(jitter(6,.2));
   document.getElementById('pve-cpu').textContent=jitter(0.38,.2).toFixed(2);
   document.getElementById('pve-mem').textContent=jitter(61.4,.03).toFixed(1)+'%';
+
+  // TV server pills
+  document.getElementById('tv-ws-cpu').textContent=jitter(0.24,.3).toFixed(2);
+  document.getElementById('tv-ws-mem').textContent=jitter(34.2,.05).toFixed(1)+'%';
+  document.getElementById('tv-ws-disk').textContent=jitter(28.1,.02).toFixed(1)+'%';
+  document.getElementById('tv-db-cpu').textContent=jitter(0.08,.4).toFixed(2);
+  document.getElementById('tv-db-mem').textContent=jitter(52.6,.03).toFixed(1)+'%';
+  document.getElementById('tv-db-disk').textContent=jitter(41.3,.02).toFixed(1)+'%';
+  document.getElementById('tv-pve-cpu').textContent=jitter(0.38,.2).toFixed(2);
+  document.getElementById('tv-pve-mem').textContent=jitter(61.4,.03).toFixed(1)+'%';
+  document.getElementById('tv-pve-disk').textContent=jitter(22.7,.02).toFixed(1)+'%';
 
   // Containers
   containers.forEach(c=>{
@@ -433,6 +955,7 @@ function simulateTick(){
   document.getElementById('m-rpm').textContent=totalRpm.toFixed(1);
   document.getElementById('m-rpm-sub').textContent=totalReqs+' total (5m)';
   document.getElementById('m-vis').textContent=totalVis;
+  document.getElementById('tv-rpm').textContent=totalRpm.toFixed(1);
 
   // Response codes
   const t2=sites.reduce((a,s)=>a+s.s2,0);
@@ -445,7 +968,7 @@ function simulateTick(){
   document.getElementById('lastUp').textContent='just now';
 }
 
-/* ── Feed ticker — add new request every 1-3s ── */
+/* ── Feed ticker ── */
 let feedTimer=0;
 setInterval(()=>{
   feedTimer++;
@@ -456,11 +979,167 @@ setInterval(()=>{
 /* ── Main refresh cycle ── */
 setInterval(simulateTick,5000);
 
-/* ── Init ── */
+/* ═══════════════════════════════════════════════
+   TV VIEW
+   ═══════════════════════════════════════════════ */
+function renderTV(){
+  // Services
+  const sg=document.getElementById('tvServices');
+  let sh='';
+  svcWebData.forEach(s=>sh+=`<div class="tv-sp-item"><div class="tv-sd active"></div>${s}</div>`);
+  svcDBData.forEach(s=>sh+=`<div class="tv-sp-item"><div class="tv-sd active"></div>${s}</div>`);
+  pm2Data.forEach(p=>sh+=`<div class="tv-sp-item"><div class="tv-sd online"></div>${p.name}<span style="color:rgba(255,255,255,.3);margin-left:auto;font-size:.85em">${p.mem}</span></div>`);
+  sg.innerHTML=sh;
+
+  // Containers
+  document.getElementById('tvContainers').innerHTML=containers.map(c=>`
+    <div class="tv-ct">
+      <div class="ct-head"><span class="ct-name">${c.name}</span><span class="ct-tag">CT ${c.ctid}</span></div>
+      <div class="bar"><div class="fill" style="width:${c.cpu}%;background:${fillColor(c.cpu)}"></div></div>
+      <div class="bar"><div class="fill" style="width:${c.ram}%;background:${fillColor(c.ram)}"></div></div>
+    </div>`).join('');
+
+  // Sites
+  document.getElementById('tvSites').innerHTML=sites.map(s=>`
+    <div class="tv-site"><div class="site-name">${s.name}</div><div class="site-stats"><span>UP</span><span>${s.rpm.toFixed(1)} rpm</span></div></div>
+  `).join('');
+
+  // Feed
+  const fl=document.getElementById('tvFeed');
+  let fh='';
+  for(let i=0;i<15;i++){
+    const time=new Date(Date.now()-i*2000).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const path=feedPaths[Math.floor(Math.random()*feedPaths.length)];
+    const site=feedSites[Math.floor(Math.random()*feedSites.length)];
+    fh+=`<div class="rr"><span class="rt">${time}</span><span class="rm GET">GET</span><span class="rp">${path}</span><span class="rsite">${site}</span><span class="rs s2">200</span></div>`;
+  }
+  fl.innerHTML=fh;
+}
+
+/* ═══════════════════════════════════════════════
+   MAP VIEW
+   ═══════════════════════════════════════════════ */
+const mapServers=[
+  {name:'Web Server',lat:34.05,lng:-118.24,city:'Los Angeles, CA',ip:'5.183.9.216',cpu:'0.24',mem:'34.2%',disk:'28.1%',conns:18},
+  {name:'Database Server',lat:40.71,lng:-74.01,city:'New York, NY',ip:'10.10.10.20',cpu:'0.08',mem:'52.6%',disk:'41.3%',conns:6},
+  {name:'Proxmox Node',lat:32.78,lng:-96.80,city:'Dallas, TX',ip:'10.10.10.5',cpu:'0.38',mem:'61.4%',disk:'22.7%',conns:3},
+];
+
+function initMap(){
+  const map=L.map('demoMap',{zoomControl:false}).setView([38,-96],4);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:19
+  }).addTo(map);
+
+  mapServers.forEach(s=>{
+    const icon=L.divIcon({className:'server-marker',html:'<div class="marker-dot up"></div>',iconSize:[20,20],iconAnchor:[10,10]});
+    const marker=L.marker([s.lat,s.lng],{icon}).addTo(map);
+    marker.bindPopup(`
+      <div class="popup-title">${s.name} <span class="popup-status up">UP</span></div>
+      <div class="popup-host">${s.ip} — ${s.city}</div>
+      <div class="popup-metrics">
+        <div class="pm"><div class="pm-val">${s.cpu}</div><div class="pm-lbl">CPU</div></div>
+        <div class="pm"><div class="pm-val">${s.mem}</div><div class="pm-lbl">Memory</div></div>
+        <div class="pm"><div class="pm-val">${s.disk}</div><div class="pm-lbl">Disk</div></div>
+        <div class="pm"><div class="pm-val">${s.conns}</div><div class="pm-lbl">Conns</div></div>
+      </div>`,{maxWidth:280});
+  });
+
+  map.fitBounds(mapServers.map(s=>[s.lat,s.lng]),{padding:[60,60]});
+  window.demoMap=map;
+}
+
+/* ═══════════════════════════════════════════════
+   ANALYTICS VIEW
+   ═══════════════════════════════════════════════ */
+function buildAnalyticsCharts(){
+  const gridColor='rgba(255,255,255,.04)';
+  const textColor='rgba(255,255,255,.55)';
+  Chart.defaults.color=textColor;
+  Chart.defaults.borderColor=gridColor;
+
+  // Traffic over time — 30 days of fake data
+  const days=[];
+  const now=new Date();
+  for(let i=29;i>=0;i--){
+    const d=new Date(now);d.setDate(d.getDate()-i);
+    const base=200+Math.sin(i/7*Math.PI)*80;
+    days.push({date:d.toISOString().slice(5,10),count:Math.round(base+Math.random()*120)});
+  }
+
+  new Chart(document.getElementById('chartTraffic'),{
+    type:'line',
+    data:{labels:days.map(x=>x.date),datasets:[{label:'Pageviews',data:days.map(x=>x.count),fill:true,backgroundColor:'rgba(88,166,255,.12)',borderColor:'#58a6ff',borderWidth:2,pointRadius:3,pointHoverRadius:5,tension:.35}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{maxTicksLimit:10}},y:{grid:{color:gridColor},beginAtZero:true}}}
+  });
+
+  // Top pages
+  const pages=['/blog/homelab-setup','/docs/getting-started','/blog/proxmox-guide','/api/v1/health','/blog/nginx-tips','/about','/pricing','/blog/docker-compose','/contact','/changelog'];
+  const pageCounts=[1420,890,672,540,410,380,290,245,180,120];
+  new Chart(document.getElementById('chartPages'),{
+    type:'bar',
+    data:{labels:pages,datasets:[{label:'Views',data:pageCounts,backgroundColor:'rgba(88,166,255,.6)',borderColor:'rgba(88,166,255,.9)',borderWidth:1,borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},beginAtZero:true},y:{grid:{color:'transparent'},ticks:{font:{size:11}}}}}
+  });
+
+  // Sections doughnut
+  const secLabels=['/blog','/','/docs','/api','/about','/admin'];
+  const secData=[4200,1800,1200,800,420,280];
+  new Chart(document.getElementById('chartSections'),{
+    type:'doughnut',
+    data:{labels:secLabels,datasets:[{data:secData,backgroundColor:['#58a6ff','#66bb6a','#ffa726','#ab47bc','#26c6da','#ef5350'],borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12}}}}
+  });
+
+  // Status codes
+  new Chart(document.getElementById('chartStatus'),{
+    type:'doughnut',
+    data:{labels:['2xx','3xx','4xx','5xx'],datasets:[{data:[8500,320,180,12],backgroundColor:['rgba(102,187,106,.8)','rgba(88,166,255,.8)','rgba(255,167,38,.8)','rgba(239,83,80,.8)'],borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12}}}}
+  });
+
+  // Traffic by hour
+  const hourData=[12,8,5,3,4,6,15,45,120,180,210,190,175,165,185,200,220,195,160,140,95,60,35,20];
+  new Chart(document.getElementById('chartHour'),{
+    type:'bar',
+    data:{labels:[...Array(24).keys()].map(h=>h+':00'),datasets:[{label:'Avg Hits',data:hourData,backgroundColor:'rgba(171,71,188,.55)',borderColor:'rgba(171,71,188,.85)',borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{maxRotation:0}},y:{grid:{color:gridColor},beginAtZero:true}}}
+  });
+
+  // Tables
+  const topics=[{name:'Homelab',c:2100},{name:'Proxmox',c:1650},{name:'Docker',c:1200},{name:'Networking',c:890},{name:'Security',c:720},{name:'Linux',c:650},{name:'Self-hosting',c:520},{name:'Monitoring',c:410}];
+  const referrers=[{name:'google.com',c:3200},{name:'reddit.com',c:1400},{name:'github.com',c:890},{name:'twitter.com',c:540},{name:'hn.algolia.com',c:380},{name:'discord.com',c:220}];
+  const ips=[{name:'142.250.80.46',c:420},{name:'151.101.1.140',c:380},{name:'104.26.10.78',c:290},{name:'172.67.182.31',c:240},{name:'93.184.216.34',c:180},{name:'35.186.224.25',c:120}];
+
+  function buildTable(id,rows,colLabel){
+    const max=rows[0].c;
+    document.getElementById(id).innerHTML=`<tr><th>#</th><th>${colLabel}</th><th style="text-align:right">Hits</th></tr>`+
+      rows.map((r,i)=>`<tr><td class="rank">${i+1}</td><td><div class="name">${r.name}</div><div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.c/max*100)}%"></div></div></td><td class="count">${r.c>=1000?(r.c/1000).toFixed(1)+'k':r.c}</td></tr>`).join('');
+  }
+  buildTable('topicsTable',topics,'Topic');
+  buildTable('referrersTable',referrers,'Referrer');
+  buildTable('ipsTable',ips,'IP Address');
+
+  document.getElementById('anUpdated').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+/* ── Days pill interaction ── */
+document.querySelectorAll('.days-pill').forEach(p=>{
+  p.addEventListener('click',()=>{
+    document.querySelectorAll('.days-pill').forEach(x=>x.classList.remove('active'));
+    p.classList.add('active');
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════ */
 renderContainers();
 renderSites();
 renderServices();
 initFeed();
+renderTV();
 </script>
 </body>
 </html>

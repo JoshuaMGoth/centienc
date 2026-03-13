@@ -97,6 +97,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <a href="#" onclick="showPage('notifications')" data-page="notifications">🔔 Notifications</a>
       <a href="#" onclick="showPage('data')" data-page="data">🗄 Data</a>
       <a href="#" onclick="showPage('proxmox')" data-page="proxmox">🖧 Proxmox</a>
+      <a href="#" onclick="showPage('about')" data-page="about">ℹ️ About</a>
     </nav>
     <div class="bottom"><a href="/">← Back to Dashboard</a></div>
   </div>
@@ -226,6 +227,38 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <button class="btn" onclick="toast('Feature coming soon','info')">Export Configuration</button>
       </div>
     </div>
+
+    <!-- ABOUT -->
+    <div class="page" id="page-about">
+      <h2>About</h2>
+      <div class="panel" style="text-align:center;padding:40px 24px">
+        <img src="/static/centienc-logo.png" alt="CentienC" style="width:72px;height:72px;border-radius:16px;margin-bottom:16px">
+        <h3 style="font-size:22px;margin-bottom:2px;color:var(--text)">CentienC</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Lightweight infrastructure monitoring — no agents required</p>
+        <span style="display:inline-block;background:var(--surface2);color:var(--accent);padding:4px 16px;border-radius:20px;font-size:13px;font-weight:600;border:1px solid var(--border)" id="aboutVersion">—</span>
+      </div>
+      <div class="panel">
+        <h3>📬 Get in Touch</h3>
+        <div style="display:grid;gap:16px;font-size:13px;margin-top:6px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="color:var(--text2);width:100px;flex-shrink:0">GitHub</span>
+            <a href="https://github.com/JoshuaMGoth/centienc" target="_blank" style="color:var(--accent);text-decoration:none">github.com/JoshuaMGoth/centienc</a>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="color:var(--text2);width:100px;flex-shrink:0">Website</span>
+            <a href="https://joshuagoth.com" target="_blank" style="color:var(--accent);text-decoration:none">joshuagoth.com</a>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="color:var(--text2);width:100px;flex-shrink:0">Bugs / Requests</span>
+            <a href="mailto:me@joshuagoth.com" style="color:var(--accent);text-decoration:none">me@joshuagoth.com</a>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>📜 License</h3>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6">CentienC is open-source software licensed under the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" style="color:var(--accent);text-decoration:none">GNU General Public License v3.0</a>.<br>Contributions welcome — see the <a href="https://github.com/JoshuaMGoth/centienc/blob/main/CONTRIBUTING.md" target="_blank" style="color:var(--accent);text-decoration:none">Contributing Guide</a>.</p>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -343,6 +376,7 @@ function showPage(p){
   if(p==='servers')loadServers();
   if(p==='websites')loadWebsites();
   if(p==='proxmox')loadPveNodes();
+  if(p==='about')loadAbout();
 }
 
 /* Settings */
@@ -622,6 +656,10 @@ async function savePve(){
   }catch(e){toast(e.message,'error')}
 }
 async function deletePve(id){if(!confirm('Delete this Proxmox node?'))return;try{await api('/api/proxmox/'+id,{method:'DELETE'});toast('Node deleted','success');loadPveNodes()}catch(e){toast(e.message,'error')}}
+
+async function loadAbout(){
+  try{const r=await fetch('/api/health');const d=await r.json();if(d.version)document.getElementById('aboutVersion').textContent='v'+d.version}catch(e){}
+}
 
 loadSettings();
 updateChannelFields();
