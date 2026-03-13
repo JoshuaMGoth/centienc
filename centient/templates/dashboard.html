@@ -327,6 +327,22 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
         <input id="wExpectedStatus" type="number" value="200">
         <label>Timeout (seconds)</label>
         <input id="wTimeout" type="number" value="15">
+        <div style="margin-top:16px;padding:16px;background:rgba(0,0,0,.3);border-radius:8px;border:1px solid rgba(255,255,255,.07)">
+            <strong style="font-size:.82em;color:#58a6ff">📊 Live Traffic Monitoring (optional)</strong>
+            <p style="font-size:.72em;color:rgba(255,255,255,.4);margin:4px 0 10px">Link to a server with SSH to see live request feed, visitor stats, top pages, and traffic drill-down. Leave blank for basic uptime monitoring only.</p>
+            <label>Server</label>
+            <select id="wServerId" style="width:100%;padding:8px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px" onchange="onServerSelect()">
+                <option value="">None (basic monitor only)</option>
+            </select>
+            <div id="wLogPathGroup" style="display:none;margin-top:10px">
+                <label>Log File Path</label>
+                <div style="display:flex;gap:6px">
+                    <input id="wLogPath" placeholder="/var/log/nginx/*access*.log" style="flex:1">
+                    <button class="btn btn-sm" onclick="detectWebServer()" id="detectBtn" style="white-space:nowrap">🔍 Auto-detect</button>
+                </div>
+                <div id="detectResult" style="margin-top:6px;font-size:.72em;color:var(--text2)"></div>
+            </div>
+        </div>
     </div>
     <input type="hidden" id="editId" value="">
     <input type="hidden" id="editType" value="">
@@ -347,6 +363,19 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
     <a href="https://joshuagoth.com" style="color:rgba(255,255,255,.45);text-decoration:none" target="_blank">JoshuaGoth.com</a><br>
     <span style="font-size:.9em">Inspired by <a href="https://prometheus.io" style="color:rgba(88,166,255,.6);text-decoration:none" target="_blank">Prometheus</a> · Customized for web developers in mind</span><br>
     <span style="font-size:.9em">A <strong>JoshuaGoth</strong> Software · Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(88,166,255,.6);text-decoration:none" target="_blank">GNU GPL-3.0</a></span>
+</div>
+
+<!-- Site Detail Drill-down Overlay -->
+<div class="modal-overlay" id="siteDetailOverlay" style="z-index:1100">
+<div class="modal" style="max-width:900px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h2 id="siteDetailTitle" style="margin:0">Site Detail</h2>
+        <button class="btn btn-sm" onclick="closeSiteDetail()">✕ Close</button>
+    </div>
+    <div id="siteDetailContent" style="font-size:.88em">
+        <div style="text-align:center;padding:40px;color:var(--text2)">Loading...</div>
+    </div>
+</div>
 </div>
 
 <!-- Update Banner -->
@@ -558,7 +587,11 @@ function renderSiteCards(data){
         const st=w.status||w.live_status||'unknown',d=findSiteData(host,w.name),rpm=(d.n/5).toFixed(1);
         const statusColor=st==='up'?'#4caf50':st==='down'?'#f44336':'#ff9800';
         const warnInfo=(st==='warning'&&w.details)?'<div style="color:#ff9800;font-size:.75em;margin-top:4px">⚠️ '+(w.status_code?'HTTP '+w.status_code+' — ':'')+esc(w.details)+'</div>':'';
-        return '<div class="site-card" onclick="editWebsite('+w.id+')" style="border-left:3px solid '+statusColor+'"><div class="sc-name">'+esc(w.name)+'</div>'+warnInfo+'<div class="sc-server"></div><div class="sc-stats"><div class="sc-stat"><div class="sc-stat-val b">'+rpm+'</div><div class="sc-stat-lbl">Req/m</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.ips.size+'</div><div class="sc-stat-lbl">Visitors</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.n+'</div><div class="sc-stat-lbl">Reqs</div></div></div><div class="sc-bar-mini"><span class="g">'+d.s2+' 2xx</span><span class="a">'+d.s4+' 4xx</span><span class="r">'+d.s5+' 5xx</span></div></div>';
+        const hasLogs=!!w.server_id;
+        const clickAction=hasLogs?'openSiteDetail('+w.id+')':'editWebsite('+w.id+')';
+        const logBadge=hasLogs?'<span style="font-size:.65em;color:#58a6ff;margin-left:6px" title="Live traffic monitoring enabled">📊</span>':'';
+        const editBtn=hasLogs?'<span onclick="event.stopPropagation();editWebsite('+w.id+')" style="position:absolute;top:8px;right:8px;cursor:pointer;font-size:.75em;color:var(--text2)" title="Edit">✏️</span>':'';
+        return '<div class="site-card" onclick="'+clickAction+'" style="border-left:3px solid '+statusColor+';position:relative;cursor:pointer"><div class="sc-name">'+esc(w.name)+logBadge+'</div>'+editBtn+warnInfo+'<div class="sc-server"></div><div class="sc-stats"><div class="sc-stat"><div class="sc-stat-val b">'+rpm+'</div><div class="sc-stat-lbl">Req/m</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.ips.size+'</div><div class="sc-stat-lbl">Visitors</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.n+'</div><div class="sc-stat-lbl">Reqs</div></div></div><div class="sc-bar-mini"><span class="g">'+d.s2+' 2xx</span><span class="a">'+d.s4+' 4xx</span><span class="r">'+d.s5+' 5xx</span></div></div>';
     }).join('');
 }
 
@@ -674,6 +707,49 @@ function clearForms(){
     document.getElementById('wExpectedStatus').value='200';document.getElementById('wTimeout').value='15';
     document.getElementById('fSystem').checked=true;
     ['fPm2','fServices','fNginx','fFail2ban'].forEach(id=>document.getElementById(id).checked=false);
+    document.getElementById('wServerId').value='';document.getElementById('wLogPath').value='';
+    document.getElementById('wLogPathGroup').style.display='none';
+    document.getElementById('detectResult').textContent='';
+    populateServerDropdown();
+}
+function onServerSelect(){
+    const v=document.getElementById('wServerId').value;
+    document.getElementById('wLogPathGroup').style.display=v?'block':'none';
+}
+async function populateServerDropdown(){
+    try{
+        const r=await fetch('/api/servers'),d=await r.json();
+        const sel=document.getElementById('wServerId');
+        const cur=sel.value;
+        sel.innerHTML='<option value="">None (basic monitor only)</option>';
+        for(const s of (d.servers||[])){
+            if(!s.ssh_user)continue;
+            sel.innerHTML+='<option value="'+s.id+'">'+esc(s.name)+' ('+esc(s.hostname)+')</option>';
+        }
+        if(cur)sel.value=cur;
+    }catch(e){}
+}
+async function detectWebServer(){
+    const sid=document.getElementById('wServerId').value;
+    if(!sid){toast('Select a server first','error');return}
+    const el=document.getElementById('detectResult');
+    el.textContent='Detecting...';
+    try{
+        const r=await fetch('/api/servers/'+sid+'/detect-web-server',{method:'POST'});
+        const d=await r.json();
+        if(!d.ok){el.textContent='Error: '+(d.error||'Failed');return}
+        const ws=d.web_servers||[];
+        const files=d.log_files||[];
+        let html=ws.length?'Found: '+ws.join(', ')+'<br>':'No web server detected<br>';
+        if(files.length){
+            html+='Log files:<br>';
+            for(const f of files){
+                html+='<a href="#" style="color:#58a6ff;text-decoration:none" onclick="document.getElementById(\'wLogPath\').value=\''+f.path+'\';return false">'+esc(f.path)+'</a> ('+f.web_server+')<br>';
+            }
+        }
+        if(d.suggested_path)document.getElementById('wLogPath').value=d.suggested_path;
+        el.innerHTML=html;
+    }catch(e){el.textContent='Error: '+e.message}
 }
 
 async function editServer(id){
@@ -699,6 +775,10 @@ async function editWebsite(id){
         document.getElementById('editId').value=id;document.getElementById('editType').value='website';switchTab('website');
         document.getElementById('wName').value=w.name||'';document.getElementById('wUrl').value=w.url||'';
         document.getElementById('wExpectedStatus').value=w.expected_status||200;document.getElementById('wTimeout').value=w.timeout||15;
+        await populateServerDropdown();
+        document.getElementById('wServerId').value=w.server_id||'';
+        document.getElementById('wLogPath').value=w.log_path||'';
+        onServerSelect();
     }catch(e){toast('Error loading website','error')}
 }
 
@@ -722,9 +802,12 @@ async function saveItem(){
             toast(eid?'Server updated':'Server added');closeModal();
         }catch(e){toast(e.message,'error')}
     }else{
+        const serverId=document.getElementById('wServerId').value;
         const body={name:document.getElementById('wName').value,url:document.getElementById('wUrl').value,
             expected_status:parseInt(document.getElementById('wExpectedStatus').value)||200,
-            timeout:parseInt(document.getElementById('wTimeout').value)||15};
+            timeout:parseInt(document.getElementById('wTimeout').value)||15,
+            server_id:serverId?parseInt(serverId):null,
+            log_path:serverId?document.getElementById('wLogPath').value||null:null};
         try{const url=eid?'/api/websites/'+eid:'/api/websites',method=eid?'PUT':'POST';
             const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
             const d=await r.json();if(!r.ok)throw new Error(d.detail||'Failed');
@@ -744,6 +827,105 @@ async function deleteItem(){
 
 async function logout(){await fetch('/api/auth/logout',{method:'POST'});location.href='/'}
 document.getElementById('addModal').addEventListener('click',function(e){if(e.target===this)closeModal()});
+document.getElementById('siteDetailOverlay').addEventListener('click',function(e){if(e.target===this)closeSiteDetail()});
+
+/* Site Detail Drill-down */
+let _siteDetailInterval=null;
+function closeSiteDetail(){
+    document.getElementById('siteDetailOverlay').classList.remove('active');
+    if(_siteDetailInterval){clearInterval(_siteDetailInterval);_siteDetailInterval=null}
+}
+async function openSiteDetail(id){
+    document.getElementById('siteDetailOverlay').classList.add('active');
+    document.getElementById('siteDetailContent').innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Loading traffic data...</div>';
+    await loadSiteDetail(id);
+    if(_siteDetailInterval)clearInterval(_siteDetailInterval);
+    _siteDetailInterval=setInterval(()=>loadSiteDetail(id),10000);
+}
+async function loadSiteDetail(id){
+    try{
+        const r=await fetch('/api/websites/'+id+'/detail?minutes=5');
+        const d=await r.json();
+        if(!d.ok){document.getElementById('siteDetailContent').innerHTML='<div style="color:#f44336">Error: '+(d.error||'Failed')+'</div>';return}
+        const w=d.website||{};
+        document.getElementById('siteDetailTitle').textContent=w.name||'Site Detail';
+
+        if(!d.has_logs){
+            document.getElementById('siteDetailContent').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:2em;margin-bottom:12px">📊</div><div style="color:var(--text2)">No log access configured.<br>Edit this website and link it to a server with SSH to enable traffic drill-down.</div><br><button class="btn btn-primary" onclick="closeSiteDetail();editWebsite('+id+')">Edit Website</button></div>';
+            return;
+        }
+        const t=d.traffic||{}, sys=d.system||{};
+        const sc=t.status_codes||{}, ua=t.user_agents||{};
+        const topPages=t.top_pages||[];
+        const reqs=t.recent_requests||[];
+
+        let h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">';
+        h+='<div class="metric"><div class="metric-val">'+t.requests+'</div><div class="metric-lbl">Requests ('+t.period_minutes+'m)</div></div>';
+        h+='<div class="metric"><div class="metric-val">'+t.unique_visitors+'</div><div class="metric-lbl">Unique Visitors</div></div>';
+        h+='<div class="metric"><div class="metric-val">'+t.req_per_min+'</div><div class="metric-lbl">Req/min</div></div>';
+        h+='<div class="metric"><div class="metric-val">'+(t.bytes>1048576?(t.bytes/1048576).toFixed(1)+'MB':(t.bytes/1024).toFixed(1)+'KB')+'</div><div class="metric-lbl">Bandwidth</div></div>';
+        h+='</div>';
+
+        /* Status codes */
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+        h+='<div><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Status Codes</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+        h+='<div style="padding:8px;background:rgba(63,185,80,.1);border-radius:6px;text-align:center"><div style="color:#3fb950;font-size:1.3em;font-weight:700">'+(sc['2xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">2xx OK</div></div>';
+        h+='<div style="padding:8px;background:rgba(210,153,34,.1);border-radius:6px;text-align:center"><div style="color:#d29922;font-size:1.3em;font-weight:700">'+(sc['3xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">3xx Redirect</div></div>';
+        h+='<div style="padding:8px;background:rgba(248,81,73,.1);border-radius:6px;text-align:center"><div style="color:#f85149;font-size:1.3em;font-weight:700">'+(sc['4xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">4xx Client Err</div></div>';
+        h+='<div style="padding:8px;background:rgba(248,81,73,.15);border-radius:6px;text-align:center"><div style="color:#f85149;font-size:1.3em;font-weight:700">'+(sc['5xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">5xx Server Err</div></div>';
+        h+='</div></div>';
+
+        /* User Agents */
+        h+='<div><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Traffic Sources</h3><div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>🌐 Browser</span><span style="font-weight:700">'+(ua.Browser||0)+'</span></div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>🤖 Bot/Crawler</span><span style="font-weight:700">'+(ua.Bot||0)+'</span></div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:6px 0"><span>📡 Monitor</span><span style="font-weight:700">'+(ua.Monitor||0)+'</span></div>';
+        h+='</div></div></div>';
+
+        /* Server System Metrics (if available) */
+        if(sys.cpu_pct!==undefined){
+            h+='<div style="margin-bottom:20px;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">';
+            h+='<h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Server: '+esc(d.server_name||'')+'</h3>';
+            h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">';
+            h+='<div style="text-align:center"><div style="font-size:1.2em;font-weight:700;color:'+(sys.cpu_pct>80?'#f85149':'var(--text)')+'">'+sys.cpu_pct+'%</div><div style="font-size:.72em;color:var(--text2)">CPU</div></div>';
+            if(sys.mem_pct!==undefined)h+='<div style="text-align:center"><div style="font-size:1.2em;font-weight:700;color:'+(sys.mem_pct>80?'#f85149':'var(--text)')+'">'+sys.mem_pct+'%</div><div style="font-size:.72em;color:var(--text2)">Memory</div></div>';
+            if(sys.disk_pct!==undefined)h+='<div style="text-align:center"><div style="font-size:1.2em;font-weight:700;color:'+(sys.disk_pct>80?'#f85149':'var(--text)')+'">'+sys.disk_pct+'%</div><div style="font-size:.72em;color:var(--text2)">Disk</div></div>';
+            h+='</div></div>';
+        }
+
+        /* Top Pages */
+        if(topPages.length){
+            h+='<div style="margin-bottom:20px"><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Top Pages</h3><div style="background:var(--surface);border-radius:8px;border:1px solid var(--border);overflow:hidden">';
+            for(const p of topPages.slice(0,15)){
+                const pct=topPages[0].hits>0?Math.round(p.hits/topPages[0].hits*100):0;
+                h+='<div style="display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:.85em;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:'+pct+'%;background:rgba(88,166,255,.07);z-index:0"></div><span style="flex:1;z-index:1;font-family:monospace;word-break:break-all">'+esc(p.path)+'</span><span style="z-index:1;font-weight:700;margin-left:8px">'+p.hits+'</span></div>';
+            }
+            h+='</div></div>';
+        }
+
+        /* Recent Requests */
+        if(reqs.length){
+            h+='<div><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Recent Requests</h3>';
+            h+='<div style="background:var(--surface);border-radius:8px;border:1px solid var(--border);overflow:hidden;max-height:300px;overflow-y:auto">';
+            for(const r of reqs.slice(0,30)){
+                const sc2=r.status>=500?'#f85149':r.status>=400?'#d29922':r.status>=300?'#58a6ff':'#3fb950';
+                const t=new Date(r.ts*1000).toLocaleTimeString();
+                h+='<div style="display:flex;gap:8px;padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.82em;font-family:monospace">';
+                h+='<span style="color:var(--text2);min-width:65px">'+t+'</span>';
+                h+='<span style="color:'+sc2+';min-width:30px;font-weight:700">'+r.status+'</span>';
+                h+='<span style="color:#58a6ff;min-width:35px">'+r.method+'</span>';
+                h+='<span style="flex:1;word-break:break-all;color:var(--text)">'+esc(r.path)+'</span>';
+                h+='<span style="color:var(--text2)" title="'+esc(r.ua||'')+'">'+esc(r.ip)+'</span>';
+                h+='</div>';
+            }
+            h+='</div></div>';
+        }
+
+        document.getElementById('siteDetailContent').innerHTML=h;
+    }catch(e){
+        document.getElementById('siteDetailContent').innerHTML='<div style="color:#f44336">Error loading detail: '+esc(e.message)+'</div>';
+    }
+}
 </script>
 </body>
 </html>

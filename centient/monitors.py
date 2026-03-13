@@ -658,6 +658,217 @@ class MonitorEngine:
         }
 
     # ══════════════════════════════════════════════════════════════
+    #  Web server detection & per-site log parsing
+    # ══════════════════════════════════════════════════════════════
+
+    # Common log paths per web server type
+    _LOG_PATHS = {
+        "nginx": [
+            "/var/log/nginx/*access*.log",
+            "/var/log/nginx/*.log",
+        ],
+        "apache": [
+            "/var/log/apache2/*access*.log",
+            "/var/log/apache2/*.log",
+            "/var/log/httpd/*access_log*",
+            "/var/log/httpd/*.log",
+        ],
+    }
+
+    async def detect_web_server(self, server: dict[str, Any]) -> dict[str, Any]:
+        """Auto-detect web server type and available log files on a server."""
+        conn = await self._get_ssh_conn(server)
+        sudo_pass = server.get("sudo_password")
+
+        # Detect installed web servers
+        detect_cmd = (
+            "which nginx 2>/dev/null && echo '---NGINX---'; "
+            "which apache2 2>/dev/null && echo '---APACHE2---'; "
+            "which httpd 2>/dev/null && echo '---HTTPD---'; "
+            "echo '---DONE---'"
+        )
+        raw = await self._ssh_cmd(conn, detect_cmd)
+
+        web_servers = []
+        if "---NGINX---" in raw:
+            web_servers.append("nginx")
+        if "---APACHE2---" in raw or "---HTTPD---" in raw:
+            web_servers.append("apache")
+
+        # Find available log files
+        log_files = []
+        for ws_type in web_servers:
+            for glob_path in self._LOG_PATHS[ws_type]:
+                ls_cmd = f"ls -1 {glob_path} 2>/dev/null"
+                if sudo_pass:
+                    result = await self._ssh_sudo_cmd(conn, ls_cmd, sudo_pass)
+                else:
+                    result = await self._ssh_cmd(conn, ls_cmd)
+                for line in result.strip().split("\n"):
+                    line = line.strip()
+                    if line and not line.startswith("ls:") and line.endswith(".log"):
+                        log_files.append({
+                            "path": line,
+                            "web_server": ws_type,
+                        })
+
+        return {
+            "web_servers": web_servers,
+            "log_files": log_files,
+            "suggested_path": log_files[0]["path"] if log_files else None,
+        }
+
+    async def get_site_detail(
+        self,
+        server: dict[str, Any],
+        website: dict[str, Any],
+        minutes: int = 5,
+    ) -> dict[str, Any]:
+        """Get detailed traffic stats for a specific website from its server logs.
+
+        Returns top pages, status code breakdown, recent requests, user agents,
+        and server system metrics — similar to the unified monitor drill-down.
+        """
+        conn = await self._get_ssh_conn(server)
+        sudo_pass = server.get("sudo_password")
+
+        # Determine which log file to read
+        log_path = website.get("log_path")
+        if not log_path:
+            # Auto-detect: try nginx first, then apache
+            log_path = "/var/log/nginx/*access*.log"
+
+        cmd = f"tail -n 15000 {log_path} 2>/dev/null || echo ''"
+        if sudo_pass:
+            raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass)
+        else:
+            raw = await self._ssh_cmd(conn, cmd)
+
+        # Extract the hostname from the website URL for filtering
+        url_host = (website.get("url") or "").replace("https://", "").replace("http://", "").split("/")[0].lower()
+
+        from datetime import datetime as dt
+        window = minutes * 60
+        cutoff = time.time() - window
+
+        # Reuse the same regex as _ssh_nginx
+        log_re = re.compile(
+            r'(?:(?P<vhost>[a-zA-Z0-9._-]+)\s+)?'
+            r'(?P<ip>[\d.]+)\s+\S+\s+\S+\s+'
+            r'\[(?P<ts>[^\]]+)\]\s+'
+            r'"(?P<method>\S+)\s+(?P<path>\S+)\s+\S+"\s+'
+            r'(?P<status>\d+)\s+(?P<bytes>\d+)\s+'
+            r'"(?P<ref>[^"]*)"\s+"(?P<ua>[^"]*)"'
+        )
+        file_header_re = re.compile(r'^==> .*/(?P<fname>[^/]+?)(?:\.access)?\.log <==$')
+        _GENERIC_LOG_NAMES = {"access", "error", "default", "nginx", "combined", "main"}
+        current_file_site: str | None = None
+
+        pages: dict[str, int] = {}
+        status_codes: dict[str, int] = {"2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0}
+        unique_ips: set[str] = set()
+        user_agents: dict[str, int] = {"Browser": 0, "Bot": 0, "Monitor": 0}
+        recent_requests: list[dict[str, Any]] = []
+        total_requests = 0
+        total_bytes = 0
+
+        for line in raw.strip().split("\n"):
+            fh = file_header_re.match(line.strip())
+            if fh:
+                fname = fh.group("fname")
+                current_file_site = None if fname in _GENERIC_LOG_NAMES else fname
+                continue
+
+            m = log_re.search(line)
+            if not m:
+                continue
+
+            try:
+                ts_str = m.group("ts")
+                ts_dt = dt.strptime(ts_str, "%d/%b/%Y:%H:%M:%S %z")
+                ts = ts_dt.timestamp()
+            except (ValueError, TypeError):
+                continue
+            if ts < cutoff:
+                continue
+
+            # Filter to this specific site
+            vhost = m.group("vhost") or current_file_site or "default"
+            vhost_lower = vhost.lower()
+            # Match by exact hostname, or by prefix (e.g. "25cent" matches "25cent.cloud")
+            if url_host and vhost_lower != url_host:
+                prefix = url_host.split(".")[0]
+                if vhost_lower != prefix and not url_host.startswith(vhost_lower + "."):
+                    continue
+
+            total_requests += 1
+            status_code = int(m.group("status"))
+            ip = m.group("ip")
+            method = m.group("method")
+            path = m.group("path")
+            ua = m.group("ua")
+            bsent = int(m.group("bytes")) if m.group("bytes").isdigit() else 0
+            total_bytes += bsent
+
+            # Status code buckets
+            bucket = f"{status_code // 100}xx"
+            if bucket in status_codes:
+                status_codes[bucket] += 1
+
+            # Page tracking (skip static assets)
+            if not self._STATIC_EXTS.search(path):
+                pages[path] = pages.get(path, 0) + 1
+
+            # Visitor tracking (exclude bots)
+            if not self._BOT_PATTERNS.search(ua):
+                unique_ips.add(ip)
+
+            # User agent classification
+            if self._BOT_PATTERNS.search(ua):
+                if "httpx" in ua.lower() or "monitoring" in ua.lower():
+                    user_agents["Monitor"] += 1
+                else:
+                    user_agents["Bot"] += 1
+            else:
+                user_agents["Browser"] += 1
+
+            recent_requests.append({
+                "ts": ts,
+                "method": method,
+                "path": path,
+                "status": status_code,
+                "ip": ip,
+                "ua": ua,
+                "bytes": bsent,
+                "site": url_host,
+            })
+
+        recent_requests.sort(key=lambda r: r.get("ts", 0), reverse=True)
+
+        top_pages = sorted(pages.items(), key=lambda x: -x[1])[:20]
+
+        # Get server system metrics from cache
+        ssh_data = self.status_cache.get(f"ssh:{server['id']}", {})
+        system_metrics = ssh_data.get("metrics", {})
+
+        return {
+            "traffic": {
+                "name": website.get("name", url_host),
+                "requests": total_requests,
+                "unique_visitors": len(unique_ips),
+                "req_per_min": round(total_requests / max(minutes, 1), 1),
+                "top_pages": [{"path": p, "hits": h} for p, h in top_pages],
+                "status_codes": status_codes,
+                "user_agents": user_agents,
+                "bytes": total_bytes,
+                "recent_requests": recent_requests[:50],
+                "period_minutes": minutes,
+            },
+            "system": system_metrics,
+            "server_name": server.get("name", "Unknown"),
+        }
+
+    # ══════════════════════════════════════════════════════════════
     #  Web Analytics (deep nginx log parse)
     # ══════════════════════════════════════════════════════════════
 

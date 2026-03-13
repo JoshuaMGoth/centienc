@@ -626,10 +626,14 @@ async def list_websites(request: Request):
 async def add_website(request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
-    allowed = {"name", "url", "method", "expected_status", "check_interval", "timeout", "follow_redirects", "verify_ssl", "enabled"}
+    allowed = {"name", "url", "method", "expected_status", "check_interval", "timeout", "follow_redirects", "verify_ssl", "enabled", "server_id", "log_path"}
     data = {k: v for k, v in body.items() if k in allowed}
     if not data.get("name") or not data.get("url"):
         raise HTTPException(400, "name and url are required")
+    # Normalize: null server_id means basic monitor (no SSH)
+    if data.get("server_id") in (None, "", 0, "null"):
+        data["server_id"] = None
+        data["log_path"] = None
     wid = await db.add_website(data)
     return {"ok": True, "id": wid}
 
@@ -638,8 +642,11 @@ async def add_website(request: Request):
 async def update_website(website_id: int, request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
-    allowed = {"name", "url", "method", "expected_status", "check_interval", "timeout", "follow_redirects", "verify_ssl", "enabled"}
+    allowed = {"name", "url", "method", "expected_status", "check_interval", "timeout", "follow_redirects", "verify_ssl", "enabled", "server_id", "log_path"}
     data = {k: v for k, v in body.items() if k in allowed}
+    if data.get("server_id") in (None, "", 0, "null"):
+        data["server_id"] = None
+        data["log_path"] = None
     ok = await db.update_website(website_id, data)
     if not ok:
         raise HTTPException(404, "Website not found")
@@ -670,6 +677,64 @@ async def website_history(website_id: int, request: Request):
     history = await db.get_history("website", website_id, hours=hours)
     uptime = await db.get_uptime("website", website_id, hours=hours)
     return {"ok": True, "history": history, "uptime_pct": round(uptime, 2)}
+
+
+@app.get("/api/websites/{website_id}/detail")
+async def website_detail(website_id: int, request: Request):
+    """Drill-down view for a website with SSH log access.
+
+    Returns traffic stats, top pages, status codes, recent requests,
+    and server system metrics — similar to the unified monitor drill-down.
+    """
+    await _require_auth_or_401(request)
+    website = await db.get_website(website_id)
+    if not website:
+        raise HTTPException(404, "Website not found")
+
+    minutes = int(request.query_params.get("minutes", "5"))
+    result: dict[str, Any] = {
+        "ok": True,
+        "website": website,
+        "has_logs": False,
+    }
+
+    # If website is linked to a server, fetch SSH log data
+    server_id = website.get("server_id")
+    if not server_id:
+        return result
+
+    servers = await db.list_servers()
+    server = next((s for s in servers if s["id"] == server_id), None)
+    if not server or not server.get("ssh_user"):
+        return result
+
+    try:
+        detail = await engine.get_site_detail(server, website, minutes=minutes)
+        result["has_logs"] = True
+        result.update(detail)
+    except Exception as exc:
+        logger.warning("Site detail failed for website %d: %s", website_id, exc)
+        result["error"] = str(exc)
+
+    return result
+
+
+@app.post("/api/servers/{server_id}/detect-web-server")
+async def detect_web_server(server_id: int, request: Request):
+    """Auto-detect web server type and log paths on a server."""
+    await _require_auth_or_401(request)
+    servers = await db.list_servers()
+    server = next((s for s in servers if s["id"] == server_id), None)
+    if not server:
+        raise HTTPException(404, "Server not found")
+    if not server.get("ssh_user"):
+        raise HTTPException(400, "Server has no SSH credentials")
+
+    try:
+        result = await engine.detect_web_server(server)
+        return {"ok": True, **result}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 # ═══════════════════════════════════════════════════════════════════

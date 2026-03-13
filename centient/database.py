@@ -179,6 +179,17 @@ class Database:
             # Drop agent columns if they exist (safe — just ignore if not present)
             await conn.commit()
 
+            # websites: migration for server linkage columns
+            cur = await conn.execute("PRAGMA table_info(websites)")
+            website_cols = [dict(r) for r in await cur.fetchall()]
+            for col, default in [
+                ("server_id", "NULL"),
+                ("log_path", "NULL"),
+            ]:
+                if not _has_column(website_cols, col):
+                    await conn.execute(f"ALTER TABLE websites ADD COLUMN {col} DEFAULT {default}")
+            await conn.commit()
+
             # Set defaults if first run
             cursor = await conn.execute("SELECT COUNT(*) FROM settings")
             count = (await cursor.fetchone())[0]
