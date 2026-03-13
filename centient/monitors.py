@@ -18,6 +18,7 @@ import asyncssh
 import httpx
 
 from .database import Database
+from .notifications import send_notification
 
 SEP = "---CENTIENT-SEP---"
 
@@ -94,8 +95,10 @@ class MonitorEngine:
         prev = self.status_cache.get(cache_key, {}).get("status")
         if status == "down" and prev != "down":
             await self.db.open_incident("server", server["id"])
+            await send_notification(self.db, "server", server["name"], "down", f"{hostname} is unreachable")
         elif status == "up" and prev == "down":
             await self.db.resolve_incident("server", server["id"])
+            await send_notification(self.db, "server", server["name"], "up", "Server is back online")
 
         self.status_cache[cache_key] = {
             "status": status,
@@ -204,8 +207,10 @@ class MonitorEngine:
         prev = self.status_cache.get(cache_key, {}).get("status")
         if status == "down" and prev != "down":
             await self.db.open_incident("service", service["id"])
+            await send_notification(self.db, "service", service["name"], "down", f"{host}:{port} is unreachable")
         elif status == "up" and prev == "down":
             await self.db.resolve_incident("service", service["id"])
+            await send_notification(self.db, "service", service["name"], "up", f"{host}:{port} is back online")
 
         self.status_cache[cache_key] = {
             "status": status,
@@ -274,8 +279,13 @@ class MonitorEngine:
         prev = self.status_cache.get(cache_key, {}).get("status")
         if status in ("down", "warning") and prev not in ("down", "warning"):
             await self.db.open_incident("website", website["id"])
+            await send_notification(
+                self.db, "website", website["name"], status,
+                details or f"{url} returned HTTP {status_code}" if status_code else details,
+            )
         elif status == "up" and prev in ("down", "warning"):
             await self.db.resolve_incident("website", website["id"])
+            await send_notification(self.db, "website", website["name"], "up", f"{url} is back online")
 
         self.status_cache[cache_key] = {
             "status": status,
@@ -600,6 +610,7 @@ class MonitorEngine:
             ip = m.group("ip")
             method = m.group("method")
             path = m.group("path")
+            ua = m.group("ua")
 
             site_name = m.group("vhost") or current_file_site or "default"
             site = sites.setdefault(site_name, {
@@ -611,7 +622,9 @@ class MonitorEngine:
             site["total_requests"] += 1
             code_bucket = str(status_code)
             site["status_codes"][code_bucket] = site["status_codes"].get(code_bucket, 0) + 1
-            site["unique_ips"].add(ip)
+            # Only count real visitors (exclude monitoring/bot user agents)
+            if not self._BOT_PATTERNS.search(ua):
+                site["unique_ips"].add(ip)
 
             if len(recent_requests) < 50:
                 recent_requests.append({
@@ -621,6 +634,7 @@ class MonitorEngine:
                     "status": status_code,
                     "ip": ip,
                     "site": site_name,
+                    "ua": m.group("ua"),
                 })
 
         rpm = total_requests / (window / 60) if total_requests > 0 else 0
@@ -1124,6 +1138,20 @@ class MonitorEngine:
         down = sum(1 for s in servers + services + websites if s.get("status") == "down")
         warning = sum(1 for s in servers + services + websites if s.get("status") == "warning")
 
+        # Build a mapping from nginx site short-names to full website hostnames.
+        # e.g. "25cent" (from 25cent.access.log) -> "25cent.cloud" (from website URL)
+        site_alias: dict[str, str] = {}
+        website_hosts: list[str] = []
+        for w in websites:
+            host = (w.get("url") or "").replace("https://", "").replace("http://", "").split("/")[0].lower()
+            if host:
+                website_hosts.append(host)
+        for host in website_hosts:
+            # Map the prefix before first dot, e.g. "25cent" -> "25cent.cloud"
+            prefix = host.split(".")[0]
+            if prefix and prefix != host:
+                site_alias.setdefault(prefix, host)
+
         # Aggregate nginx + fail2ban across all SSH-monitored servers
         all_recent_requests: list[dict[str, Any]] = []
         total_rpm = 0.0
@@ -1133,7 +1161,10 @@ class MonitorEngine:
             ssh = srv.get("ssh") or {}
             nginx = ssh.get("nginx") or {}
             for req in nginx.get("recent_requests", []):
-                all_recent_requests.append({**req, "server_name": srv.get("name", "")})
+                # Normalize site names to match configured website hostnames
+                raw_site = req.get("site", "default")
+                normalized = site_alias.get(raw_site, raw_site)
+                all_recent_requests.append({**req, "site": normalized, "server_name": srv.get("name", "")})
             total_rpm += (nginx.get("totals") or {}).get("rpm", 0)
             fb = ssh.get("fail2ban") or {}
             fail2ban_total += fb.get("total_banned", 0)

@@ -541,10 +541,21 @@ function renderProxmox(nodes){
 function renderSiteCards(data){
     const el=document.getElementById('siteCards'),ws=data.websites||[],reqs=(data.nginx||{}).recent_requests||[];
     if(!ws.length){el.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="emoji">🌐</div>No websites yet. Click + to add one.</div>';return}
-    const ss={};for(const r of reqs){const k=r.site||r.server_name||'default';if(!ss[k])ss[k]={n:0,ips:new Set(),s2:0,s4:0,s5:0};ss[k].n++;ss[k].ips.add(r.ip);const c=r.status;if(c>=200&&c<300)ss[k].s2++;else if(c>=400&&c<500)ss[k].s4++;else if(c>=500)ss[k].s5++}
+    /* Exclude monitoring bots from visitor counts */
+    const botUA=/python-httpx|python-requests|python-urllib|curl|wget|Go-http|monitoring/i;
+    const ss={};for(const r of reqs){const k=r.site||r.server_name||'default';if(!ss[k])ss[k]={n:0,ips:new Set(),s2:0,s4:0,s5:0};ss[k].n++;if(!botUA.test(r.ua||''))ss[k].ips.add(r.ip);const c=r.status;if(c>=200&&c<300)ss[k].s2++;else if(c>=400&&c<500)ss[k].s4++;else if(c>=500)ss[k].s5++}
+    /* Build lookup helper: try exact hostname, then prefix, then partial match */
+    function findSiteData(host,name){
+        if(ss[host])return ss[host];
+        if(ss[name])return ss[name];
+        const prefix=host.split('.')[0];
+        if(prefix&&ss[prefix])return ss[prefix];
+        for(const k in ss){if(k.startsWith(prefix+'.')||host.startsWith(k+'.'))return ss[k]}
+        return ss['default']||{n:0,ips:new Set(),s2:0,s4:0,s5:0};
+    }
     el.innerHTML=ws.map(w=>{
         const host=(w.url||'').replace(/^https?:\/\//,'').replace(/\/.*/,'');
-        const st=w.status||w.live_status||'unknown',d=ss[host]||ss[w.name]||ss['default']||{n:0,ips:new Set(),s2:0,s4:0,s5:0},rpm=(d.n/5).toFixed(1);
+        const st=w.status||w.live_status||'unknown',d=findSiteData(host,w.name),rpm=(d.n/5).toFixed(1);
         const statusColor=st==='up'?'#4caf50':st==='down'?'#f44336':'#ff9800';
         const warnInfo=(st==='warning'&&w.details)?'<div style="color:#ff9800;font-size:.75em;margin-top:4px">⚠️ '+(w.status_code?'HTTP '+w.status_code+' — ':'')+esc(w.details)+'</div>':'';
         return '<div class="site-card" onclick="editWebsite('+w.id+')" style="border-left:3px solid '+statusColor+'"><div class="sc-name">'+esc(w.name)+'</div>'+warnInfo+'<div class="sc-server"></div><div class="sc-stats"><div class="sc-stat"><div class="sc-stat-val b">'+rpm+'</div><div class="sc-stat-lbl">Req/m</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.ips.size+'</div><div class="sc-stat-lbl">Visitors</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.n+'</div><div class="sc-stat-lbl">Reqs</div></div></div><div class="sc-bar-mini"><span class="g">'+d.s2+' 2xx</span><span class="a">'+d.s4+' 4xx</span><span class="r">'+d.s5+' 5xx</span></div></div>';
