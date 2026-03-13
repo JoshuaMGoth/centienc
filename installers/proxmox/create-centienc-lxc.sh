@@ -22,7 +22,7 @@
 #    --bridge  STR    Network bridge      (default: vmbr0)
 #    --ip      CIDR   Static IP/CIDR      (default: dhcp)
 #    --gw      IP     Gateway IP          (default: auto from bridge)
-#    --port    NUM    CentienC port      (default: 9090)
+#    --port    NUM    CentienC port      (default: 9099)
 #    --vlan    NUM    VLAN tag            (optional)
 #    --template STR   OS template         (default: auto-download debian-12)
 #    --start         Start after creation (default: yes)
@@ -48,7 +48,7 @@ STORAGE="local-lvm"
 BRIDGE="vmbr0"
 IP_ADDR="dhcp"
 GATEWAY=""
-PORT=9090
+PORT=9099
 VLAN=""
 TEMPLATE=""
 START=true

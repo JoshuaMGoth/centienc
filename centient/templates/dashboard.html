@@ -15,20 +15,20 @@
 <meta property="og:image" content="/static/centienc-og.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-gradient(135deg,#1e3c72 0%,#2a5298 100%);color:#fff;min-height:100vh;overflow-x:hidden}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;color:#fff;min-height:100vh;overflow-x:hidden}
 
 /* ── Header ── */
-.header{background:rgba(0,0,0,.3);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.1)}
-.header h1{font-size:1.5em;font-weight:600;text-shadow:1px 1px 3px rgba(0,0,0,.5);display:flex;align-items:center;gap:10px}
+.header{background:rgba(0,0,0,.4);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.07)}
+.header h1{font-size:1.5em;font-weight:600;text-shadow:none;display:flex;align-items:center;gap:10px}
 .header .logo{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
 .header-sub{color:rgba(255,255,255,.55);font-size:.82em;margin-top:2px}
 .header-right{display:flex;align-items:center;gap:16px;font-size:.82em;color:rgba(255,255,255,.65)}
 .header-right a{color:rgba(255,255,255,.65);text-decoration:none;transition:.2s}
-.header-right a:hover{color:#64b5f6}
-.uptime-badge{background:rgba(255,255,255,.1);padding:4px 12px;border-radius:20px}
+.header-right a:hover{color:#58a6ff}
+.uptime-badge{background:rgba(255,255,255,.07);padding:4px 12px;border-radius:20px}
 .header-links{display:flex;gap:10px}
-.header-links a{background:rgba(255,255,255,.08);padding:4px 12px;border-radius:8px;font-size:.82em;border:1px solid rgba(255,255,255,.1)}
-.header-links a:hover{background:rgba(255,255,255,.15);border-color:rgba(100,181,246,.4)}
+.header-links a{background:rgba(255,255,255,.05);padding:4px 12px;border-radius:8px;font-size:.82em;border:1px solid rgba(255,255,255,.07)}
+.header-links a:hover{background:rgba(255,255,255,.07);border-color:rgba(88,166,255,.4)}
 
 /* ── Status Banner ── */
 .status-banner{padding:10px 20px;text-align:center;font-size:.92em;font-weight:600;transition:all .3s}
@@ -42,7 +42,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 
 /* ── Metric Strip ── */
 .metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px 22px;max-width:1500px;margin:0 auto}
-.mc{background:rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;text-align:center;border:1px solid rgba(255,255,255,.1);transition:transform .2s}
+.mc{background:rgba(255,255,255,.05);border-radius:10px;padding:12px 14px;text-align:center;border:1px solid rgba(255,255,255,.07);transition:transform .2s}
 .mc:hover{transform:translateY(-2px)}
 .mc-label{font-size:.7em;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
 .mc-val{font-size:1.7em;font-weight:700}
@@ -51,9 +51,9 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 
 /* ── Server pills ── */
 .server-pills{display:flex;gap:12px;padding:0 22px 10px;max-width:1500px;margin:0 auto;flex-wrap:wrap}
-.server-pill{background:rgba(255,255,255,.07);border-radius:10px;padding:14px 18px;flex:1;min-width:280px;border:1px solid rgba(255,255,255,.08);cursor:pointer;transition:all .25s}
-.server-pill:hover{border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.1)}
-.server-pill h4{color:#64b5f6;font-size:.85em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.server-pill{background:rgba(255,255,255,.04);border-radius:10px;padding:14px 18px;flex:1;min-width:280px;border:1px solid rgba(255,255,255,.05);cursor:pointer;transition:all .25s}
+.server-pill:hover{border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.07)}
+.server-pill h4{color:#58a6ff;font-size:.85em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .server-pill .pill-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.78em}
 .server-pill .pill-item{text-align:center}
 .server-pill .pill-val{font-size:1.2em;font-weight:700}
@@ -63,15 +63,15 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 
 /* ── Proxmox containers ── */
 .ct-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
-.ct-card{background:rgba(255,255,255,.08);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.1);transition:all .25s}
-.ct-card:hover{transform:translateY(-2px);border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.12)}
+.ct-card{background:rgba(255,255,255,.05);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.07);transition:all .25s}
+.ct-card:hover{transform:translateY(-2px);border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.08)}
 .ct-card .ct-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .ct-card .ct-name{font-size:1em;font-weight:700}
-.ct-card .ct-id{font-size:.72em;color:#64b5f6;font-weight:600;background:rgba(100,181,246,.12);padding:2px 8px;border-radius:10px}
+.ct-card .ct-id{font-size:.72em;color:#58a6ff;font-weight:600;background:rgba(88,166,255,.12);padding:2px 8px;border-radius:10px}
 .ct-card .ct-bars{display:flex;flex-direction:column;gap:6px}
 .ct-bar{display:flex;align-items:center;gap:8px}
 .ct-bar .cb-label{width:32px;font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase;font-weight:600;flex-shrink:0}
-.ct-bar .cb-track{flex:1;height:8px;background:rgba(0,0,0,.25);border-radius:4px;overflow:hidden}
+.ct-bar .cb-track{flex:1;height:8px;background:rgba(0,0,0,.35);border-radius:4px;overflow:hidden}
 .ct-bar .cb-fill{height:100%;border-radius:4px;transition:width .6s ease}
 .ct-bar .cb-val{width:36px;text-align:right;font-size:.72em;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
 .ct-card .ct-meta{display:flex;gap:14px;margin-top:8px;font-size:.75em;color:rgba(255,255,255,.4)}
@@ -81,8 +81,8 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 
 /* ── Site cards ── */
 .site-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
-.site-card{background:rgba(255,255,255,.08);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.1);transition:all .25s;position:relative;overflow:hidden;cursor:pointer}
-.site-card:hover{transform:translateY(-3px);border-color:rgba(100,181,246,.4);background:rgba(255,255,255,.12)}
+.site-card{background:rgba(255,255,255,.05);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.07);transition:all .25s;position:relative;overflow:hidden;cursor:pointer}
+.site-card:hover{transform:translateY(-3px);border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.08)}
 .site-card .sc-name{font-size:1em;font-weight:700;margin-bottom:4px}
 .site-card .sc-server{font-size:.7em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
 .site-card .sc-stats{display:flex;gap:12px;font-size:.82em}
@@ -90,16 +90,16 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 .site-card .sc-stat-val{font-size:1.4em;font-weight:700}
 .site-card .sc-stat-lbl{font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase}
 .site-card .sc-bar-mini{display:flex;gap:6px;margin-top:8px;font-size:.72em}
-.site-card .sc-bar-mini span{padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.06)}
+.site-card .sc-bar-mini span{padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.04)}
 
 /* ── Grid ── */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 22px 22px;max-width:1500px;margin:0 auto}
-.card{background:rgba(255,255,255,.08);border-radius:12px;padding:18px;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1)}
-.card h3{margin-bottom:10px;color:#64b5f6;font-size:1.05em}
+.card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.07)}
+.card h3{margin-bottom:10px;color:#58a6ff;font-size:1.05em}
 .card.full{grid-column:1/-1}
 
 /* ── Scrollable lists ── */
-.slist{max-height:170px;overflow-y:auto;background:rgba(0,0,0,.15);border-radius:6px;padding:8px;font-family:'SF Mono','Fira Code',monospace;font-size:.8em}
+.slist{max-height:170px;overflow-y:auto;background:rgba(0,0,0,.35);border-radius:6px;padding:8px;font-family:'SF Mono','Fira Code',monospace;font-size:.8em}
 .slist::-webkit-scrollbar{width:4px}
 .slist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px}
 
@@ -112,9 +112,9 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 .rp{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.75)}
 .rs{flex-shrink:0;width:28px;text-align:right}
 .rs.s2{color:#4caf50}.rs.s3{color:#42a5f5}.rs.s4{color:#ff9800}.rs.s5{color:#f44336}
-.rsite{color:rgba(100,181,246,.7);flex-shrink:0;width:110px;text-align:right;font-size:.85em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rsite{color:rgba(88,166,255,.7);flex-shrink:0;width:110px;text-align:right;font-size:.85em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ri{color:rgba(255,255,255,.35);flex-shrink:0;width:120px;text-align:right;font-size:.85em}
-.ri a{color:rgba(255,255,255,.35);text-decoration:none}.ri a:hover{color:#64b5f6}
+.ri a{color:rgba(255,255,255,.35);text-decoration:none}.ri a:hover{color:#58a6ff}
 .ban-btn{background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:.9em;padding:0 4px;flex-shrink:0}
 .ban-btn:hover{color:#f44336}
 
@@ -126,7 +126,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 
 /* ── Services / PM2 ── */
 .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:6px}
-.sp{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.15);padding:7px 10px;border-radius:7px;font-size:.8em}
+.sp{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.35);padding:7px 10px;border-radius:7px;font-size:.8em}
 .sd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .sd.active,.sd.online{background:#4caf50}
 .sd.failed,.sd.stopped{background:#f44336}
@@ -141,20 +141,20 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 .muted{color:rgba(255,255,255,.35)}
 
 /* ── Modal ── */
-.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.active{display:flex}
-.modal{background:linear-gradient(135deg,#1e3c72,#2a5298);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 12px 50px rgba(0,0,0,.5)}
-.modal h2{margin-bottom:16px;font-size:1.1em;color:#64b5f6}
+.modal{background:#0d1117;border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 12px 50px rgba(0,0,0,.7)}
+.modal h2{margin-bottom:16px;font-size:1.1em;color:#58a6ff}
 .modal label{display:block;font-size:.72em;color:rgba(255,255,255,.5);margin-bottom:4px;margin-top:12px;text-transform:uppercase;letter-spacing:.04em}
-.modal input,.modal select{width:100%;padding:10px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:8px;color:#fff;font-size:.88em;outline:none;transition:.2s}
-.modal input:focus,.modal select:focus{border-color:#64b5f6;background:rgba(255,255,255,.13)}
+.modal input,.modal select{width:100%;padding:10px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(48,54,61,.8);border-radius:8px;color:#fff;font-size:.88em;outline:none;transition:.2s}
+.modal input:focus,.modal select:focus{border-color:#58a6ff;background:rgba(255,255,255,.08)}
 .modal input::placeholder{color:rgba(255,255,255,.3)}
-.modal select option{background:#1e3c72;color:#fff}
+.modal select option{background:#0d1117;color:#e6edf3}
 .modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
-.btn{padding:10px 22px;border-radius:8px;border:1px solid rgba(255,255,255,.2);cursor:pointer;font-size:.85em;font-weight:600;transition:.2s;background:rgba(255,255,255,.08);color:rgba(255,255,255,.8)}
-.btn:hover{border-color:#64b5f6;color:#64b5f6}
-.btn-primary{background:linear-gradient(135deg,#1e88e5,#1565c0);color:#fff;border-color:#1e88e5}
-.btn-primary:hover{background:linear-gradient(135deg,#1976d2,#0d47a1)}
+.btn{padding:10px 22px;border-radius:8px;border:1px solid rgba(255,255,255,.2);cursor:pointer;font-size:.85em;font-weight:600;transition:.2s;background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+.btn:hover{border-color:#58a6ff;color:#58a6ff}
+.btn-primary{background:#388bfd;color:#fff;border-color:#388bfd}
+.btn-primary:hover{background:#2d6fd4}
 .btn-danger{background:rgba(244,67,54,.15);color:#f44336;border-color:rgba(244,67,54,.3)}
 .btn-danger:hover{background:rgba(244,67,54,.25)}
 .btn-sm{padding:6px 14px;font-size:.78em}
@@ -165,7 +165,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 .check-group input[type=checkbox]{width:auto;margin:0}
 
 /* ── Toast ── */
-.toast{position:fixed;top:20px;right:20px;background:rgba(0,0,0,.85);color:#fff;padding:12px 20px;border-radius:10px;z-index:2000;font-size:.85em;transform:translateY(-30px);opacity:0;transition:.3s;pointer-events:none;border:1px solid rgba(255,255,255,.15)}
+.toast{position:fixed;top:20px;right:20px;background:rgba(0,0,0,.85);color:#fff;padding:12px 20px;border-radius:10px;z-index:2000;font-size:.85em;transform:translateY(-30px);opacity:0;transition:.3s;pointer-events:none;border:1px solid rgba(255,255,255,.07)}
 .toast.show{transform:translateY(0);opacity:1}
 .toast.error{border-color:#f44336}.toast.success{border-color:#4caf50}
 
@@ -175,24 +175,24 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
 .ws-dot.disconnected{background:#f44336}
 
 /* ── Add button ── */
-.add-btn{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1e88e5,#1565c0);color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 6px 20px rgba(30,136,229,.5);transition:.2s;z-index:100;display:flex;align-items:center;justify-content:center}
+.add-btn{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:#388bfd;color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 6px 20px rgba(56,139,253,.4);transition:.2s;z-index:100;display:flex;align-items:center;justify-content:center}
 .add-btn:hover{transform:scale(1.1)}
 
 /* ── IP Map Modal ── */
 .ip-modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);z-index:1100;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .ip-modal-overlay.active{display:flex}
-.ip-modal{background:linear-gradient(135deg,#1a2a4a,#1e3c72);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:24px;width:420px;max-width:95vw;box-shadow:0 16px 60px rgba(0,0,0,.6)}
+.ip-modal{background:#161b22;border:1px solid rgba(48,54,61,.8);border-radius:16px;padding:24px;width:420px;max-width:95vw;box-shadow:0 16px 60px rgba(0,0,0,.6)}
 .ip-modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.ip-modal-header h3{color:#64b5f6;font-size:1.05em;display:flex;align-items:center;gap:8px}
+.ip-modal-header h3{color:#58a6ff;font-size:1.05em;display:flex;align-items:center;gap:8px}
 .ip-modal-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:1.4em;cursor:pointer;padding:0 4px;line-height:1}
 .ip-modal-close:hover{color:#f44336}
-.ip-map-container{width:100%;height:200px;border-radius:10px;overflow:hidden;margin-bottom:16px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08)}
+.ip-map-container{width:100%;height:200px;border-radius:10px;overflow:hidden;margin-bottom:16px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.05)}
 .ip-info-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.85em}
 .ip-info-grid .lbl{color:rgba(255,255,255,.45);text-transform:uppercase;font-size:.72em;font-weight:600;letter-spacing:.04em;align-self:center}
 .ip-info-grid .val{color:rgba(255,255,255,.88);word-break:break-all}
 .ip-info-loading{text-align:center;padding:30px;color:rgba(255,255,255,.4)}
 .ip-modal-footer{margin-top:14px;display:flex;justify-content:space-between;align-items:center}
-.ip-modal-footer a{color:#64b5f6;font-size:.78em;text-decoration:none;opacity:.7}
+.ip-modal-footer a{color:#58a6ff;font-size:.78em;text-decoration:none;opacity:.7}
 .ip-modal-footer a:hover{opacity:1;text-decoration:underline}
 
 /* ── Empty ── */
@@ -295,8 +295,8 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
         <input id="sHostname" placeholder="192.168.1.100 or server.example.com">
         <label>Port</label>
         <input id="sPort" type="number" value="22">
-        <div style="margin-top:16px;padding:16px;background:rgba(0,0,0,.2);border-radius:8px;border:1px solid rgba(255,255,255,.1)">
-            <strong style="font-size:.82em;color:#64b5f6">SSH Monitoring (optional)</strong>
+        <div style="margin-top:16px;padding:16px;background:rgba(0,0,0,.3);border-radius:8px;border:1px solid rgba(255,255,255,.07)">
+            <strong style="font-size:.82em;color:#58a6ff">SSH Monitoring (optional)</strong>
             <p style="font-size:.72em;color:rgba(255,255,255,.4);margin:4px 0 10px">Enable rich metrics: CPU, memory, disk, PM2, nginx logs.</p>
             <label>SSH Username</label>
             <input id="sSshUser" placeholder="root">
@@ -345,14 +345,15 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:linear-g
     Powered by <strong>CentienC</strong> v<span id="cVersion">1.0.0</span> ·
     <a href="https://github.com/JoshuaMGoth/centienc" style="color:rgba(255,255,255,.45);text-decoration:none" target="_blank">GitHub</a> ·
     <a href="https://joshuagoth.com" style="color:rgba(255,255,255,.45);text-decoration:none" target="_blank">JoshuaGoth.com</a><br>
-    <span style="font-size:.9em">A <strong>JoshuaGoth</strong> Software · Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(100,181,246,.6);text-decoration:none" target="_blank">GNU GPL-3.0</a></span>
+    <span style="font-size:.9em">Inspired by <a href="https://prometheus.io" style="color:rgba(88,166,255,.6);text-decoration:none" target="_blank">Prometheus</a> · Customized for web developers in mind</span><br>
+    <span style="font-size:.9em">A <strong>JoshuaGoth</strong> Software · Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(88,166,255,.6);text-decoration:none" target="_blank">GNU GPL-3.0</a></span>
 </div>
 
 <!-- Update Banner -->
-<div id="updateBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(90deg,#1565c0,#1e88e5);padding:10px 20px;text-align:center;font-size:.88em;z-index:900;border-top:1px solid rgba(255,255,255,.15);box-shadow:0 -4px 20px rgba(0,0,0,.3)">
+<div id="updateBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(90deg,#161b22,#1c2333);padding:10px 20px;text-align:center;font-size:.88em;z-index:900;border-top:1px solid rgba(255,255,255,.07);box-shadow:0 -4px 20px rgba(0,0,0,.4)">
     <span id="updateMsg"></span>
     <a id="updateLink" href="#" target="_blank" style="color:#fff;text-decoration:underline;margin-left:8px;font-weight:600">View Release</a>
-    <button id="updateBtn" onclick="doUpdate()" style="background:#fff;color:#1565c0;border:none;border-radius:4px;padding:4px 14px;margin-left:10px;font-weight:700;cursor:pointer;font-size:.92em;transition:all .2s">⬆ Update Now</button>
+    <button id="updateBtn" onclick="doUpdate()" style="background:#fff;color:#388bfd;border:none;border-radius:4px;padding:4px 14px;margin-left:10px;font-weight:700;cursor:pointer;font-size:.92em;transition:all .2s">⬆ Update Now</button>
     <button onclick="document.getElementById('updateBanner').style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.6);cursor:pointer;margin-left:12px;font-size:1.1em">&times;</button>
 </div>
 
@@ -650,8 +651,8 @@ function switchTab(t){
     currentTab=t;
     document.getElementById('formServer').style.display=t==='server'?'block':'none';
     document.getElementById('formWebsite').style.display=t==='website'?'block':'none';
-    document.getElementById('tabServer').style.borderColor=t==='server'?'#64b5f6':'rgba(255,255,255,.2)';
-    document.getElementById('tabWebsite').style.borderColor=t==='website'?'#64b5f6':'rgba(255,255,255,.2)';
+    document.getElementById('tabServer').style.borderColor=t==='server'?'#58a6ff':'rgba(255,255,255,.2)';
+    document.getElementById('tabWebsite').style.borderColor=t==='website'?'#58a6ff':'rgba(255,255,255,.2)';
 }
 function clearForms(){
     ['sName','sHostname','sSshUser','sSshKeyPath','sSshPassword','sSudoPassword','wName','wUrl'].forEach(id=>document.getElementById(id).value='');

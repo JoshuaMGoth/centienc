@@ -20,7 +20,7 @@ set -euo pipefail
 VERSION="1.0.0"
 INSTALL_DIR="$HOME/.centient"
 VENV_DIR="${INSTALL_DIR}/venv"
-PORT=9090
+PORT=9099
 MODE="tray"
 UNINSTALL=false
 PLIST_LABEL="com.centient.monitor"
@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
         --service)   MODE="service";;
         --tray)      MODE="tray";;
         --uninstall) UNINSTALL=true;;
-        --port)      shift; PORT="${1:-9090}";;
+        --port)      shift; PORT="${1:-9099}";;
         --port=*)    PORT="${1#*=}";;
         *)           ;;
     esac

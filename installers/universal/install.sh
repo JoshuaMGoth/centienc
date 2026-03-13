@@ -21,7 +21,7 @@
 set -euo pipefail
 
 VERSION="1.0.0"
-PORT=9090
+PORT=9099
 MODE="service"
 UNINSTALL=false
 
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         --tray)      MODE="tray";;
         --service)   MODE="service";;
         --uninstall) UNINSTALL=true;;
-        --port)      shift; PORT="${1:-9090}";;
+        --port)      shift; PORT="${1:-9099}";;
         --port=*)    PORT="${1#*=}";;
         *)           ;;
     esac

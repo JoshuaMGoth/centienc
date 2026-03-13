@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Lightweight, self-hosted server &amp; infrastructure monitoring dashboard</strong><br>
-  <em>Inspired by Grafana &amp; Prometheus — built for simplicity.</em>
+  <em>Inspired by Prometheus · Customized for web developers in mind</em>
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 
 ## About
 
-**CentienC** is a professional-grade, self-hosted monitoring dashboard that tracks your servers, services, websites, and Proxmox infrastructure — all from a single lightweight process. Inspired by the power of **Grafana** and **Prometheus**, CentienC was designed to deliver real-time infrastructure visibility without the complexity of deploying and configuring multiple services.
+**CentienC** is a professional-grade, self-hosted monitoring dashboard that tracks your servers, services, websites, and Proxmox infrastructure — all from a single lightweight process. Inspired by **Prometheus**, CentienC was customized for web developers in mind — delivering real-time infrastructure visibility without the complexity of deploying and configuring multiple services.
 
 There are no separate agents to install on your monitored machines. CentienC connects to your servers via SSH to collect system metrics (CPU, RAM, disk, network, nginx, PM2, systemd, fail2ban) in real time. For Proxmox users, API token integration gives you container and VM stats alongside your servers.
 
@@ -79,7 +79,7 @@ curl -fsSL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installer
 curl -fsSL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/universal/install.sh | sudo bash
 ```
 
-After install, open `http://<your-ip>:9090` to run the setup wizard.
+After install, open `http://<your-ip>:9099` to run the setup wizard.
 
 ### Manual Install
 
@@ -144,7 +144,7 @@ Modes (mutually exclusive):
 
 Options:
   --host       Bind address        (auto per mode)
-  --port       Listen port         (default: 9090)
+  --port       Listen port         (default: 9099)
   --data-dir   Data directory      (default: ~/.centient)
   --open       Open browser on start (tray mode)
   --version    Show version

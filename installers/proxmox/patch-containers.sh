@@ -92,7 +92,7 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║${NC}    ${BOLD}${GREEN}✓ CentienC patched and restarted${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  Dashboard: ${BLUE}http://${CT_IP}:9090${NC}"
+echo -e "  Dashboard: ${BLUE}http://${CT_IP}:9099${NC}"
 echo ""
 echo "  What was fixed:"
 echo "    • ICMP ping group range — servers should no longer show offline"

@@ -33,7 +33,7 @@ def main() -> None:
         help="Run headless as a background service (binds 0.0.0.0)",
     )
     parser.add_argument("--host", default=None, help="Bind address (auto-detected per mode)")
-    parser.add_argument("--port", type=int, default=9090, help="Listen port (default: 9090)")
+    parser.add_argument("--port", type=int, default=9099, help="Listen port (default: 9099)")
     parser.add_argument("--data-dir", default=None, help="Data directory (default: ~/.centient)")
     parser.add_argument(
         "--open", action="store_true",

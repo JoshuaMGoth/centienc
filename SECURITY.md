@@ -45,7 +45,7 @@ If you discover a security vulnerability in CentienC, **please do not open a pub
 
 ### Network
 - Place CentienC behind a reverse proxy (nginx, Caddy) with HTTPS
-- Restrict access to the dashboard port (9090) via firewall rules
+- Restrict access to the dashboard port (9099) via firewall rules
 - Use SSH key-based authentication for monitored servers — avoid storing passwords
 
 ### SSH Keys

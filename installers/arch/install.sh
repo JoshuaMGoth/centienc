@@ -22,7 +22,7 @@ INSTALL_DIR="/opt/centient"
 DATA_DIR="/var/lib/centient"
 SERVICE_USER="centient"
 VENV_DIR="${INSTALL_DIR}/venv"
-PORT=9090
+PORT=9099
 MODE="service"
 UNINSTALL=false
 
@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
         --tray)      MODE="tray";;
         --service)   MODE="service";;
         --uninstall) UNINSTALL=true;;
-        --port)      shift; PORT="${1:-9090}";;
+        --port)      shift; PORT="${1:-9099}";;
         --port=*)    PORT="${1#*=}";;
         *)           ;;
     esac
