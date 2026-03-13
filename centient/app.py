@@ -871,13 +871,17 @@ async def health():
 _update_cache: dict[str, Any] = {}
 
 @app.get("/api/update-check")
-async def update_check():
-    """Check GitHub for a newer release. Cached for 1 hour."""
+async def update_check(request: Request = None):
+    """Check GitHub for a newer release. Cached for 15 minutes."""
     import time
     from packaging.version import Version
 
     now = time.time()
-    if _update_cache.get("ts", 0) > now - 3600:
+    # Allow cache bust with ?fresh=1
+    force = False
+    if request and request.query_params.get("fresh"):
+        force = True
+    if not force and _update_cache.get("ts", 0) > now - 900:
         return _update_cache["data"]
 
     current = __version__
@@ -950,7 +954,8 @@ async def update_install(request: Request):
 
         _update_progress = {"status": "checking", "step": "Checking for updates…"}
 
-        # 1. Verify an update is actually available
+        # 1. Verify an update is actually available (force fresh check)
+        _update_cache.clear()
         check = await update_check()
         if not check.get("update_available"):
             _update_progress = {"status": "idle"}

@@ -364,10 +364,11 @@ let ws=null,wsRetry=null,currentTab='server',lastData=null;
 function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:true})}
 setInterval(updateClock,1000);updateClock();
 
-/* Update Check — runs once on load, then every 6 hours */
-async function checkForUpdate(){
+/* Update Check — runs once on load (fresh), then every 6 hours */
+async function checkForUpdate(fresh){
     try{
-        const r=await fetch('/api/update-check');
+        const url=fresh?'/api/update-check?fresh=1':'/api/update-check';
+        const r=await fetch(url);
         const d=await r.json();
         if(d.ok&&d.update_available){
             document.getElementById('updateMsg').textContent='CentienC '+d.latest_version+' is available (you have '+d.current_version+')';
@@ -379,7 +380,7 @@ async function checkForUpdate(){
         if(d.ok&&d.current_version){document.getElementById('cVersion').textContent=d.current_version}
     }catch(e){}
 }
-checkForUpdate();
+checkForUpdate(true);
 setInterval(checkForUpdate,6*3600*1000);
 
 /* One-Click Updater */
@@ -544,7 +545,9 @@ function renderSiteCards(data){
     el.innerHTML=ws.map(w=>{
         const host=(w.url||'').replace(/^https?:\/\//,'').replace(/\/.*/,'');
         const st=w.status||w.live_status||'unknown',d=ss[host]||ss[w.name]||ss['default']||{n:0,ips:new Set(),s2:0,s4:0,s5:0},rpm=(d.n/5).toFixed(1);
-        return '<div class="site-card" onclick="editWebsite('+w.id+')" style="border-left:3px solid '+(st==='up'?'#4caf50':st==='down'?'#f44336':'#ff9800')+'"><div class="sc-name">'+esc(w.name)+'</div><div class="sc-server"></div><div class="sc-stats"><div class="sc-stat"><div class="sc-stat-val b">'+rpm+'</div><div class="sc-stat-lbl">Req/m</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.ips.size+'</div><div class="sc-stat-lbl">Visitors</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.n+'</div><div class="sc-stat-lbl">Reqs</div></div></div><div class="sc-bar-mini"><span class="g">'+d.s2+' 2xx</span><span class="a">'+d.s4+' 4xx</span><span class="r">'+d.s5+' 5xx</span></div></div>';
+        const statusColor=st==='up'?'#4caf50':st==='down'?'#f44336':'#ff9800';
+        const warnInfo=(st==='warning'&&w.details)?'<div style="color:#ff9800;font-size:.75em;margin-top:4px">⚠️ '+(w.status_code?'HTTP '+w.status_code+' — ':'')+esc(w.details)+'</div>':'';
+        return '<div class="site-card" onclick="editWebsite('+w.id+')" style="border-left:3px solid '+statusColor+'"><div class="sc-name">'+esc(w.name)+'</div>'+warnInfo+'<div class="sc-server"></div><div class="sc-stats"><div class="sc-stat"><div class="sc-stat-val b">'+rpm+'</div><div class="sc-stat-lbl">Req/m</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.ips.size+'</div><div class="sc-stat-lbl">Visitors</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.n+'</div><div class="sc-stat-lbl">Reqs</div></div></div><div class="sc-bar-mini"><span class="g">'+d.s2+' 2xx</span><span class="a">'+d.s4+' 4xx</span><span class="r">'+d.s5+' 5xx</span></div></div>';
     }).join('');
 }
 

@@ -272,9 +272,9 @@ class MonitorEngine:
         cache_key = f"website:{website['id']}"
 
         prev = self.status_cache.get(cache_key, {}).get("status")
-        if status == "down" and prev != "down":
+        if status in ("down", "warning") and prev not in ("down", "warning"):
             await self.db.open_incident("website", website["id"])
-        elif status in ("up", "warning") and prev == "down":
+        elif status == "up" and prev in ("down", "warning"):
             await self.db.resolve_incident("website", website["id"])
 
         self.status_cache[cache_key] = {
@@ -571,13 +571,17 @@ class MonitorEngine:
         # When tail reads multiple files it emits "==> /path/to/file <=="
         # headers. Extract a site name from the filename to use as fallback.
         file_header_re = re.compile(r'^==> .*/(?P<fname>[^/]+?)(?:\.access)?\.log <==$')
+        # Generic filenames that should NOT be used as site names
+        _GENERIC_LOG_NAMES = {"access", "error", "default", "nginx", "combined", "main"}
         current_file_site: str | None = None
 
         from datetime import datetime
         for line in raw.strip().split("\n"):
             fh = file_header_re.match(line.strip())
             if fh:
-                current_file_site = fh.group("fname")
+                fname = fh.group("fname")
+                # Don't use generic log names like 'access' as site names
+                current_file_site = None if fname in _GENERIC_LOG_NAMES else fname
                 continue
             m = log_re.search(line)
             if not m:
