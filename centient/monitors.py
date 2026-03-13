@@ -231,9 +231,19 @@ class MonitorEngine:
         while self._running:
             try:
                 websites = await self.db.list_websites(enabled_only=True)
-                tasks = [self._check_website(w) for w in websites]
-                if tasks:
-                    await asyncio.gather(*tasks, return_exceptions=True)
+                if websites:
+                    # Stagger checks to avoid 429s — run up to 2 concurrently
+                    sem = asyncio.Semaphore(2)
+
+                    async def _throttled(w: dict) -> None:
+                        async with sem:
+                            await self._check_website(w)
+                            await asyncio.sleep(1.5)   # pause between each check
+
+                    await asyncio.gather(
+                        *[_throttled(w) for w in websites],
+                        return_exceptions=True,
+                    )
             except asyncio.CancelledError:
                 break
             except Exception as e:
