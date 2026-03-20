@@ -305,6 +305,9 @@ class MonitorEngine:
             "name": website["name"],
             "url": url,
             "details": details,
+            # Preserve website linkage metadata so dashboard cards can enable drill-down.
+            "server_id": website.get("server_id"),
+            "log_path": website.get("log_path"),
         }
         await self.db.record_check(
             "website", website["id"], status, elapsed, status_code, details
@@ -860,6 +863,9 @@ class MonitorEngine:
         # Get server system metrics from cache
         ssh_data = self.status_cache.get(f"ssh:{server['id']}", {})
         system_metrics = ssh_data.get("metrics", {})
+        services = ssh_data.get("services", [])
+        pm2 = ssh_data.get("pm2", [])
+        fail2ban = ssh_data.get("fail2ban", {})
 
         return {
             "traffic": {
@@ -876,6 +882,9 @@ class MonitorEngine:
             },
             "system": system_metrics,
             "server_name": server.get("name", "Unknown"),
+            "services": services,
+            "pm2": pm2,
+            "fail2ban": fail2ban,
         }
 
     # ══════════════════════════════════════════════════════════════

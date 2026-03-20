@@ -83,6 +83,8 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
 .site-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:0 22px 14px;max-width:1500px;margin:0 auto}
 .site-card{background:rgba(255,255,255,.05);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.07);transition:all .25s;position:relative;overflow:hidden;cursor:pointer}
 .site-card:hover{transform:translateY(-3px);border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.08)}
+/* ── Site drill-down full-screen ── */
+#siteDetailOverlay{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
 .site-card .sc-name{font-size:1em;font-weight:700;margin-bottom:4px}
 .site-card .sc-server{font-size:.7em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
 .site-card .sc-stats{display:flex;gap:12px;font-size:.82em}
@@ -365,17 +367,37 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
     <span style="font-size:.9em">A <strong>JoshuaGoth</strong> Software · Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(88,166,255,.6);text-decoration:none" target="_blank">GNU GPL-3.0</a></span>
 </div>
 
-<!-- Site Detail Drill-down Overlay -->
-<div class="modal-overlay" id="siteDetailOverlay" style="z-index:1100">
-<div class="modal" style="max-width:900px;max-height:90vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h2 id="siteDetailTitle" style="margin:0">Site Detail</h2>
-        <button class="btn btn-sm" onclick="closeSiteDetail()">✕ Close</button>
+<!-- Site Detail Drill-down Overlay (full-screen) -->
+<div id="siteDetailOverlay" style="display:none;position:fixed;inset:0;z-index:1100;background:var(--bg);overflow-y:auto">
+  <div style="max-width:1400px;margin:0 auto;padding:18px 20px 40px">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="closeSiteDetail()" style="font-size:.85em;padding:7px 16px">&#8592; Back</button>
+        <h2 id="siteDetailTitle" style="margin:0;font-size:1.3em;color:var(--text)">Site Detail</h2>
+        <span id="siteDetailStatusBadge" style="padding:3px 11px;border-radius:12px;font-size:.78em;font-weight:700;display:none"></span>
+        <span id="siteDetailUptimeBadge" style="color:var(--text2);font-size:.82em"></span>
+      </div>
+      <div style="font-family:monospace;font-size:.82em;color:var(--text2)" id="siteDetailClock"></div>
     </div>
-    <div id="siteDetailContent" style="font-size:.88em">
-        <div style="text-align:center;padding:40px;color:var(--text2)">Loading...</div>
+    <!-- Metrics strip -->
+    <div id="ddMetricsStrip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:18px"></div>
+    <!-- Charts row -->
+    <div id="ddChartsRow" style="display:none;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+      <div class="card" style="padding:14px">
+        <div style="font-size:.82em;font-weight:600;margin-bottom:8px;color:var(--text2)">System Performance</div>
+        <canvas id="ddChartSys" height="90"></canvas>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="font-size:.82em;font-weight:600;margin-bottom:8px;color:var(--text2)">Traffic</div>
+        <canvas id="ddChartTraffic" height="90"></canvas>
+      </div>
     </div>
-</div>
+    <!-- Main content (status codes, top pages, recent requests, services, pm2, fail2ban) -->
+    <div id="siteDetailContent">
+      <div style="text-align:center;padding:80px;color:var(--text2)">Loading traffic data…</div>
+    </div>
+  </div>
 </div>
 
 <!-- Update Banner -->
@@ -535,7 +557,7 @@ function renderServerPills(servers){
 }
 
 function renderMetrics(data){
-    const ng=data.nginx||{},fb=data.fail2ban||{},servers=data.servers||[],ws=data.websites||[],pve=data.proxmox_nodes||[];
+    const ng=data.nginx||{},fb=data.fail2ban||{},servers=data.servers||[],ws=data.websites||[],pve=data.proxmox_nodes||[],vuln=data.vulnerabilities||{};
     document.getElementById('m-rpm').textContent=(ng.total_rpm||0).toFixed(1);
     const reqs=ng.recent_requests||[];
     document.getElementById('m-rpm-sub').textContent=reqs.length+' recent';
@@ -552,6 +574,13 @@ function renderMetrics(data){
     document.getElementById('m-ct-sub').textContent=ctR+'/'+ctT+' running';
     document.getElementById('m-banned').textContent=fb.total_banned||0;
     document.getElementById('m-banned-sub').textContent=(fb.active_bans||0)+' active / '+(fb.total_banned||0)+' total';
+
+    const vulnVal=document.getElementById('m-vuln');
+    const vulnSub=vulnVal?.parentElement?.querySelector('.mc-sub');
+    const activeVulns=Number(vuln.active||0);
+    const criticalVulns=Number(vuln.critical||0);
+    if(vulnVal)vulnVal.textContent=activeVulns;
+    if(vulnSub)vulnSub.textContent=criticalVulns+' critical';
 }
 
 function renderProxmox(nodes){
@@ -588,10 +617,10 @@ function renderSiteCards(data){
         const statusColor=st==='up'?'#4caf50':st==='down'?'#f44336':'#ff9800';
         const warnInfo=(st==='warning'&&w.details)?'<div style="color:#ff9800;font-size:.75em;margin-top:4px">⚠️ '+(w.status_code?'HTTP '+w.status_code+' — ':'')+esc(w.details)+'</div>':'';
         const hasLogs=!!w.server_id;
-        const clickAction=hasLogs?'openSiteDetail('+w.id+')':'editWebsite('+w.id+')';
         const logBadge=hasLogs?'<span style="font-size:.65em;color:#58a6ff;margin-left:6px" title="Live traffic monitoring enabled">📊</span>':'';
-        const editBtn=hasLogs?'<span onclick="event.stopPropagation();editWebsite('+w.id+')" style="position:absolute;top:8px;right:8px;cursor:pointer;font-size:.75em;color:var(--text2)" title="Edit">✏️</span>':'';
-        return '<div class="site-card" onclick="'+clickAction+'" style="border-left:3px solid '+statusColor+';position:relative;cursor:pointer"><div class="sc-name">'+esc(w.name)+logBadge+'</div>'+editBtn+warnInfo+'<div class="sc-server"></div><div class="sc-stats"><div class="sc-stat"><div class="sc-stat-val b">'+rpm+'</div><div class="sc-stat-lbl">Req/m</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.ips.size+'</div><div class="sc-stat-lbl">Visitors</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.n+'</div><div class="sc-stat-lbl">Reqs</div></div></div><div class="sc-bar-mini"><span class="g">'+d.s2+' 2xx</span><span class="a">'+d.s4+' 4xx</span><span class="r">'+d.s5+' 5xx</span></div></div>';
+        const editBtn='<span onclick="event.stopPropagation();editWebsite('+w.id+')" style="position:absolute;top:8px;right:8px;cursor:pointer;font-size:.75em;color:var(--text2)" title="Edit">✏️</span>';
+        const hostLabel=host||'no host';
+        return '<div class="site-card" onclick="openSiteDetail('+w.id+')" style="border-left:3px solid '+statusColor+';position:relative;cursor:pointer"><div class="sc-name">'+esc(w.name)+logBadge+'</div>'+editBtn+warnInfo+'<div class="sc-server">'+esc(hostLabel)+'</div><div class="sc-stats"><div class="sc-stat"><div class="sc-stat-val b">'+rpm+'</div><div class="sc-stat-lbl">Req/m</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.ips.size+'</div><div class="sc-stat-lbl">Visitors</div></div><div class="sc-stat"><div class="sc-stat-val w">'+d.n+'</div><div class="sc-stat-lbl">Reqs</div></div></div><div class="sc-bar-mini"><span class="g">'+d.s2+' 2xx</span><span class="a">'+d.s4+' 4xx</span><span class="r">'+d.s5+' 5xx</span></div></div>';
     }).join('');
 }
 
@@ -829,93 +858,307 @@ async function logout(){await fetch('/api/auth/logout',{method:'POST'});location
 document.getElementById('addModal').addEventListener('click',function(e){if(e.target===this)closeModal()});
 document.getElementById('siteDetailOverlay').addEventListener('click',function(e){if(e.target===this)closeSiteDetail()});
 
-/* Site Detail Drill-down */
-let _siteDetailInterval=null;
+/* ── Site Detail Drill-down ── */
+let _ddId=null,_ddInterval=null,_ddClockInterval=null;
+let _ddChartSys=null,_ddChartTraffic=null;
+const MAX_DD_PTS=30;
+let _ddH={labels:[],cpu:[],mem:[],rpm:[],vis:[],conns:[]};
+
+function _ddResetHistory(){_ddH={labels:[],cpu:[],mem:[],rpm:[],vis:[],conns:[]};}
+
 function closeSiteDetail(){
-    document.getElementById('siteDetailOverlay').classList.remove('active');
-    if(_siteDetailInterval){clearInterval(_siteDetailInterval);_siteDetailInterval=null}
+    const ov=document.getElementById('siteDetailOverlay');
+    ov.style.display='none'; document.body.style.overflow='';
+    if(_ddInterval){clearInterval(_ddInterval);_ddInterval=null;}
+    if(_ddClockInterval){clearInterval(_ddClockInterval);_ddClockInterval=null;}
+    if(_ddChartSys){_ddChartSys.destroy();_ddChartSys=null;}
+    if(_ddChartTraffic){_ddChartTraffic.destroy();_ddChartTraffic=null;}
+    _ddResetHistory(); _ddId=null;
 }
+
 async function openSiteDetail(id){
-    document.getElementById('siteDetailOverlay').classList.add('active');
-    document.getElementById('siteDetailContent').innerHTML='<div style="text-align:center;padding:40px;color:var(--text2)">Loading traffic data...</div>';
-    await loadSiteDetail(id);
-    if(_siteDetailInterval)clearInterval(_siteDetailInterval);
-    _siteDetailInterval=setInterval(()=>loadSiteDetail(id),10000);
+    _ddId=id;
+    const ov=document.getElementById('siteDetailOverlay');
+    ov.style.display='block'; ov.scrollTop=0;
+    document.body.style.overflow='hidden';
+    _ddResetHistory();
+    if(_ddChartSys){_ddChartSys.destroy();_ddChartSys=null;}
+    if(_ddChartTraffic){_ddChartTraffic.destroy();_ddChartTraffic=null;}
+    document.getElementById('ddMetricsStrip').innerHTML='';
+    document.getElementById('ddChartsRow').style.display='none';
+    document.getElementById('siteDetailContent').innerHTML='<div style="text-align:center;padding:80px;color:var(--text2)">Loading traffic data…</div>';
+    document.getElementById('siteDetailStatusBadge').style.display='none';
+    document.getElementById('siteDetailUptimeBadge').textContent='';
+    // start clock
+    if(_ddClockInterval)clearInterval(_ddClockInterval);
+    function _ddTick(){document.getElementById('siteDetailClock').textContent=new Date().toLocaleTimeString('en-US',{hour12:true});}
+    _ddTick(); _ddClockInterval=setInterval(_ddTick,1000);
+    await loadSiteDetail(id,true);
+    if(_ddInterval)clearInterval(_ddInterval);
+    _ddInterval=setInterval(()=>loadSiteDetail(id,false),10000);
 }
-async function loadSiteDetail(id){
+
+function _ddMetricCard(val,lbl,color){
+    return '<div class="metric" style="text-align:center"><div class="metric-val" style="color:'+(color||'var(--text)')+'">'+val+'</div><div class="metric-lbl">'+lbl+'</div></div>';
+}
+
+function _ddInitCharts(){
+    const sCfg={type:'line',data:{labels:_ddH.labels,datasets:[
+        {label:'CPU %',data:_ddH.cpu,borderColor:'#58a6ff',backgroundColor:'rgba(88,166,255,.08)',tension:.3,borderWidth:2,pointRadius:0,fill:true},
+        {label:'Mem %',data:_ddH.mem,borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,.08)',tension:.3,borderWidth:2,pointRadius:0,fill:true}
+    ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.6)',font:{size:11},boxWidth:12}}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},y:{min:0,max:100,ticks:{color:'rgba(255,255,255,.35)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}}}}};
+    const tCfg={type:'line',data:{labels:_ddH.labels,datasets:[
+        {label:'Req/min',data:_ddH.rpm,borderColor:'#d29922',backgroundColor:'rgba(210,153,34,.08)',tension:.3,borderWidth:2,pointRadius:0,fill:true},
+        {label:'Visitors',data:_ddH.vis,borderColor:'#f0883e',backgroundColor:'rgba(240,136,62,.06)',tension:.3,borderWidth:2,pointRadius:0,fill:false},
+        {label:'Connections',data:_ddH.conns,borderColor:'#bc8cff',backgroundColor:'rgba(188,140,255,.06)',tension:.3,borderWidth:2,pointRadius:0,fill:false}
+    ]},options:{responsive:true,plugins:{legend:{labels:{color:'rgba(255,255,255,.6)',font:{size:11},boxWidth:12}}},scales:{x:{ticks:{color:'rgba(255,255,255,.35)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},y:{min:0,ticks:{color:'rgba(255,255,255,.35)',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}}}}};
+    const sc=document.getElementById('ddChartSys');
+    const tc=document.getElementById('ddChartTraffic');
+    if(sc&&tc){
+        _ddChartSys=new Chart(sc,sCfg);
+        _ddChartTraffic=new Chart(tc,tCfg);
+        document.getElementById('ddChartsRow').style.display='grid';
+    }
+}
+
+function _ddUpdateCharts(){
+    if(!_ddChartSys||!_ddChartTraffic)return;
+    _ddChartSys.data.labels=_ddH.labels;
+    _ddChartSys.data.datasets[0].data=_ddH.cpu;
+    _ddChartSys.data.datasets[1].data=_ddH.mem;
+    _ddChartSys.update('none');
+    _ddChartTraffic.data.labels=_ddH.labels;
+    _ddChartTraffic.data.datasets[0].data=_ddH.rpm;
+    _ddChartTraffic.data.datasets[1].data=_ddH.vis;
+    _ddChartTraffic.data.datasets[2].data=_ddH.conns;
+    _ddChartTraffic.update('none');
+}
+
+async function loadSiteDetail(id,init){
     try{
         const r=await fetch('/api/websites/'+id+'/detail?minutes=5');
         const d=await r.json();
-        if(!d.ok){document.getElementById('siteDetailContent').innerHTML='<div style="color:#f44336">Error: '+(d.error||'Failed')+'</div>';return}
+        if(!d.ok){document.getElementById('siteDetailContent').innerHTML='<div style="color:#f44336;padding:20px">Error: '+esc(d.error||'Failed')+'</div>';return;}
         const w=d.website||{};
-        document.getElementById('siteDetailTitle').textContent=w.name||'Site Detail';
+        document.getElementById('siteDetailTitle').textContent=w.name||d.server_name||'Site Detail';
+
+        // status badge
+        const live=d.live||{};
+        const badge=document.getElementById('siteDetailStatusBadge');
+        const statusColors={up:'background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3)',down:'background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3)',warning:'background:rgba(210,153,34,.15);color:#d29922;border:1px solid rgba(210,153,34,.3)'};
+        if(live.status){badge.style.cssText=(statusColors[live.status]||statusColors.warning)+';padding:3px 11px;border-radius:12px;font-size:.78em;font-weight:700';badge.textContent=live.status.toUpperCase();badge.style.display='inline-block';}
+        document.getElementById('siteDetailUptimeBadge').textContent=(d.uptime_pct_24h!=null?(d.uptime_pct_24h.toFixed(1)+'% uptime'):'');
 
         if(!d.has_logs){
-            document.getElementById('siteDetailContent').innerHTML='<div style="text-align:center;padding:40px"><div style="font-size:2em;margin-bottom:12px">📊</div><div style="color:var(--text2)">No log access configured.<br>Edit this website and link it to a server with SSH to enable traffic drill-down.</div><br><button class="btn btn-primary" onclick="closeSiteDetail();editWebsite('+id+')">Edit Website</button></div>';
+            const rt=live.response_time!=null?Math.round(live.response_time)+' ms':'--';
+            const code=live.status_code!=null?live.status_code:'--';
+            const upPct=d.uptime_pct_24h!=null?d.uptime_pct_24h:null;
+            const strip=document.getElementById('ddMetricsStrip');
+            strip.innerHTML=
+                _ddMetricCard(esc(live.status||'unknown'),'Status',live.status==='up'?'#3fb950':live.status==='down'?'#f85149':'#d29922')+
+                _ddMetricCard(rt,'Response Time')+
+                _ddMetricCard(code,'HTTP Code')+
+                (upPct!=null?_ddMetricCard(upPct.toFixed(1)+'%','Uptime 24h',upPct>=99?'#3fb950':upPct>=90?'#d29922':'#f85149'):'');
+
+            const checks=(d.recent_checks||[]).slice().reverse(); // oldest→newest
+            let h='';
+
+            /* uptime dots + response time sparkline */
+            if(checks.length){
+                h+='<div class="card" style="padding:14px;margin-bottom:14px">';
+                h+='<div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:10px">Uptime — last '+checks.length+' checks</div>';
+                h+='<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:12px">';
+                for(const c of checks){
+                    const dc=c.status==='up'?'#3fb950':c.status==='warning'?'#d29922':'#f85149';
+                    const ts=new Date(c.checked_at).toLocaleString();
+                    const r2=c.response_time!=null?Math.round(c.response_time)+'ms':'--';
+                    h+='<div title="'+ts+' · '+c.status+' '+r2+'" style="width:10px;height:10px;border-radius:50%;background:'+dc+'"></div>';
+                }
+                h+='</div>';
+                /* response time bars */
+                const rts=checks.filter(c=>c.response_time!=null).map(c=>c.response_time);
+                if(rts.length>=2){
+                    const maxRT=Math.max(...rts)||1;
+                    h+='<div style="display:flex;gap:2px;align-items:flex-end;height:36px">';
+                    for(const r of rts){
+                        const hp=Math.max(4,Math.round(r/maxRT*100));
+                        const bc=r<300?'#3fb950':r<1000?'#d29922':'#f85149';
+                        h+='<div style="flex:1;background:'+bc+';min-width:3px;height:'+hp+'%;border-radius:2px 2px 0 0;opacity:.75" title="'+Math.round(r)+'ms"></div>';
+                    }
+                    h+='</div>';
+                    h+='<div style="font-size:.72em;color:var(--text2);margin-top:4px">Response time ↑ (oldest → newest)</div>';
+                }
+                h+='</div>';
+
+                /* recent checks table */
+                h+='<div class="card" style="padding:14px;margin-bottom:14px">';
+                h+='<div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:8px">Recent Checks</div>';
+                h+='<div style="max-height:240px;overflow-y:auto">';
+                for(const c of checks.slice().reverse().slice(0,30)){
+                    const sc2=c.status==='up'?'#3fb950':c.status==='warning'?'#d29922':'#f85149';
+                    const ts=new Date(c.checked_at).toLocaleString();
+                    const rt2=c.response_time!=null?Math.round(c.response_time)+' ms':'--';
+                    const cd=c.status_code||'--';
+                    h+='<div style="display:flex;gap:10px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:.82em">';
+                    h+='<span style="color:var(--text2);flex:1">'+ts+'</span>';
+                    h+='<span style="color:'+sc2+';font-weight:700;min-width:60px">'+c.status+'</span>';
+                    h+='<span style="color:var(--text2);min-width:32px">'+cd+'</span>';
+                    h+='<span style="color:var(--text2);min-width:65px;text-align:right">'+rt2+'</span>';
+                    if(c.details)h+='<span style="color:#d29922;flex:1" title="'+esc(c.details||'')+'">⚠ '+esc((c.details||'').substring(0,50))+'</span>';
+                    h+='</div>';
+                }
+                h+='</div></div>';
+            }else{
+                h+='<div class="card" style="text-align:center;padding:32px"><div style="color:var(--text2);font-size:.88em">No check history yet — monitoring is running, data will appear shortly.</div></div>';
+            }
+
+            /* Info footer: ssh tip */
+            if(d.drilldown_reason){
+                h+='<div style="padding:10px 14px;font-size:.78em;color:var(--text2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center">';
+                h+='<span>💡 '+esc(d.drilldown_reason)+' Link to a server with SSH to unlock nginx traffic logs, top pages &amp; request feed.</span>';
+                h+='<button class="btn btn-sm" style="margin-left:12px" onclick="closeSiteDetail();editWebsite('+id+')">⚙ Edit</button>';
+                h+='</div>';
+            }
+
+            document.getElementById('siteDetailContent').innerHTML=h;
             return;
         }
-        const t=d.traffic||{}, sys=d.system||{};
-        const sc=t.status_codes||{}, ua=t.user_agents||{};
+
+        const t=d.traffic||{},sys=d.system||{};
+        const sc=t.status_codes||{},ua=t.user_agents||{};
         const topPages=t.top_pages||[];
         const reqs=t.recent_requests||[];
+        const services=d.services||[];
+        const pm2procs=d.pm2||[];
+        const fb=d.fail2ban||{};
+        const now=new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
 
-        let h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">';
-        h+='<div class="metric"><div class="metric-val">'+t.requests+'</div><div class="metric-lbl">Requests ('+t.period_minutes+'m)</div></div>';
-        h+='<div class="metric"><div class="metric-val">'+t.unique_visitors+'</div><div class="metric-lbl">Unique Visitors</div></div>';
-        h+='<div class="metric"><div class="metric-val">'+t.req_per_min+'</div><div class="metric-lbl">Req/min</div></div>';
-        h+='<div class="metric"><div class="metric-val">'+(t.bytes>1048576?(t.bytes/1048576).toFixed(1)+'MB':(t.bytes/1024).toFixed(1)+'KB')+'</div><div class="metric-lbl">Bandwidth</div></div>';
+        // build history point
+        const memPct=(sys.memory&&sys.memory.used_pct!=null)?sys.memory.used_pct:0;
+        _ddH.labels.push(now);
+        _ddH.cpu.push(sys.cpu_pct||0);
+        _ddH.mem.push(memPct);
+        _ddH.rpm.push(t.req_per_min||0);
+        _ddH.vis.push(t.unique_visitors||0);
+        _ddH.conns.push(sys.connections||0);
+        if(_ddH.labels.length>MAX_DD_PTS){Object.keys(_ddH).forEach(k=>_ddH[k].shift());}
+
+        // metrics strip
+        const banned=fb.total_banned||fb.active_bans||0;
+        const attacks=(sc['4xx']||0)+(sc['5xx']||0);
+        const diskPct=sys.disk&&sys.disk.used_pct!=null?sys.disk.used_pct:0;
+        const strip=document.getElementById('ddMetricsStrip');
+        strip.innerHTML=
+            _ddMetricCard((sys.cpu_pct||0)+'%','CPU Load',sys.cpu_pct>80?'#f85149':sys.cpu_pct>60?'#d29922':'var(--text)')+
+            _ddMetricCard(memPct+'%','Memory',memPct>80?'#f85149':memPct>60?'#d29922':'var(--text)')+
+            _ddMetricCard(diskPct+'%','Disk',diskPct>85?'#f85149':diskPct>70?'#d29922':'var(--text)')+
+            _ddMetricCard(sys.connections||0,'Connections')+
+            _ddMetricCard(t.req_per_min||0,'Req / min')+
+            _ddMetricCard(t.unique_visitors||0,'Visitors')+
+            (banned?_ddMetricCard(banned,'Banned IPs','#f85149'):'')+
+            (attacks?_ddMetricCard(attacks,'Errors','#d29922'):'');
+
+        // init charts on first load
+        if(init){_ddInitCharts();}else{_ddUpdateCharts();}
+
+        /* ── build main content ── */
+        let h='';
+
+        /* Row 1: status codes + traffic sources */
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">';
+        /* Status codes */
+        h+='<div class="card" style="padding:14px"><div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:10px">HTTP Status Codes</div>';
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+        h+='<div style="padding:10px;background:rgba(63,185,80,.1);border-radius:8px;text-align:center"><div style="color:#3fb950;font-size:1.5em;font-weight:700">'+(sc['2xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">2xx OK</div></div>';
+        h+='<div style="padding:10px;background:rgba(88,166,255,.08);border-radius:8px;text-align:center"><div style="color:#58a6ff;font-size:1.5em;font-weight:700">'+(sc['3xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">3xx Redirect</div></div>';
+        h+='<div style="padding:10px;background:rgba(210,153,34,.1);border-radius:8px;text-align:center"><div style="color:#d29922;font-size:1.5em;font-weight:700">'+(sc['4xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">4xx Client Err</div></div>';
+        h+='<div style="padding:10px;background:rgba(248,81,73,.12);border-radius:8px;text-align:center"><div style="color:#f85149;font-size:1.5em;font-weight:700">'+(sc['5xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">5xx Server Err</div></div>';
+        h+='</div></div>';
+        /* Traffic sources + server info */
+        h+='<div style="display:flex;flex-direction:column;gap:10px">';
+        h+='<div class="card" style="padding:14px"><div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:8px">Traffic Sources</div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:.85em"><span>🌐 Browser</span><span style="font-weight:700">'+(ua.Browser||0)+'</span></div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:.85em"><span>🤖 Bot / Crawler</span><span style="font-weight:700">'+(ua.Bot||0)+'</span></div>';
+        h+='<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:.85em"><span>📡 Monitor</span><span style="font-weight:700">'+(ua.Monitor||0)+'</span></div>';
+        h+='</div>';
+        h+='<div class="card" style="padding:14px"><div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:6px">Traffic Summary</div>';
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.85em">';
+        h+='<div>Requests</div><div style="font-weight:700;text-align:right">'+(t.requests||0)+'</div>';
+        h+='<div>Bandwidth</div><div style="font-weight:700;text-align:right">'+(t.bytes>1048576?(t.bytes/1048576).toFixed(1)+' MB':(t.bytes/1024).toFixed(1)+' KB')+'</div>';
+        h+='<div>Period</div><div style="font-weight:700;text-align:right">'+(t.period_minutes||5)+' min</div>';
+        h+='<div>Server</div><div style="font-weight:700;text-align:right;color:#58a6ff">'+esc(d.server_name||'')+'</div>';
+        h+='</div></div>';
+        h+='</div>';
         h+='</div>';
 
-        /* Status codes */
-        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
-        h+='<div><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Status Codes</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-        h+='<div style="padding:8px;background:rgba(63,185,80,.1);border-radius:6px;text-align:center"><div style="color:#3fb950;font-size:1.3em;font-weight:700">'+(sc['2xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">2xx OK</div></div>';
-        h+='<div style="padding:8px;background:rgba(210,153,34,.1);border-radius:6px;text-align:center"><div style="color:#d29922;font-size:1.3em;font-weight:700">'+(sc['3xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">3xx Redirect</div></div>';
-        h+='<div style="padding:8px;background:rgba(248,81,73,.1);border-radius:6px;text-align:center"><div style="color:#f85149;font-size:1.3em;font-weight:700">'+(sc['4xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">4xx Client Err</div></div>';
-        h+='<div style="padding:8px;background:rgba(248,81,73,.15);border-radius:6px;text-align:center"><div style="color:#f85149;font-size:1.3em;font-weight:700">'+(sc['5xx']||0)+'</div><div style="font-size:.72em;color:var(--text2)">5xx Server Err</div></div>';
-        h+='</div></div>';
-
-        /* User Agents */
-        h+='<div><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Traffic Sources</h3><div>';
-        h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>🌐 Browser</span><span style="font-weight:700">'+(ua.Browser||0)+'</span></div>';
-        h+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span>🤖 Bot/Crawler</span><span style="font-weight:700">'+(ua.Bot||0)+'</span></div>';
-        h+='<div style="display:flex;justify-content:space-between;padding:6px 0"><span>📡 Monitor</span><span style="font-weight:700">'+(ua.Monitor||0)+'</span></div>';
-        h+='</div></div></div>';
-
-        /* Server System Metrics (if available) */
-        if(sys.cpu_pct!==undefined){
-            h+='<div style="margin-bottom:20px;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">';
-            h+='<h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Server: '+esc(d.server_name||'')+'</h3>';
-            h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">';
-            h+='<div style="text-align:center"><div style="font-size:1.2em;font-weight:700;color:'+(sys.cpu_pct>80?'#f85149':'var(--text)')+'">'+sys.cpu_pct+'%</div><div style="font-size:.72em;color:var(--text2)">CPU</div></div>';
-            if(sys.mem_pct!==undefined)h+='<div style="text-align:center"><div style="font-size:1.2em;font-weight:700;color:'+(sys.mem_pct>80?'#f85149':'var(--text)')+'">'+sys.mem_pct+'%</div><div style="font-size:.72em;color:var(--text2)">Memory</div></div>';
-            if(sys.disk_pct!==undefined)h+='<div style="text-align:center"><div style="font-size:1.2em;font-weight:700;color:'+(sys.disk_pct>80?'#f85149':'var(--text)')+'">'+sys.disk_pct+'%</div><div style="font-size:.72em;color:var(--text2)">Disk</div></div>';
-            h+='</div></div>';
+        /* Row 2: fail2ban (if any) */
+        if(fb.jails&&fb.jails.length){
+            h+='<div class="card" style="padding:14px;margin-bottom:16px">';
+            h+='<div style="font-size:.82em;font-weight:600;color:#f85149;margin-bottom:10px">🚫 Fail2ban — Banned IPs</div>';
+            h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">';
+            for(const j of fb.jails){
+                h+='<div style="padding:8px 12px;background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.2);border-radius:8px;font-size:.82em">';
+                h+='<div style="font-weight:700;color:#f85149">'+esc(j.name)+'</div>';
+                h+='<div style="color:var(--text2)">'+(j.banned||0)+' banned · '+(j.failed||0)+' failed</div>';
+                h+='</div>';
+            }
+            h+='</div>';
+            if(fb.banned_ips&&fb.banned_ips.length){
+                h+='<div style="margin-top:10px;font-size:.8em;font-family:monospace;color:var(--text2);max-height:100px;overflow-y:auto;padding:6px 8px;background:rgba(0,0,0,.2);border-radius:6px">';
+                h+=fb.banned_ips.slice(0,30).map(ip=>esc(ip)).join(' · ');
+                h+='</div>';
+            }
+            h+='</div>';
         }
 
-        /* Top Pages */
+        /* Row 3: top pages */
         if(topPages.length){
-            h+='<div style="margin-bottom:20px"><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Top Pages</h3><div style="background:var(--surface);border-radius:8px;border:1px solid var(--border);overflow:hidden">';
-            for(const p of topPages.slice(0,15)){
+            h+='<div class="card" style="padding:14px;margin-bottom:16px"><div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:10px">Top Pages</div>';
+            h+='<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">';
+            for(const p of topPages.slice(0,20)){
                 const pct=topPages[0].hits>0?Math.round(p.hits/topPages[0].hits*100):0;
-                h+='<div style="display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);font-size:.85em;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:'+pct+'%;background:rgba(88,166,255,.07);z-index:0"></div><span style="flex:1;z-index:1;font-family:monospace;word-break:break-all">'+esc(p.path)+'</span><span style="z-index:1;font-weight:700;margin-left:8px">'+p.hits+'</span></div>';
+                h+='<div style="display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid var(--border);font-size:.83em;position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:'+pct+'%;background:rgba(88,166,255,.07);z-index:0"></div><span style="flex:1;z-index:1;font-family:monospace;word-break:break-all">'+esc(p.path)+'</span><span style="z-index:1;font-weight:700;margin-left:8px;color:#58a6ff">'+p.hits+'</span></div>';
             }
             h+='</div></div>';
         }
 
-        /* Recent Requests */
+        /* Row 4: services + pm2 grid */
+        if(services.length||pm2procs.length){
+            h+='<div style="display:grid;grid-template-columns:'+(services.length&&pm2procs.length?'1fr 1fr':'1fr')+';gap:14px;margin-bottom:16px">';
+            if(services.length){
+                h+='<div class="card" style="padding:14px"><div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:10px">⚙ Systemd Services</div>';
+                h+='<div style="max-height:220px;overflow-y:auto">';
+                for(const svc of services){
+                    const clr=svc.ok?'#3fb950':'#f85149';
+                    h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid var(--border);font-size:.82em"><span style="font-family:monospace;word-break:break-all">'+esc(svc.name)+'</span><span style="color:'+clr+';font-weight:700;min-width:50px;text-align:right">'+esc(svc.sub||svc.active||'')+'</span></div>';
+                }
+                h+='</div></div>';
+            }
+            if(pm2procs.length){
+                h+='<div class="card" style="padding:14px"><div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:10px">⚡ PM2 Processes</div>';
+                h+='<div style="max-height:220px;overflow-y:auto">';
+                for(const p of pm2procs){
+                    const clr=p.status==='online'?'#3fb950':'#f85149';
+                    h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid var(--border);font-size:.82em"><span style="font-family:monospace">'+esc(p.name)+'</span><div style="display:flex;gap:8px;align-items:center"><span style="color:var(--text2)">CPU: '+p.cpu+'% Mem: '+p.memory_mb+'MB</span><span style="color:'+clr+';font-weight:700">'+esc(p.status)+'</span></div></div>';
+                }
+                h+='</div></div>';
+            }
+            h+='</div>';
+        }
+
+        /* Row 5: Recent requests (full width) */
         if(reqs.length){
-            h+='<div><h3 style="margin:0 0 8px;font-size:.9em;color:var(--text2)">Recent Requests</h3>';
-            h+='<div style="background:var(--surface);border-radius:8px;border:1px solid var(--border);overflow:hidden;max-height:300px;overflow-y:auto">';
-            for(const r of reqs.slice(0,30)){
-                const sc2=r.status>=500?'#f85149':r.status>=400?'#d29922':r.status>=300?'#58a6ff':'#3fb950';
-                const t=new Date(r.ts*1000).toLocaleTimeString();
-                h+='<div style="display:flex;gap:8px;padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.82em;font-family:monospace">';
-                h+='<span style="color:var(--text2);min-width:65px">'+t+'</span>';
-                h+='<span style="color:'+sc2+';min-width:30px;font-weight:700">'+r.status+'</span>';
-                h+='<span style="color:#58a6ff;min-width:35px">'+r.method+'</span>';
-                h+='<span style="flex:1;word-break:break-all;color:var(--text)">'+esc(r.path)+'</span>';
-                h+='<span style="color:var(--text2)" title="'+esc(r.ua||'')+'">'+esc(r.ip)+'</span>';
+            h+='<div class="card" style="padding:14px"><div style="font-size:.82em;font-weight:600;color:var(--text2);margin-bottom:10px">Live Request Feed</div>';
+            h+='<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;max-height:360px;overflow-y:auto">';
+            for(const req of reqs.slice(0,50)){
+                const sc2=req.status>=500?'#f85149':req.status>=400?'#d29922':req.status>=300?'#58a6ff':'#3fb950';
+                const ts=new Date(req.ts*1000).toLocaleTimeString();
+                h+='<div style="display:flex;gap:8px;padding:4px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.8em;font-family:monospace">';
+                h+='<span style="color:var(--text2);min-width:68px">'+ts+'</span>';
+                h+='<span style="color:'+sc2+';min-width:32px;font-weight:700">'+req.status+'</span>';
+                h+='<span style="color:#58a6ff;min-width:38px">'+req.method+'</span>';
+                h+='<span style="flex:1;word-break:break-all;color:var(--text)">'+esc(req.path)+'</span>';
+                h+='<span style="color:var(--text2)" title="'+esc(req.ua||'')+'">'+esc(req.ip)+'</span>';
                 h+='</div>';
             }
             h+='</div></div>';
@@ -923,7 +1166,7 @@ async function loadSiteDetail(id){
 
         document.getElementById('siteDetailContent').innerHTML=h;
     }catch(e){
-        document.getElementById('siteDetailContent').innerHTML='<div style="color:#f44336">Error loading detail: '+esc(e.message)+'</div>';
+        document.getElementById('siteDetailContent').innerHTML='<div style="color:#f44336;padding:20px">Error loading detail: '+esc(e.message)+'</div>';
     }
 }
 </script>

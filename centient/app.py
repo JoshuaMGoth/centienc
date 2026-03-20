@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -52,10 +53,12 @@ async def _ws_broadcast_loop() -> None:
                 continue
             overview = engine.get_overview()
             settings = await db.get_all_settings()
+            vulnerabilities = await _fetch_vulnerability_summary(settings)
             incidents = await db.get_recent_incidents(10)
             payload = json.dumps({
                 "type": "overview",
                 **overview,
+                "vulnerabilities": vulnerabilities,
                 "settings": {
                     "app_title": settings.get("app_title", "CentienC"),
                     "theme": settings.get("theme", "dark"),
@@ -152,6 +155,62 @@ async def _require_auth_or_401(request: Request) -> dict[str, Any]:
     if user is None:
         raise HTTPException(401, "Authentication required")
     return user
+
+
+async def _fetch_vulnerability_summary(settings: dict[str, Any] | None = None) -> dict[str, int | str]:
+    """Fetch vulnerability summary from a Jarvis API endpoint.
+
+    This is best-effort and always returns a stable result shape.
+    """
+    settings = settings or {}
+    base_candidates = [
+        settings.get("jarvis_api_base_url", ""),
+        os.getenv("JARVIS_API_BASE_URL", ""),
+        "http://127.0.0.1:8787",
+    ]
+
+    default = {
+        "total": 0,
+        "active": 0,
+        "critical": 0,
+        "high": 0,
+        "unreviewed": 0,
+        "acknowledged": 0,
+        "dismissed": 0,
+        "fixed": 0,
+        "source": "unavailable",
+    }
+
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        for base in base_candidates:
+            if not base:
+                continue
+            url = f"{base.rstrip('/')}/api/deps/vulnerabilities"
+            try:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    continue
+                payload = resp.json()
+                summary = payload.get("summary") or {}
+                total = int(summary.get("total", 0) or 0)
+                fixed = int(summary.get("fixed", 0) or 0)
+                dismissed = int(summary.get("dismissed", 0) or 0)
+                active = max(total - fixed - dismissed, 0)
+                return {
+                    "total": total,
+                    "active": active,
+                    "critical": int(summary.get("critical", 0) or 0),
+                    "high": int(summary.get("high", 0) or 0),
+                    "unreviewed": int(summary.get("unreviewed", 0) or 0),
+                    "acknowledged": int(summary.get("acknowledged", 0) or 0),
+                    "dismissed": dismissed,
+                    "fixed": fixed,
+                    "source": base,
+                }
+            except Exception:
+                continue
+
+    return default
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -252,10 +311,12 @@ async def websocket_endpoint(ws: WebSocket):
         if engine and db:
             overview = engine.get_overview()
             settings = await db.get_all_settings()
+            vulnerabilities = await _fetch_vulnerability_summary(settings)
             incidents = await db.get_recent_incidents(10)
             await ws.send_text(json.dumps({
                 "type": "overview",
                 **overview,
+                "vulnerabilities": vulnerabilities,
                 "settings": {
                     "app_title": settings.get("app_title", "CentienC"),
                     "theme": settings.get("theme", "dark"),
@@ -367,6 +428,7 @@ async def api_overview(request: Request):
     await _require_auth_or_401(request)
     overview = engine.get_overview()
     settings = await db.get_all_settings()
+    vulnerabilities = await _fetch_vulnerability_summary(settings)
     incidents = await db.get_recent_incidents(10)
     # Merge DB-sourced proxmox nodes with cache so new nodes appear immediately
     db_pve_nodes = await db.list_proxmox_nodes()
@@ -384,6 +446,7 @@ async def api_overview(request: Request):
     return {
         "ok": True,
         **overview,
+        "vulnerabilities": vulnerabilities,
         "settings": {
             "app_title": settings.get("app_title", "CentienC"),
             "theme": settings.get("theme", "dark"),
@@ -696,16 +759,33 @@ async def website_detail(website_id: int, request: Request):
         "ok": True,
         "website": website,
         "has_logs": False,
+        "drilldown_reason": None,
     }
+
+    # Always include the latest website status + basic uptime trend.
+    cache = engine.status_cache.get(f"website:{website_id}", {}) if engine else {}
+    result["live"] = {
+        "status": cache.get("status", "unknown"),
+        "response_time": cache.get("response_time"),
+        "status_code": cache.get("status_code"),
+        "details": cache.get("details"),
+        "last_check": cache.get("last_check"),
+    }
+    uptime_24h = await db.get_uptime("website", website_id, hours=24)
+    recent_history = await db.get_history("website", website_id, hours=6)
+    result["uptime_pct_24h"] = round(uptime_24h, 2)
+    result["recent_checks"] = recent_history[-50:]
 
     # If website is linked to a server, fetch SSH log data
     server_id = website.get("server_id")
     if not server_id:
+        result["drilldown_reason"] = "Website is not linked to a server."
         return result
 
     servers = await db.list_servers()
     server = next((s for s in servers if s["id"] == server_id), None)
     if not server or not server.get("ssh_user"):
+        result["drilldown_reason"] = "Linked server is missing SSH credentials."
         return result
 
     try:
@@ -714,6 +794,7 @@ async def website_detail(website_id: int, request: Request):
         result.update(detail)
     except Exception as exc:
         logger.warning("Site detail failed for website %d: %s", website_id, exc)
+        result["drilldown_reason"] = str(exc)
         result["error"] = str(exc)
 
     return result

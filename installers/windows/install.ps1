@@ -20,7 +20,7 @@ param(
     [switch]$Service,
     [switch]$Tray,
     [switch]$Uninstall,
-    [int]$Port = 9090
+    [int]$Port = 9099
 )
 
 $ErrorActionPreference = "Stop"
