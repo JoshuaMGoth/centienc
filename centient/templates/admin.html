@@ -156,7 +156,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
           <button class="btn btn-primary" onclick="openWebsiteModal()">+ Add Website</button>
         </div>
         <table class="tbl">
-          <thead><tr><th>Name</th><th>URL</th><th>Expected</th><th>Timeout</th><th>Status</th><th>Response</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>URL</th><th>Linked Server</th><th>Log Path</th><th>Status</th><th>Response</th><th>Actions</th></tr></thead>
           <tbody id="websiteTableBody"></tbody>
         </table>
       </div>
@@ -349,6 +349,11 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <label>URL</label><input id="fwUrl" placeholder="https://example.com">
     <label>Expected Status</label><input id="fwExpectedStatus" type="number" value="200">
     <label>Timeout (seconds)</label><input id="fwTimeout" type="number" value="15">
+    <label>Linked Server (optional)</label><select id="fwServerId" onchange="onAdminWebsiteServerSelect()"><option value="">None (basic monitor only)</option></select>
+    <div id="fwLogPathWrap" style="display:none">
+      <label>Log Path (for drill-down)</label><input id="fwLogPath" placeholder="/var/log/nginx/access.log">
+      <div class="hint">Link a website to an SSH-enabled server and log path to unlock nginx traffic drill-down.</div>
+    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeWebsiteModal()">Cancel</button>
       <button class="btn btn-danger" id="websiteDeleteBtn" style="display:none" onclick="deleteWebsite()">Delete</button>
@@ -504,16 +509,19 @@ async function deleteServer(){if(!editServerId)return;await confirmDeleteServer(
 /* ── Websites ── */
 async function loadWebsites(){
   try{
-    const d=await api('/api/websites');if(!d)return;
+    const [d,sd]=await Promise.all([api('/api/websites'),api('/api/servers')]);if(!d||!sd)return;
+    const serverNames=Object.fromEntries((sd.servers||[]).map(s=>[s.id,s.name]));
     const tb=document.getElementById('websiteTableBody');
     tb.innerHTML=(d.websites||[]).map(w=>{
       const st=w.live_status||'unknown';
       const stColor=st==='up'?'var(--green)':st==='down'?'var(--red)':'var(--text2)';
+      const linkedServer=w.server_id?serverNames[w.server_id]||('Server #'+w.server_id):'—';
+      const logPath=w.log_path||'—';
       return `<tr>
         <td><strong>${w.name}</strong></td>
         <td style="font-family:monospace;font-size:12px">${w.url||'—'}</td>
-        <td>${w.expected_status||200}</td>
-        <td>${w.timeout||15}s</td>
+        <td>${linkedServer}</td>
+        <td style="font-family:monospace;font-size:12px">${logPath}</td>
         <td style="color:${stColor};font-weight:600">${st}${w.status_code?' ('+w.status_code+')':''}</td>
         <td>${w.response_time!=null?w.response_time.toFixed(0)+'ms':'—'}</td>
         <td class="actions">
@@ -529,9 +537,32 @@ function openWebsiteModal(id=null){
   editWebsiteId=id;
   document.getElementById('websiteModalTitle').textContent=id?'Edit Website':'Add Website';
   document.getElementById('websiteDeleteBtn').style.display=id?'inline-block':'none';
-  if(!id){['fwName','fwUrl'].forEach(i=>document.getElementById(i).value='');document.getElementById('fwExpectedStatus').value='200';document.getElementById('fwTimeout').value='15'}
+  if(!id){
+    ['fwName','fwUrl','fwLogPath'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('fwExpectedStatus').value='200';
+    document.getElementById('fwTimeout').value='15';
+    document.getElementById('fwServerId').value='';
+    onAdminWebsiteServerSelect();
+  }
   document.getElementById('websiteModalOverlay').classList.add('active');
+  populateAdminWebsiteServers();
   if(id)loadWebsiteEdit(id);
+}
+async function populateAdminWebsiteServers(selected=''){
+  try{
+    const d=await api('/api/servers');if(!d)return;
+    const sel=document.getElementById('fwServerId');
+    sel.innerHTML='<option value="">None (basic monitor only)</option>';
+    (d.servers||[]).filter(s=>s.ssh_user).forEach(s=>{
+      sel.innerHTML+=`<option value="${s.id}">${s.name} (${s.hostname})</option>`;
+    });
+    sel.value=selected||'';
+    onAdminWebsiteServerSelect();
+  }catch(e){}
+}
+function onAdminWebsiteServerSelect(){
+  const hasServer=!!document.getElementById('fwServerId').value;
+  document.getElementById('fwLogPathWrap').style.display=hasServer?'block':'none';
 }
 async function loadWebsiteEdit(id){
   try{
@@ -541,15 +572,20 @@ async function loadWebsiteEdit(id){
     document.getElementById('fwUrl').value=w.url||'';
     document.getElementById('fwExpectedStatus').value=w.expected_status||200;
     document.getElementById('fwTimeout').value=w.timeout||15;
+    await populateAdminWebsiteServers(String(w.server_id||''));
+    document.getElementById('fwLogPath').value=w.log_path||'';
   }catch(e){}
 }
 function closeWebsiteModal(){document.getElementById('websiteModalOverlay').classList.remove('active');editWebsiteId=null}
 async function saveWebsite(){
+  const serverId=document.getElementById('fwServerId').value;
   const body={
     name:document.getElementById('fwName').value,
     url:document.getElementById('fwUrl').value,
     expected_status:parseInt(document.getElementById('fwExpectedStatus').value)||200,
-    timeout:parseInt(document.getElementById('fwTimeout').value)||15
+    timeout:parseInt(document.getElementById('fwTimeout').value)||15,
+    server_id:serverId?parseInt(serverId,10):null,
+    log_path:serverId?(document.getElementById('fwLogPath').value||null):null
   };
   try{
     if(editWebsiteId)await api('/api/websites/'+editWebsiteId,{method:'PUT',body:JSON.stringify(body)});
@@ -615,9 +651,10 @@ async function loadPveNodes(){
     tb.innerHTML=(d.nodes||[]).map(n=>`<tr>
       <td>${n.name}</td><td>${n.host}:${n.port||8006}</td><td>${n.node||'pve'}</td>
       <td>${n.user||'—'}</td><td>${n.token_id||'—'}</td>
-      <td style="color:${n.live_status==='up'?'var(--green)':'var(--red)'}">${n.live_status||'unknown'}</td>
+      <td style="color:${n.live_status==='up'?'var(--green)':'var(--red)'}">${n.live_status||'unknown'}${n.error?` · ${n.error}`:''}</td>
       <td class="actions">
         <button onclick="openPveModal(${n.id})">Edit</button>
+        <button onclick="refreshPve(${n.id})">Refresh</button>
         <button class="del" onclick="deletePve(${n.id})">Delete</button>
       </td>
     </tr>`).join('');
@@ -640,7 +677,8 @@ async function loadPveEdit(id){
     document.getElementById('fpNode').value=n.node||'pve';
     document.getElementById('fpUser').value=n.user||'';
     document.getElementById('fpTokenId').value=n.token_id||'';
-    document.getElementById('fpTokenSecret').value=n.token_secret||'';
+    document.getElementById('fpTokenSecret').value='';
+    document.getElementById('fpTokenSecret').placeholder=n.has_token_secret?'Stored securely. Enter a new secret to replace it.':'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx';
     document.getElementById('fpVerifySSL').value=n.verify_ssl?'1':'0';
     document.getElementById('fpInterval').value=n.check_interval||60;
   }catch(e){}
@@ -648,6 +686,8 @@ async function loadPveEdit(id){
 function closePveModal(){document.getElementById('pveModalOverlay').classList.remove('active');editPveId=null}
 async function savePve(){
   const body={name:document.getElementById('fpName').value,host:document.getElementById('fpHost').value,port:parseInt(document.getElementById('fpPort').value)||8006,node:document.getElementById('fpNode').value||'pve',user:document.getElementById('fpUser').value,token_id:document.getElementById('fpTokenId').value,token_secret:document.getElementById('fpTokenSecret').value,verify_ssl:parseInt(document.getElementById('fpVerifySSL').value)||0,check_interval:parseInt(document.getElementById('fpInterval').value)||60};
+  if(editPveId&&!body.token_secret)delete body.token_secret;
+  if(editPveId&&!body.token_id)delete body.token_id;
   try{
     if(editPveId)await api('/api/proxmox/'+editPveId,{method:'PUT',body:JSON.stringify(body)});
     else await api('/api/proxmox',{method:'POST',body:JSON.stringify(body)});
@@ -655,6 +695,7 @@ async function savePve(){
     closePveModal();loadPveNodes();
   }catch(e){toast(e.message,'error')}
 }
+async function refreshPve(id){try{const d=await api('/api/proxmox/'+id+'/refresh',{method:'POST'});toast(d.error?('Refresh: '+d.error):'Refresh complete','info');loadPveNodes()}catch(e){toast(e.message,'error')}}
 async function deletePve(id){if(!confirm('Delete this Proxmox node?'))return;try{await api('/api/proxmox/'+id,{method:'DELETE'});toast('Node deleted','success');loadPveNodes()}catch(e){toast(e.message,'error')}}
 
 async function loadAbout(){

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import asyncssh
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -44,6 +45,60 @@ _ws_clients: set[WebSocket] = set()
 _ws_broadcast_task: asyncio.Task | None = None
 
 
+async def _build_overview_payload() -> dict[str, Any]:
+    """Build the dashboard payload consistently for HTTP and WebSocket clients."""
+    if engine is None or db is None:
+        return {
+            "servers": [],
+            "services": [],
+            "proxmox_nodes": [],
+            "containers": [],
+            "vms": [],
+            "incidents": [],
+            "vulnerabilities": {},
+            "settings": {
+                "app_title": "CentienC",
+                "theme": "dark",
+                "auth_enabled": "false",
+                "check_interval": "60",
+            },
+        }
+
+    monitor_engine = engine
+    database = db
+
+    overview = monitor_engine.get_overview()
+    settings = await database.get_all_settings()
+    vulnerabilities = await _fetch_vulnerability_summary(settings)
+    incidents = await database.get_recent_incidents(10)
+
+    # Merge DB-sourced proxmox nodes with cache so new nodes appear immediately
+    db_pve_nodes = await database.list_proxmox_nodes()
+    cache_ids = {n["id"] for n in overview.get("proxmox_nodes", [])}
+    for node in db_pve_nodes:
+        if node["id"] not in cache_ids:
+            cache = monitor_engine.status_cache.get(f"proxmox:{node['id']}", {})
+            node["live_status"] = cache.get("status", "unknown")
+            node["containers"] = cache.get("containers", [])
+            node["vms"] = cache.get("vms", [])
+            node["node_status"] = cache.get("node_status", {})
+            node["last_update"] = cache.get("last_update")
+            node["error"] = cache.get("error")
+            overview["proxmox_nodes"].append(node)
+
+    return {
+        **overview,
+        "vulnerabilities": vulnerabilities,
+        "settings": {
+            "app_title": settings.get("app_title", "CentienC"),
+            "theme": settings.get("theme", "dark"),
+            "auth_enabled": settings.get("auth_enabled", "false"),
+            "check_interval": settings.get("check_interval", "60"),
+        },
+        "incidents": incidents,
+    }
+
+
 async def _ws_broadcast_loop() -> None:
     """Periodically push overview data to all connected WebSocket clients."""
     while True:
@@ -51,21 +106,10 @@ async def _ws_broadcast_loop() -> None:
             await asyncio.sleep(5)
             if not _ws_clients or engine is None or db is None:
                 continue
-            overview = engine.get_overview()
-            settings = await db.get_all_settings()
-            vulnerabilities = await _fetch_vulnerability_summary(settings)
-            incidents = await db.get_recent_incidents(10)
+            overview = await _build_overview_payload()
             payload = json.dumps({
                 "type": "overview",
                 **overview,
-                "vulnerabilities": vulnerabilities,
-                "settings": {
-                    "app_title": settings.get("app_title", "CentienC"),
-                    "theme": settings.get("theme", "dark"),
-                    "auth_enabled": settings.get("auth_enabled", "false"),
-                    "check_interval": settings.get("check_interval", "60"),
-                },
-                "incidents": incidents,
             }, default=str)
             dead: set[WebSocket] = set()
             for ws in _ws_clients.copy():
@@ -155,6 +199,20 @@ async def _require_auth_or_401(request: Request) -> dict[str, Any]:
     if user is None:
         raise HTTPException(401, "Authentication required")
     return user
+
+
+async def _require_ws_auth(websocket: WebSocket) -> dict[str, Any] | None:
+    """Validate auth for websocket routes when auth is enabled."""
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled != "true":
+        return {"sub": 0, "username": "admin", "role": "admin"}
+
+    token = websocket.query_params.get("token")
+    if not token:
+        token = websocket.cookies.get("centient_token")
+    if not token:
+        return None
+    return decode_token(token)
 
 
 async def _fetch_vulnerability_summary(settings: dict[str, Any] | None = None) -> dict[str, int | str]:
@@ -309,21 +367,10 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         # Send initial data immediately
         if engine and db:
-            overview = engine.get_overview()
-            settings = await db.get_all_settings()
-            vulnerabilities = await _fetch_vulnerability_summary(settings)
-            incidents = await db.get_recent_incidents(10)
+            overview = await _build_overview_payload()
             await ws.send_text(json.dumps({
                 "type": "overview",
                 **overview,
-                "vulnerabilities": vulnerabilities,
-                "settings": {
-                    "app_title": settings.get("app_title", "CentienC"),
-                    "theme": settings.get("theme", "dark"),
-                    "auth_enabled": settings.get("auth_enabled", "false"),
-                    "check_interval": settings.get("check_interval", "60"),
-                },
-                "incidents": incidents,
             }, default=str))
         # Keep alive — client can send pings
         while True:
@@ -426,40 +473,31 @@ async def auth_me(request: Request):
 @app.get("/api/overview")
 async def api_overview(request: Request):
     await _require_auth_or_401(request)
-    overview = engine.get_overview()
-    settings = await db.get_all_settings()
-    vulnerabilities = await _fetch_vulnerability_summary(settings)
-    incidents = await db.get_recent_incidents(10)
-    # Merge DB-sourced proxmox nodes with cache so new nodes appear immediately
-    db_pve_nodes = await db.list_proxmox_nodes()
-    cache_ids = {n["id"] for n in overview.get("proxmox_nodes", [])}
-    for n in db_pve_nodes:
-        if n["id"] not in cache_ids:
-            cache = engine.status_cache.get(f"proxmox:{n['id']}", {})
-            n["live_status"] = cache.get("status", "unknown")
-            n["containers"] = cache.get("containers", [])
-            n["vms"] = cache.get("vms", [])
-            n["node_status"] = cache.get("node_status", {})
-            n["last_update"] = cache.get("last_update")
-            n["error"] = cache.get("error")
-            overview["proxmox_nodes"].append(n)
+    overview = await _build_overview_payload()
     return {
         "ok": True,
         **overview,
-        "vulnerabilities": vulnerabilities,
-        "settings": {
-            "app_title": settings.get("app_title", "CentienC"),
-            "theme": settings.get("theme", "dark"),
-            "auth_enabled": settings.get("auth_enabled", "false"),
-            "check_interval": settings.get("check_interval", "60"),
-        },
-        "incidents": incidents,
     }
 
 
 # ═══════════════════════════════════════════════════════════════════
 #  Server CRUD API
 # ═══════════════════════════════════════════════════════════════════
+
+def _sanitize_server(server: dict) -> dict:
+    sanitized = dict(server)
+    sanitized.pop("ssh_password", None)
+    sanitized.pop("sudo_password", None)
+    return sanitized
+
+
+def _sanitize_proxmox_node(node: dict) -> dict:
+    sanitized = dict(node)
+    token_secret = sanitized.pop("token_secret", None)
+    ssh_password = sanitized.pop("ssh_password", None)
+    sanitized["has_token_secret"] = bool(token_secret)
+    sanitized["has_ssh_password"] = bool(ssh_password)
+    return sanitized
 
 @app.get("/api/servers")
 async def list_servers(request: Request):
@@ -470,7 +508,7 @@ async def list_servers(request: Request):
         cache = engine.status_cache.get(f"server:{s['id']}", {})
         s["live_status"] = cache.get("status", "unknown")
         s["response_time"] = cache.get("response_time")
-    return {"ok": True, "servers": servers}
+    return {"ok": True, "servers": [_sanitize_server(s) for s in servers]}
 
 
 @app.post("/api/servers")
@@ -552,7 +590,7 @@ async def list_proxmox_nodes(request: Request):
         n["node_status"] = cache.get("node_status", {})
         n["last_update"] = cache.get("last_update")
         n["error"] = cache.get("error")
-    return {"ok": True, "nodes": nodes}
+    return {"ok": True, "nodes": [_sanitize_proxmox_node(n) for n in nodes]}
 
 
 @app.post("/api/proxmox")
@@ -560,7 +598,8 @@ async def add_proxmox_node(request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
     allowed = {"name", "host", "port", "node", "user", "token_id", "token_secret",
-               "verify_ssl", "check_interval", "enabled"}
+               "verify_ssl", "check_interval", "enabled",
+               "ssh_port", "ssh_user", "ssh_password", "ssh_key_path"}
     data = {k: v for k, v in body.items() if k in allowed}
     required = {"name", "host", "user", "token_id", "token_secret"}
     missing = required - set(data.keys())
@@ -575,8 +614,15 @@ async def update_proxmox_node(node_id: int, request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
     allowed = {"name", "host", "port", "node", "user", "token_id", "token_secret",
-               "verify_ssl", "check_interval", "enabled"}
+               "verify_ssl", "check_interval", "enabled",
+               "ssh_port", "ssh_user", "ssh_password", "ssh_key_path"}
     data = {k: v for k, v in body.items() if k in allowed}
+    if data.get("token_secret") in (None, ""):
+        data.pop("token_secret", None)
+    if data.get("token_id") in (None, ""):
+        data.pop("token_id", None)
+    if data.get("ssh_password") in (None, ""):
+        data.pop("ssh_password", None)
     ok = await db.update_proxmox_node(node_id, data)
     if not ok:
         raise HTTPException(404, "Proxmox node not found")
@@ -602,6 +648,113 @@ async def refresh_proxmox_node(node_id: int, request: Request):
     await engine._poll_proxmox(node)
     cache = engine.status_cache.get(f"proxmox:{node_id}", {})
     return {"ok": True, **cache}
+
+
+@app.websocket("/api/terminal/{node_id}/{vmid}")
+async def terminal_websocket(websocket: WebSocket, node_id: int, vmid: int):
+    """Interactive terminal websocket via SSH to Proxmox host and pct/qm shell."""
+    user = await _require_ws_auth(websocket)
+    if user is None:
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept()
+    conn: asyncssh.SSHClientConnection | None = None
+    process: asyncssh.SSHClientProcess | None = None
+
+    try:
+        node = await db.get_proxmox_node(node_id)
+        if not node:
+            await websocket.send_json({"type": "error", "message": "Proxmox node not found"})
+            await websocket.close(code=1008)
+            return
+
+        ssh_host = node.get("host")
+        ssh_port = int(node.get("ssh_port") or 22)
+        ssh_user = node.get("ssh_user") or "root"
+        ssh_password = node.get("ssh_password")
+        ssh_key_path = node.get("ssh_key_path")
+
+        connect_kwargs: dict[str, Any] = {
+            "host": ssh_host,
+            "port": ssh_port,
+            "username": ssh_user,
+            "known_hosts": None,
+        }
+        if ssh_key_path:
+            connect_kwargs["client_keys"] = [ssh_key_path]
+        if ssh_password:
+            connect_kwargs["password"] = ssh_password
+
+        conn = await asyncssh.connect(**connect_kwargs)
+
+        vm_type = websocket.query_params.get("vm_type", "lxc").lower()
+        if vm_type == "qemu":
+            command = f"qm terminal {vmid}"
+        else:
+            command = f"pct enter {vmid}"
+
+        process = await conn.create_process(command, term_type="xterm-256color", term_size=(24, 80))
+        await websocket.send_json({"type": "connected", "node_id": node_id, "vmid": vmid, "vm_type": vm_type})
+
+        async def stream_output(reader: asyncssh.SSHReader):
+            while not reader.at_eof():
+                chunk = await reader.read(4096)
+                if not chunk:
+                    break
+                await websocket.send_json({"type": "output", "data": chunk})
+
+        async def accept_input():
+            while True:
+                message = await websocket.receive_text()
+                try:
+                    payload = json.loads(message)
+                except Exception:
+                    continue
+                if payload.get("type") == "input" and process:
+                    process.stdin.write(payload.get("data", ""))
+
+        tasks = [
+            asyncio.create_task(stream_output(process.stdout)),
+            asyncio.create_task(stream_output(process.stderr)),
+            asyncio.create_task(accept_input()),
+            asyncio.create_task(process.wait()),
+        ]
+
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+
+        exit_status = None
+        for task in done:
+            try:
+                result = task.result()
+                if isinstance(result, int):
+                    exit_status = result
+            except Exception:
+                pass
+
+        await websocket.send_json({"type": "exit", "code": exit_status})
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.warning("Terminal websocket error for node=%s vmid=%s: %s", node_id, vmid, exc)
+        try:
+            await websocket.send_json({"type": "error", "message": str(exc)})
+        except Exception:
+            pass
+    finally:
+        try:
+            if process:
+                process.close()
+        except Exception:
+            pass
+        try:
+            if conn:
+                conn.close()
+                await conn.wait_closed()
+        except Exception:
+            pass
 
 
 # ═══════════════════════════════════════════════════════════════════

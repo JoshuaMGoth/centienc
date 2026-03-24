@@ -67,6 +67,10 @@ CREATE TABLE IF NOT EXISTS proxmox_nodes (
     user           TEXT NOT NULL,
     token_id       TEXT NOT NULL,
     token_secret   TEXT NOT NULL,
+    ssh_port       INTEGER DEFAULT 22,
+    ssh_user       TEXT DEFAULT 'root',
+    ssh_password   TEXT,
+    ssh_key_path   TEXT,
     verify_ssl     INTEGER DEFAULT 0,
     check_interval INTEGER DEFAULT 60,
     enabled        INTEGER DEFAULT 1,
@@ -188,6 +192,19 @@ class Database:
             ]:
                 if not _has_column(website_cols, col):
                     await conn.execute(f"ALTER TABLE websites ADD COLUMN {col} DEFAULT {default}")
+            await conn.commit()
+
+            # proxmox_nodes: migration for SSH access columns used by terminal feature
+            cur = await conn.execute("PRAGMA table_info(proxmox_nodes)")
+            proxmox_cols = [dict(r) for r in await cur.fetchall()]
+            for col, default in [
+                ("ssh_port", "22"),
+                ("ssh_user", "'root'"),
+                ("ssh_password", "NULL"),
+                ("ssh_key_path", "NULL"),
+            ]:
+                if not _has_column(proxmox_cols, col):
+                    await conn.execute(f"ALTER TABLE proxmox_nodes ADD COLUMN {col} DEFAULT {default}")
             await conn.commit()
 
             # Set defaults if first run

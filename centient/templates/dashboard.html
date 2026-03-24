@@ -528,7 +528,7 @@ function renderDashboard(data){
     else if(stats.warning>0){banner.className='status-banner warning';banner.textContent='⚠️ '+stats.warning+' warning'+(stats.warning>1?'s':'')+' — '+stats.up+'/'+stats.total+' operational'}
     else{banner.className='status-banner ok';banner.textContent='🟢 All systems operational'+(fb.total_banned?' — '+fb.total_banned+' IPs blocked historically':'')}
 
-    renderServerPills(servers);
+    renderServerPills(servers, proxmox);
     renderMetrics(data);
     renderProxmox(proxmox);
     renderSiteCards(data);
@@ -539,10 +539,29 @@ function renderDashboard(data){
     document.getElementById('lastUp').textContent='just now';
 }
 
-function renderServerPills(servers){
+function renderServerPills(servers, proxmoxNodes){
     const el=document.getElementById('serverPills');
-    if(!servers.length){el.innerHTML='<div class="empty"><div class="emoji">🖥️</div>No servers yet. Click + to add one.</div>';return}
-    el.innerHTML=servers.map(s=>{
+    const pveHosts=(proxmoxNodes||[]).map(n=>{
+        const ns=n.node_status||{},st=n.status||n.live_status||'unknown';
+        const memPct=ns.mem_used&&ns.mem_total?(ns.mem_used/ns.mem_total*100):0;
+        return {
+            id:'pve-'+n.id,
+            name:n.name||'Proxmox Node',
+            host:(n.host||'')+':'+(n.port||8006),
+            status:st,
+            ssh:{metrics:{
+                cpu_pct:ns.cpu||0,
+                memory:{used_pct:memPct},
+                disk:null,
+                connections:(n.containers||[]).length+(n.vms||[]).length,
+                load_1m:null,
+            }},
+            is_proxmox:true,
+        };
+    });
+    const all=[...(servers||[]),...pveHosts];
+    if(!all.length){el.innerHTML='<div class="empty"><div class="emoji">🖥️</div>No servers yet. Click + to add one.</div>';return}
+    el.innerHTML=all.map(s=>{
         const ssh=s.ssh||{},m=ssh.metrics||{},st=s.status||s.live_status||'unknown';
         const dot=st==='up'?'on':st==='down'?'off':'unknown';
         const cpu=m.load_1m!=null?m.load_1m.toFixed(2):'--';
@@ -552,7 +571,8 @@ function renderServerPills(servers){
         const disk=m.disk?m.disk.used_pct.toFixed(1)+'%':'--';
         const diskC=(m.disk?.used_pct||0)<50?'g':(m.disk?.used_pct||0)<80?'a':'r';
         const conns=m.connections!=null?m.connections:'--';
-        return '<div class="server-pill" onclick="editServer('+s.id+')"><h4><span class="pill-dot '+dot+'"></span> '+esc(s.name)+'</h4><div class="pill-grid"><div class="pill-item"><div class="pill-val '+cpuC+'">'+cpu+'</div><div class="pill-lbl">CPU</div></div><div class="pill-item"><div class="pill-val '+memC+'">'+mem+'</div><div class="pill-lbl">Memory</div></div><div class="pill-item"><div class="pill-val '+diskC+'">'+disk+'</div><div class="pill-lbl">Disk</div></div><div class="pill-item"><div class="pill-val b">'+conns+'</div><div class="pill-lbl">Conns</div></div></div></div>';
+        const onClick=s.is_proxmox?'':' onclick="editServer('+s.id+')"';
+        return '<div class="server-pill"'+onClick+'><h4><span class="pill-dot '+dot+'"></span> '+esc(s.name)+'</h4><div style="font-size:.72em;color:rgba(255,255,255,.42);margin:-3px 0 8px">'+esc(s.host||'')+(s.is_proxmox?' · Proxmox host':'')+'</div><div class="pill-grid"><div class="pill-item"><div class="pill-val '+cpuC+'">'+cpu+'</div><div class="pill-lbl">CPU</div></div><div class="pill-item"><div class="pill-val '+memC+'">'+mem+'</div><div class="pill-lbl">Memory</div></div><div class="pill-item"><div class="pill-val '+diskC+'">'+disk+'</div><div class="pill-lbl">Disk</div></div><div class="pill-item"><div class="pill-val b">'+conns+'</div><div class="pill-lbl">Conns</div></div></div></div>';
     }).join('');
 }
 
@@ -585,14 +605,29 @@ function renderMetrics(data){
 
 function renderProxmox(nodes){
     const title=document.getElementById('pveTitle'),el=document.getElementById('ctCards');
+    if(!nodes.length){title.style.display='none';el.innerHTML='';return}
+    title.style.display='block';
     const all=[];
     for(const n of nodes){for(const c of(n.containers||[]))all.push({...c,type:'CT',node:n.name});for(const v of(n.vms||[]))all.push({...v,type:'VM',node:n.name})}
-    if(!all.length){title.style.display='none';el.innerHTML='';return}
-    title.style.display='block';
-    title.textContent=nodes.length===1?'Proxmox Containers — '+nodes[0].name:'Proxmox Containers';
+    title.textContent=nodes.length===1?'Proxmox — '+nodes[0].name:'Proxmox Nodes';
+    if(!all.length){
+        /* Show node status cards even when there are no guests */
+        el.innerHTML=nodes.map(n=>{
+            const st=n.status||n.live_status||'unknown';
+            const stC=st==='up'?'var(--green)':st==='down'?'var(--red)':'var(--text2)';
+            const ns=n.node_status||{};
+            const cpu=ns.cpu!=null?ns.cpu+'%':'--';
+            const mem=ns.mem_used&&ns.mem_total?Math.round(ns.mem_used/ns.mem_total*100)+'%':'--';
+            const up=ns.uptime?fmtUp(ns.uptime):'--';
+            const err=n.error?'<div style="margin-top:8px;font-size:.8em;color:var(--yellow);line-height:1.4">⚠ '+esc(n.error)+'</div>':'';
+            return '<div class="ct-card" style="min-width:280px"><div class="ct-header"><div><div class="ct-name">'+esc(n.name||'Node')+'</div><div style="font-size:.8em;color:var(--text2)">'+esc(n.host||'')+':'+( n.port||8006)+'</div></div><div style="display:flex;gap:6px;align-items:center"><span class="ct-status '+(st==='up'?'running':'stopped')+'" style="color:'+stC+'">'+st+'</span></div></div><div style="padding:12px 16px;font-size:.88em;color:var(--text2)">CPU: '+cpu+' · Memory: '+mem+' · Uptime: '+up+'<br>No containers or VMs found on this node.'+err+'</div></div>';
+        }).join('');
+        return;
+    }
     el.innerHTML=all.map(g=>{
         const cpu=g.cpu_pct||0,mem=g.mem_pct||0,disk=g.disk_pct||0,up=g.uptime?fmtUp(g.uptime):'--';
-        return '<div class="ct-card"><div class="ct-header"><div><div class="ct-name">'+esc(g.name)+'</div></div><div style="display:flex;gap:6px;align-items:center"><span class="ct-status '+g.status+'">'+g.status+'</span><span class="ct-id">'+g.type+' '+g.vmid+'</span></div></div><div class="ct-bars"><div class="ct-bar"><span class="cb-label">CPU</span><div class="cb-track"><div class="cb-fill" style="width:'+cpu+'%;background:'+fc(cpu)+'"></div></div><span class="cb-val">'+cpu+'%</span></div><div class="ct-bar"><span class="cb-label">RAM</span><div class="cb-track"><div class="cb-fill" style="width:'+mem+'%;background:'+fc(mem)+'"></div></div><span class="cb-val">'+mem+'%</span></div><div class="ct-bar"><span class="cb-label">Disk</span><div class="cb-track"><div class="cb-fill" style="width:'+disk+'%;background:'+fc(disk)+'"></div></div><span class="cb-val">'+disk+'%</span></div></div><div class="ct-meta"><span>⏱ '+up+'</span></div></div>';
+        const ip=g.ipv4||'--';
+        return '<div class="ct-card"><div class="ct-header"><div><div class="ct-name">'+esc(g.name)+'</div></div><div style="display:flex;gap:6px;align-items:center"><span class="ct-status '+g.status+'">'+g.status+'</span><span class="ct-id">'+g.type+' '+g.vmid+'</span></div></div><div class="ct-bars"><div class="ct-bar"><span class="cb-label">CPU</span><div class="cb-track"><div class="cb-fill" style="width:'+cpu+'%;background:'+fc(cpu)+'"></div></div><span class="cb-val">'+cpu+'%</span></div><div class="ct-bar"><span class="cb-label">RAM</span><div class="cb-track"><div class="cb-fill" style="width:'+mem+'%;background:'+fc(mem)+'"></div></div><span class="cb-val">'+mem+'%</span></div><div class="ct-bar"><span class="cb-label">Disk</span><div class="cb-track"><div class="cb-fill" style="width:'+disk+'%;background:'+fc(disk)+'"></div></div><span class="cb-val">'+disk+'%</span></div></div><div class="ct-meta"><span>⏱ '+up+'</span><span>IPv4: '+esc(ip)+'</span></div></div>';
     }).join('');
 }
 

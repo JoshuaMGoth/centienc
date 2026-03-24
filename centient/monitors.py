@@ -129,11 +129,17 @@ class MonitorEngine:
                 logger.debug("ICMP blocked for %s, falling back to TCP probe", host)
                 return await self._tcp_probe(host)
             return "down", None
+        except FileNotFoundError:
+            logger.debug("ping binary unavailable for %s, falling back to TCP probe", host)
+            return await self._tcp_probe(host)
         except PermissionError:
             logger.debug("ICMP PermissionError for %s, falling back to TCP probe", host)
             return await self._tcp_probe(host)
-        except (asyncio.TimeoutError, OSError):
+        except asyncio.TimeoutError:
             return "down", None
+        except OSError:
+            logger.debug("ICMP probe failed to start for %s, falling back to TCP probe", host)
+            return await self._tcp_probe(host)
 
     async def _tcp_probe(self, host: str, ports: tuple[int, ...] = (22, 80, 443, 3389, 8080)) -> tuple[str, float | None]:
         """TCP connectivity fallback used when ICMP ping is unavailable (e.g. unprivileged LXC)."""
@@ -409,17 +415,25 @@ class MonitorEngine:
         try:
             conn = await self._get_ssh_conn(server)
             sudo_pass = server.get("sudo_password")
+            is_macos = str(server.get("type", "")).lower() == "macos"
 
-            if flags.get("system", True):
-                results["metrics"] = await self._ssh_system_metrics(conn)
+            if flags.get("system", flags.get("system_metrics", True)):
+                if is_macos:
+                    results["metrics"] = await self._ssh_system_metrics_macos(conn)
+                else:
+                    metrics = await self._ssh_system_metrics(conn)
+                    # Auto-fallback to macOS collection if Linux /proc failed
+                    if metrics.get("error") and "Incomplete" in str(metrics["error"]):
+                        metrics = await self._ssh_system_metrics_macos(conn)
+                    results["metrics"] = metrics
 
             if flags.get("pm2", False):
                 results["pm2"] = await self._ssh_pm2(conn)
 
-            if flags.get("services", False):
+            if flags.get("services", flags.get("systemd", flags.get("systemd_services", False))):
                 results["services"] = await self._ssh_services(conn)
 
-            if flags.get("nginx", False):
+            if flags.get("nginx", flags.get("web_server", False)):
                 results["nginx"] = await self._ssh_nginx(conn, sudo_pass)
 
             if flags.get("fail2ban", False):
@@ -521,6 +535,104 @@ class MonitorEngine:
                     break
         except Exception:
             pass
+
+        return result
+
+    async def _ssh_system_metrics_macos(self, conn: asyncssh.SSHClientConnection) -> dict[str, Any]:
+        """Collect CPU, memory, disk, connections for macOS via SSH."""
+        batch_cmd = (
+            f"sysctl -n hw.ncpu && echo '{SEP}' && "
+            f"sysctl -n vm.loadavg && echo '{SEP}' && "
+            f"vm_stat && echo '{SEP}' && "
+            f"sysctl -n hw.memsize && echo '{SEP}' && "
+            f"df -g / | tail -1 && echo '{SEP}' && "
+            f"sysctl -n kern.boottime && echo '{SEP}' && "
+            f"netstat -an 2>/dev/null | grep -c ESTABLISHED"
+        )
+        raw = await self._ssh_cmd(conn, batch_cmd)
+        parts = raw.split(SEP)
+        if len(parts) < 7:
+            return {"error": "Incomplete macOS system metrics response"}
+
+        result: dict[str, Any] = {}
+
+        # CPU cores + load
+        try:
+            cores = int(parts[0].strip())
+            # vm.loadavg format: "{ 1.23 4.56 7.89 }"
+            load_str = parts[1].strip().strip("{}").strip()
+            load1 = float(load_str.split()[0])
+            result["cpu_pct"] = round(load1 / cores * 100, 1)
+            result["load_1m"] = load1
+            result["cores"] = cores
+        except (ValueError, IndexError):
+            result["cpu_pct"] = 0
+            result["cores"] = 1
+
+        # Memory from vm_stat + hw.memsize
+        try:
+            page_size = 16384  # Apple Silicon default
+            vm_text = parts[2].strip()
+            # Try to extract page size from vm_stat header
+            for line in vm_text.split("\n"):
+                if "page size of" in line:
+                    ps_match = re.search(r"page size of (\d+)", line)
+                    if ps_match:
+                        page_size = int(ps_match.group(1))
+                    break
+            vm = {}
+            for line in vm_text.split("\n"):
+                if ":" in line:
+                    k, v = line.split(":", 1)
+                    v_clean = v.strip().rstrip(".")
+                    if v_clean.isdigit():
+                        vm[k.strip()] = int(v_clean)
+            total_bytes = int(parts[3].strip())
+            total_mb = round(total_bytes / 1048576)
+            free_pages = vm.get("Pages free", 0) + vm.get("Pages speculative", 0)
+            inactive_pages = vm.get("Pages inactive", 0)
+            purgeable_pages = vm.get("Pages purgeable", 0)
+            avail_mb = round((free_pages + inactive_pages + purgeable_pages) * page_size / 1048576)
+            used_mb = total_mb - avail_mb
+            result["memory"] = {
+                "total_mb": total_mb,
+                "used_mb": max(0, used_mb),
+                "used_pct": round(max(0, used_mb) / total_mb * 100, 1) if total_mb > 0 else 0,
+            }
+        except (ValueError, IndexError):
+            result["memory"] = {"total_mb": 0, "used_mb": 0, "used_pct": 0}
+
+        # Disk
+        try:
+            disk_cols = parts[4].strip().split()
+            # df -g on macOS: Filesystem Gblocks Used Available Capacity ...
+            total_g = int(disk_cols[1])
+            used_g = int(disk_cols[2])
+            result["disk"] = {
+                "total_gb": total_g,
+                "used_gb": used_g,
+                "used_pct": round(used_g / total_g * 100, 1) if total_g > 0 else 0,
+            }
+        except (ValueError, IndexError):
+            result["disk"] = {"total_gb": 0, "used_gb": 0, "used_pct": 0}
+
+        # Uptime from kern.boottime
+        try:
+            bt_str = parts[5].strip()
+            sec_match = re.search(r"sec\s*=\s*(\d+)", bt_str)
+            if sec_match:
+                boot_epoch = int(sec_match.group(1))
+                result["uptime"] = int(time.time()) - boot_epoch
+            else:
+                result["uptime"] = 0
+        except (ValueError, IndexError):
+            result["uptime"] = 0
+
+        # Connections
+        try:
+            result["connections"] = int(parts[6].strip())
+        except (ValueError, IndexError):
+            result["connections"] = 0
 
         return result
 
@@ -1167,6 +1279,7 @@ class MonitorEngine:
         verify_ssl = bool(node.get("verify_ssl", 0))
         nid = node["id"]
         cache_key = f"proxmox:{nid}"
+        previous = self.status_cache.get(cache_key, {})
 
         base = f"https://{host}:{port}/api2/json"
         auth_header = f"PVEAPIToken={user}!{token_id}={token_secret}"
@@ -1177,9 +1290,9 @@ class MonitorEngine:
             "name": node["name"],
             "last_update": time.time(),
             "status": "unknown",
-            "containers": [],
-            "vms": [],
-            "node_status": {},
+            "containers": previous.get("containers", []),
+            "vms": previous.get("vms", []),
+            "node_status": previous.get("node_status", {}),
             "error": None,
         }
 
@@ -1228,6 +1341,9 @@ class MonitorEngine:
 
                 # Fetch guests if node is reachable (including partial-403 access)
                 if results["status"] == "up":
+                    fresh_containers: list[dict[str, Any]] = []
+                    fresh_vms: list[dict[str, Any]] = []
+
                     # LXC containers
                     try:
                         r = await client.get(f"{base}/nodes/{pve_node}/lxc", headers=headers)
@@ -1242,12 +1358,31 @@ class MonitorEngine:
                                     cdata = rs.json().get("data", {}) if rs.status_code == 200 else {}
                                 except Exception:
                                     cdata = {}
+                                ipv4 = None
+                                try:
+                                    ri = await client.get(
+                                        f"{base}/nodes/{pve_node}/lxc/{vmid}/interfaces",
+                                        headers=headers,
+                                    )
+                                    if ri.status_code == 200:
+                                        iface_data = ri.json().get("data", [])
+                                        for iface in iface_data:
+                                            for addr in iface.get("inet", []) or []:
+                                                ip = str(addr).split("/")[0]
+                                                if ip and not ip.startswith("127."):
+                                                    ipv4 = ip
+                                                    break
+                                            if ipv4:
+                                                break
+                                except Exception:
+                                    ipv4 = None
                                 maxmem = cdata.get("maxmem", 1) or 1
                                 maxdisk = cdata.get("maxdisk", 1) or 1
-                                results["containers"].append({
+                                fresh_containers.append({
                                     "vmid": vmid,
                                     "name": ct.get("name", f"CT{vmid}"),
                                     "status": ct.get("status", "unknown"),
+                                    "ipv4": ipv4,
                                     "cpu_pct": round(cdata.get("cpu", 0) * 100, 1),
                                     "mem_used": cdata.get("mem", 0),
                                     "mem_total": maxmem,
@@ -1257,6 +1392,7 @@ class MonitorEngine:
                                     "disk_pct": round(cdata.get("disk", 0) / maxdisk * 100, 1),
                                     "uptime": cdata.get("uptime", 0),
                                 })
+                            results["containers"] = fresh_containers
                     except Exception as exc:
                         logger.debug("Proxmox LXC list error: %s", exc)
 
@@ -1275,7 +1411,7 @@ class MonitorEngine:
                                 except Exception:
                                     vdata = {}
                                 maxmem = vdata.get("maxmem", 1) or 1
-                                results["vms"].append({
+                                fresh_vms.append({
                                     "vmid": vmid,
                                     "name": vm.get("name", f"VM{vmid}"),
                                     "status": vm.get("status", "unknown"),
@@ -1285,6 +1421,7 @@ class MonitorEngine:
                                     "mem_pct": round(vdata.get("mem", 0) / maxmem * 100, 1),
                                     "uptime": vdata.get("uptime", 0),
                                 })
+                            results["vms"] = fresh_vms
                     except Exception as exc:
                         logger.debug("Proxmox VM list error: %s", exc)
 
