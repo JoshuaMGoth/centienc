@@ -88,7 +88,7 @@ async def _send_email(
     msg.attach(MIMEText(body, "plain"))
 
     try:
-        if use_tls:
+        if use_tls and smtp_port != 587:
             with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as s:
                 if username and password:
                     s.login(username, password)
@@ -96,8 +96,10 @@ async def _send_email(
         else:
             with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as s:
                 s.ehlo()
-                if username and password:
+                if use_tls or (username and password):
                     s.starttls()
+                    s.ehlo()
+                if username and password:
                     s.login(username, password)
                 s.sendmail(from_addr, [to_addr], msg.as_string())
         logger.info("Email notification sent to %s", to_addr)

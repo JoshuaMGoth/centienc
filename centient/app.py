@@ -55,7 +55,6 @@ async def _build_overview_payload() -> dict[str, Any]:
             "containers": [],
             "vms": [],
             "incidents": [],
-            "vulnerabilities": {},
             "settings": {
                 "app_title": "CentienC",
                 "theme": "dark",
@@ -69,7 +68,6 @@ async def _build_overview_payload() -> dict[str, Any]:
 
     overview = monitor_engine.get_overview()
     settings = await database.get_all_settings()
-    vulnerabilities = await _fetch_vulnerability_summary(settings)
     incidents = await database.get_recent_incidents(10)
 
     # Merge DB-sourced proxmox nodes with cache so new nodes appear immediately
@@ -88,7 +86,6 @@ async def _build_overview_payload() -> dict[str, Any]:
 
     return {
         **overview,
-        "vulnerabilities": vulnerabilities,
         "settings": {
             "app_title": settings.get("app_title", "CentienC"),
             "theme": settings.get("theme", "dark"),
