@@ -519,8 +519,10 @@ class MonitorEngine:
         try:
             conn_lines = [l for l in parts[5].strip().split("\n") if l.strip()]
             result["connections"] = len(conn_lines)
+            result["raw_connections"] = parts[5].strip()
         except Exception:
             result["connections"] = 0
+            result["raw_connections"] = ""
 
         # Network I/O
         try:
@@ -893,6 +895,7 @@ class MonitorEngine:
         status_codes: dict[str, int] = {"2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0}
         unique_ips: set[str] = set()
         user_agents: dict[str, int] = {"Browser": 0, "Bot": 0, "Monitor": 0}
+        device_types: dict[str, int] = {"desktop": 0, "mobile": 0, "tablet": 0}
         recent_requests: list[dict[str, Any]] = []
         total_requests = 0
         total_bytes = 0
@@ -956,6 +959,14 @@ class MonitorEngine:
                     user_agents["Bot"] += 1
             else:
                 user_agents["Browser"] += 1
+                # Device type classification (only for browsers)
+                ua_lower = ua.lower()
+                if "ipad" in ua_lower or "tablet" in ua_lower or ("android" in ua_lower and "mobile" not in ua_lower):
+                    device_types["tablet"] += 1
+                elif self._MOBILE_UA.search(ua):
+                    device_types["mobile"] += 1
+                else:
+                    device_types["desktop"] += 1
 
             recent_requests.append({
                 "ts": ts,
@@ -979,6 +990,20 @@ class MonitorEngine:
         pm2 = ssh_data.get("pm2", [])
         fail2ban = ssh_data.get("fail2ban", {})
 
+        # Parse active connections by port from cached ss output
+        connection_types: dict[str, int] = {}
+        raw_connections = system_metrics.get("raw_connections", "")
+        if raw_connections:
+            for cline in raw_connections.strip().split("\n"):
+                parts = cline.split()
+                if len(parts) >= 4:
+                    local_addr = parts[3]
+                    # Extract port from address like "0.0.0.0:80" or "[::]:443"
+                    port_str = local_addr.rsplit(":", 1)[-1] if ":" in local_addr else ""
+                    if port_str.isdigit():
+                        port_label = port_str
+                        connection_types[port_label] = connection_types.get(port_label, 0) + 1
+
         return {
             "traffic": {
                 "name": website.get("name", url_host),
@@ -988,10 +1013,12 @@ class MonitorEngine:
                 "top_pages": [{"path": p, "hits": h} for p, h in top_pages],
                 "status_codes": status_codes,
                 "user_agents": user_agents,
+                "device_types": device_types,
                 "bytes": total_bytes,
                 "recent_requests": recent_requests[:50],
                 "period_minutes": minutes,
             },
+            "connection_types": connection_types,
             "system": system_metrics,
             "server_name": server.get("name", "Unknown"),
             "services": services,
@@ -1524,6 +1551,8 @@ class MonitorEngine:
         total_rpm = 0.0
         fail2ban_total = 0
         fail2ban_active = 0
+        device_types: dict[str, int] = {"desktop": 0, "mobile": 0, "tablet": 0}
+        connection_types: dict[str, int] = {}
         for srv in servers:
             ssh = srv.get("ssh") or {}
             nginx = ssh.get("nginx") or {}
@@ -1532,10 +1561,33 @@ class MonitorEngine:
                 raw_site = req.get("site", "default")
                 normalized = site_alias.get(raw_site, raw_site)
                 all_recent_requests.append({**req, "site": normalized, "server_name": srv.get("name", "")})
+
+                # Classify device type from user agent
+                ua = req.get("ua", "")
+                if ua and not self._BOT_PATTERNS.search(ua):
+                    ua_lower = ua.lower()
+                    if "ipad" in ua_lower or "tablet" in ua_lower or ("android" in ua_lower and "mobile" not in ua_lower):
+                        device_types["tablet"] += 1
+                    elif self._MOBILE_UA.search(ua):
+                        device_types["mobile"] += 1
+                    else:
+                        device_types["desktop"] += 1
+
             total_rpm += (nginx.get("totals") or {}).get("rpm", 0)
             fb = ssh.get("fail2ban") or {}
             fail2ban_total += fb.get("total_banned", 0)
             fail2ban_active += fb.get("active_bans", 0)
+
+            # Aggregate connection types from SSH metrics
+            raw_conns = (ssh.get("metrics") or {}).get("raw_connections", "")
+            if raw_conns:
+                for line in raw_conns.strip().splitlines():
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        local_addr = parts[3]
+                        port = local_addr.rsplit(":", 1)[-1] if ":" in local_addr else ""
+                        if port.isdigit() and int(port) < 10000:
+                            connection_types[port] = connection_types.get(port, 0) + 1
 
         all_recent_requests.sort(key=lambda r: r.get("ts", 0), reverse=True)
 
@@ -1552,6 +1604,8 @@ class MonitorEngine:
                 "total_banned": fail2ban_total,
                 "active_bans": fail2ban_active,
             },
+            "device_types": device_types,
+            "connection_types": connection_types,
             "stats": {
                 "total": total,
                 "up": up,

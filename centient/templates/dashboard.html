@@ -9,13 +9,15 @@
 <link rel="apple-touch-icon" href="/static/centienc-logo.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <meta property="og:type" content="website">
 <meta property="og:title" content="CentienC — Infrastructure Dashboard">
 <meta property="og:description" content="Monitor your servers, services, and websites in real-time.">
 <meta property="og:image" content="/static/centienc-og.png">
 <style>
+:root{--bg:#0d1117;--surface:rgba(255,255,255,.05);--border:rgba(255,255,255,.07);--text:#fff;--text2:rgba(255,255,255,.55);--green:#3fb950;--red:#f85149;--yellow:#d29922;--blue:#58a6ff}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;color:#fff;min-height:100vh;overflow-x:hidden}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
 /* ── Header ── */
 .header{background:rgba(0,0,0,.4);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.07)}
@@ -84,7 +86,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
 .site-card{background:rgba(255,255,255,.05);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.07);transition:all .25s;position:relative;overflow:hidden;cursor:pointer}
 .site-card:hover{transform:translateY(-3px);border-color:rgba(88,166,255,.4);background:rgba(255,255,255,.08)}
 /* ── Site drill-down full-screen ── */
-#siteDetailOverlay{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
+#siteDetailPage{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
 .site-card .sc-name{font-size:1em;font-weight:700;margin-bottom:4px}
 .site-card .sc-server{font-size:.7em;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
 .site-card .sc-stats{display:flex;gap:12px;font-size:.82em}
@@ -119,6 +121,20 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
 .ri a{color:rgba(255,255,255,.35);text-decoration:none}.ri a:hover{color:#58a6ff}
 .ban-btn{background:none;border:none;color:rgba(255,255,255,.25);cursor:pointer;font-size:.9em;padding:0 4px;flex-shrink:0}
 .ban-btn:hover{color:#f44336}
+.rdev{flex-shrink:0;width:18px;text-align:center;font-size:.82em;opacity:.55}
+
+/* ── Device & Connection cards ── */
+.device-chart-wrap{display:flex;align-items:center;gap:18px;margin-top:8px}
+.device-chart-wrap canvas{max-width:130px;max-height:130px}
+.device-legend{display:flex;flex-direction:column;gap:6px}
+.device-legend-item{display:flex;align-items:center;gap:8px;font-size:.85em}
+.device-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.device-legend-val{font-weight:700;margin-left:auto;min-width:28px;text-align:right}
+.conn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px}
+.conn-card{background:rgba(0,0,0,.3);border-radius:8px;padding:10px;text-align:center;border:1px solid rgba(255,255,255,.06)}
+.conn-port{font-size:1.3em;font-weight:700;color:#58a6ff}
+.conn-label{font-size:.7em;color:rgba(255,255,255,.45);text-transform:uppercase;margin:2px 0}
+.conn-count{font-size:.85em;color:rgba(255,255,255,.7)}
 
 /* ── Status codes bar ── */
 .sc-bar{display:flex;gap:10px;margin-top:8px}
@@ -207,6 +223,40 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
 </head>
 <body>
 
+<!-- Site Detail Drill-down (full page, hidden by default) -->
+<div id="siteDetailPage" style="display:none">
+  <div style="max-width:1400px;margin:0 auto;padding:18px 20px 40px">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="closeSiteDetail()" style="font-size:.85em;padding:7px 16px">&#8592; Back</button>
+        <h2 id="siteDetailTitle" style="margin:0;font-size:1.3em;color:var(--text)">Site Detail</h2>
+        <span id="siteDetailStatusBadge" style="padding:3px 11px;border-radius:12px;font-size:.78em;font-weight:700;display:none"></span>
+        <span id="siteDetailUptimeBadge" style="color:var(--text2);font-size:.82em"></span>
+      </div>
+      <div style="font-family:monospace;font-size:.82em;color:var(--text2)" id="siteDetailClock"></div>
+    </div>
+    <!-- Metrics strip -->
+    <div id="ddMetricsStrip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:18px"></div>
+    <!-- Charts row -->
+    <div id="ddChartsRow" style="display:none;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+      <div class="card" style="padding:14px">
+        <div style="font-size:.82em;font-weight:600;margin-bottom:8px;color:var(--text2)">System Performance</div>
+        <canvas id="ddChartSys" height="90"></canvas>
+      </div>
+      <div class="card" style="padding:14px">
+        <div style="font-size:.82em;font-weight:600;margin-bottom:8px;color:var(--text2)">Traffic</div>
+        <canvas id="ddChartTraffic" height="90"></canvas>
+      </div>
+    </div>
+    <!-- Main content -->
+    <div id="siteDetailContent">
+      <div style="text-align:center;padding:80px;color:var(--text2)">Loading traffic data…</div>
+    </div>
+  </div>
+</div>
+
+<div id="dashboardMain">
 <div class="header">
     <div>
         <h1><img class="logo" src="/static/centienc-logo.png" alt="CentienC logo"> <span id="appTitle">CentienC</span></h1>
@@ -250,6 +300,14 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
         <div id="feedList" class="slist" style="max-height:260px"><span class="muted">Waiting for data…</span></div>
     </div>
     <div class="card">
+        <h3>📊 Device Analytics</h3>
+        <div id="deviceChartContainer"><span class="muted">Waiting for data…</span></div>
+    </div>
+    <div class="card">
+        <h3>🔌 Active Connections</h3>
+        <div id="connectionTypesContainer"><span class="muted">Waiting for data…</span></div>
+    </div>
+    <div class="card">
         <h3>📈 Response Codes (5 min)</h3>
         <div class="sc-bar">
             <div class="sc-item"><div class="sc-val g" id="sc2">0</div><div class="sc-lbl">2xx OK</div></div>
@@ -271,6 +329,7 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
         <div id="servicesContainer"><span class="muted">Waiting for data…</span></div>
     </div>
 </div>
+</div><!-- /dashboardMain -->
 
 <button class="add-btn" onclick="showAddModal()" title="Add server/website">+</button>
 <!-- IP Map Modal -->
@@ -365,39 +424,6 @@ body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;
     <a href="https://joshuagoth.com" style="color:rgba(255,255,255,.45);text-decoration:none" target="_blank">JoshuaGoth.com</a><br>
     <span style="font-size:.9em">Inspired by <a href="https://prometheus.io" style="color:rgba(88,166,255,.6);text-decoration:none" target="_blank">Prometheus</a> · Customized for web developers in mind</span><br>
     <span style="font-size:.9em">A <strong>JoshuaGoth</strong> Software · Licensed under <a href="https://www.gnu.org/licenses/gpl-3.0.html" style="color:rgba(88,166,255,.6);text-decoration:none" target="_blank">GNU GPL-3.0</a></span>
-</div>
-
-<!-- Site Detail Drill-down Overlay (full-screen) -->
-<div id="siteDetailOverlay" style="display:none;position:fixed;inset:0;z-index:1100;background:var(--bg);overflow-y:auto">
-  <div style="max-width:1400px;margin:0 auto;padding:18px 20px 40px">
-    <!-- Header -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px">
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="closeSiteDetail()" style="font-size:.85em;padding:7px 16px">&#8592; Back</button>
-        <h2 id="siteDetailTitle" style="margin:0;font-size:1.3em;color:var(--text)">Site Detail</h2>
-        <span id="siteDetailStatusBadge" style="padding:3px 11px;border-radius:12px;font-size:.78em;font-weight:700;display:none"></span>
-        <span id="siteDetailUptimeBadge" style="color:var(--text2);font-size:.82em"></span>
-      </div>
-      <div style="font-family:monospace;font-size:.82em;color:var(--text2)" id="siteDetailClock"></div>
-    </div>
-    <!-- Metrics strip -->
-    <div id="ddMetricsStrip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:18px"></div>
-    <!-- Charts row -->
-    <div id="ddChartsRow" style="display:none;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
-      <div class="card" style="padding:14px">
-        <div style="font-size:.82em;font-weight:600;margin-bottom:8px;color:var(--text2)">System Performance</div>
-        <canvas id="ddChartSys" height="90"></canvas>
-      </div>
-      <div class="card" style="padding:14px">
-        <div style="font-size:.82em;font-weight:600;margin-bottom:8px;color:var(--text2)">Traffic</div>
-        <canvas id="ddChartTraffic" height="90"></canvas>
-      </div>
-    </div>
-    <!-- Main content (status codes, top pages, recent requests, services, pm2, fail2ban) -->
-    <div id="siteDetailContent">
-      <div style="text-align:center;padding:80px;color:var(--text2)">Loading traffic data…</div>
-    </div>
-  </div>
 </div>
 
 <!-- Update Banner -->
@@ -528,7 +554,7 @@ function renderDashboard(data){
     else if(stats.warning>0){banner.className='status-banner warning';banner.textContent='⚠️ '+stats.warning+' warning'+(stats.warning>1?'s':'')+' — '+stats.up+'/'+stats.total+' operational'}
     else{banner.className='status-banner ok';banner.textContent='🟢 All systems operational'+(fb.total_banned?' — '+fb.total_banned+' IPs blocked historically':'')}
 
-    renderServerPills(servers, proxmox);
+    renderServerPills(servers);
     renderMetrics(data);
     renderProxmox(proxmox);
     renderSiteCards(data);
@@ -536,30 +562,14 @@ function renderDashboard(data){
     renderResponseCodes(nginx);
     renderBans(fb);
     renderServices(data);
+    renderDeviceChart(data.device_types||{});
+    renderConnectionTypes(data.connection_types||{});
     document.getElementById('lastUp').textContent='just now';
 }
 
-function renderServerPills(servers, proxmoxNodes){
+function renderServerPills(servers){
     const el=document.getElementById('serverPills');
-    const pveHosts=(proxmoxNodes||[]).map(n=>{
-        const ns=n.node_status||{},st=n.status||n.live_status||'unknown';
-        const memPct=ns.mem_used&&ns.mem_total?(ns.mem_used/ns.mem_total*100):0;
-        return {
-            id:'pve-'+n.id,
-            name:n.name||'Proxmox Node',
-            host:(n.host||'')+':'+(n.port||8006),
-            status:st,
-            ssh:{metrics:{
-                cpu_pct:ns.cpu||0,
-                memory:{used_pct:memPct},
-                disk:null,
-                connections:(n.containers||[]).length+(n.vms||[]).length,
-                load_1m:null,
-            }},
-            is_proxmox:true,
-        };
-    });
-    const all=[...(servers||[]),...pveHosts];
+    const all=[...(servers||[])];
     if(!all.length){el.innerHTML='<div class="empty"><div class="emoji">🖥️</div>No servers yet. Click + to add one.</div>';return}
     el.innerHTML=all.map(s=>{
         const ssh=s.ssh||{},m=ssh.metrics||{},st=s.status||s.live_status||'unknown';
@@ -571,8 +581,7 @@ function renderServerPills(servers, proxmoxNodes){
         const disk=m.disk?m.disk.used_pct.toFixed(1)+'%':'--';
         const diskC=(m.disk?.used_pct||0)<50?'g':(m.disk?.used_pct||0)<80?'a':'r';
         const conns=m.connections!=null?m.connections:'--';
-        const onClick=s.is_proxmox?'':' onclick="editServer('+s.id+')"';
-        return '<div class="server-pill"'+onClick+'><h4><span class="pill-dot '+dot+'"></span> '+esc(s.name)+'</h4><div style="font-size:.72em;color:rgba(255,255,255,.42);margin:-3px 0 8px">'+esc(s.host||'')+(s.is_proxmox?' · Proxmox host':'')+'</div><div class="pill-grid"><div class="pill-item"><div class="pill-val '+cpuC+'">'+cpu+'</div><div class="pill-lbl">CPU</div></div><div class="pill-item"><div class="pill-val '+memC+'">'+mem+'</div><div class="pill-lbl">Memory</div></div><div class="pill-item"><div class="pill-val '+diskC+'">'+disk+'</div><div class="pill-lbl">Disk</div></div><div class="pill-item"><div class="pill-val b">'+conns+'</div><div class="pill-lbl">Conns</div></div></div></div>';
+        return '<div class="server-pill" onclick="editServer('+s.id+')"><h4><span class="pill-dot '+dot+'"></span> '+esc(s.name)+'</h4><div style="font-size:.72em;color:rgba(255,255,255,.42);margin:-3px 0 8px">'+esc(s.host||'')+'</div><div class="pill-grid"><div class="pill-item"><div class="pill-val '+cpuC+'">'+cpu+'</div><div class="pill-lbl">CPU</div></div><div class="pill-item"><div class="pill-val '+memC+'">'+mem+'</div><div class="pill-lbl">Memory</div></div><div class="pill-item"><div class="pill-val '+diskC+'">'+disk+'</div><div class="pill-lbl">Disk</div></div><div class="pill-item"><div class="pill-val b">'+conns+'</div><div class="pill-lbl">Conns</div></div></div></div>';
     }).join('');
 }
 
@@ -659,13 +668,22 @@ function renderSiteCards(data){
     }).join('');
 }
 
+function _devIcon(ua){
+    if(!ua)return '🖥';
+    var l=ua.toLowerCase();
+    if(/ipad|tablet/.test(l)||(/android/.test(l)&&!/mobile/.test(l)))return '📱';
+    if(/mobile|iphone|ipod|blackberry|iemobile|opera mini/.test(l))return '📱';
+    return '🖥';
+}
+
 function renderFeed(nginx){
     const el=document.getElementById('feedList'),reqs=nginx.recent_requests||[];
     if(!reqs.length){el.innerHTML='<span class="muted">No recent requests</span>';return}
     el.innerHTML=reqs.slice(0,50).map(r=>{
         const ts=r.ts?new Date(r.ts*1000).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}):'--';
         const sc=r.status<300?'s2':r.status<400?'s3':r.status<500?'s4':'s5';
-        return '<div class="rr"><span class="rt">'+ts+'</span><span class="rm '+r.method+'">'+r.method+'</span><span class="rp">'+esc(r.path)+'</span><span class="rsite">'+esc(r.site||r.server_name||'')+'</span><span class="rs '+sc+'">'+r.status+'</span><span class="ri"><a href="#" onclick="event.preventDefault();event.stopPropagation();showIpMap(\''+r.ip+'\')">'+r.ip+'</a></span><button class="ban-btn" title="Block IP" onclick="event.stopPropagation()">🚫</button></div>';
+        const dev=_devIcon(r.ua);
+        return '<div class="rr"><span class="rt">'+ts+'</span><span class="rdev" title="'+esc(r.ua||'')+'">'+dev+'</span><span class="rm '+r.method+'">'+r.method+'</span><span class="rp">'+esc(r.path)+'</span><span class="rsite">'+esc(r.site||r.server_name||'')+'</span><span class="rs '+sc+'">'+r.status+'</span><span class="ri"><a href="#" onclick="event.preventDefault();event.stopPropagation();showIpMap(\''+r.ip+'\')">'+r.ip+'</a></span><button class="ban-btn" title="Block IP" onclick="event.stopPropagation()">🚫</button></div>';
     }).join('');
 }
 
@@ -694,6 +712,49 @@ function renderServices(data){
         if(pm2.length)h+='<div style="margin-bottom:10px"><strong style="font-size:.78em;color:rgba(255,255,255,.45)">PM2 PROCESSES <span class="muted">('+pm2.length+')</span></strong><div class="sgrid" style="margin-top:5px;max-height:250px;overflow-y:auto">'+pm2.map(p=>'<div class="sp"><div class="sd '+p.status+'"></div><span class="sn">'+esc(p.name)+'</span><span class="stag">'+esc(s.name.substring(0,8).toLowerCase())+'</span><span class="smem">'+p.memory_mb+'MB</span></div>').join('')+'</div></div>';
     }
     if(!h)h='<span class="muted">No services data — configure SSH monitoring on servers.</span>';
+    el.innerHTML=h;
+}
+
+/* ── Device Analytics Chart ── */
+let _deviceChart=null;
+function renderDeviceChart(dt){
+    const el=document.getElementById('deviceChartContainer');
+    const total=(dt.desktop||0)+(dt.mobile||0)+(dt.tablet||0);
+    if(!total){el.innerHTML='<span class="muted">No device data yet</span>';return}
+    const items=[
+        {label:'Desktop',val:dt.desktop||0,color:'#58a6ff'},
+        {label:'Mobile',val:dt.mobile||0,color:'#3fb950'},
+        {label:'Tablet',val:dt.tablet||0,color:'#bc8cff'}
+    ];
+    let h='<div class="device-chart-wrap"><canvas id="deviceDoughnut" width="130" height="130"></canvas>';
+    h+='<div class="device-legend">';
+    for(const it of items){
+        const pct=total>0?Math.round(it.val/total*100):0;
+        h+='<div class="device-legend-item"><span class="device-legend-dot" style="background:'+it.color+'"></span><span>'+it.label+'</span><span class="device-legend-val">'+it.val+' <span style="font-weight:400;color:rgba(255,255,255,.4);font-size:.85em">('+pct+'%)</span></span></div>';
+    }
+    h+='</div></div>';
+    el.innerHTML=h;
+    const cv=document.getElementById('deviceDoughnut');
+    if(cv&&typeof Chart!=='undefined'){
+        if(_deviceChart){_deviceChart.destroy();_deviceChart=null}
+        _deviceChart=new Chart(cv,{type:'doughnut',data:{labels:items.map(i=>i.label),datasets:[{data:items.map(i=>i.val),backgroundColor:items.map(i=>i.color),borderWidth:0,hoverOffset:4}]},options:{responsive:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){const t=ctx.dataset.data.reduce((a,b)=>a+b,0);return ctx.label+': '+ctx.raw+' ('+Math.round(ctx.raw/t*100)+'%)'}}}}}});
+    }
+}
+
+/* ── Connection Types ── */
+const PORT_LABELS={'22':'SSH','80':'HTTP','443':'HTTPS','8080':'Alt HTTP','8443':'Alt HTTPS','3306':'MySQL','5432':'Postgres','6379':'Redis','27017':'MongoDB','53':'DNS','25':'SMTP','587':'SMTP','993':'IMAP','995':'POP3'};
+function renderConnectionTypes(ct){
+    const el=document.getElementById('connectionTypesContainer');
+    const ports=Object.keys(ct).sort((a,b)=>(ct[b]||0)-(ct[a]||0));
+    if(!ports.length){el.innerHTML='<span class="muted">No active connections</span>';return}
+    const total=ports.reduce((s,p)=>s+(ct[p]||0),0);
+    let h='<div style="font-size:.82em;color:rgba(255,255,255,.5);margin-bottom:8px">'+total+' active connections</div>';
+    h+='<div class="conn-grid">';
+    for(const p of ports.slice(0,12)){
+        const lbl=PORT_LABELS[p]||('Port '+p);
+        h+='<div class="conn-card"><div class="conn-port">'+p+'</div><div class="conn-label">'+esc(lbl)+'</div><div class="conn-count">'+ct[p]+' conn'+(ct[p]>1?'s':'')+'</div></div>';
+    }
+    h+='</div>';
     el.innerHTML=h;
 }
 
@@ -891,7 +952,6 @@ async function deleteItem(){
 
 async function logout(){await fetch('/api/auth/logout',{method:'POST'});location.href='/'}
 document.getElementById('addModal').addEventListener('click',function(e){if(e.target===this)closeModal()});
-document.getElementById('siteDetailOverlay').addEventListener('click',function(e){if(e.target===this)closeSiteDetail()});
 
 /* ── Site Detail Drill-down ── */
 let _ddId=null,_ddInterval=null,_ddClockInterval=null;
@@ -902,8 +962,9 @@ let _ddH={labels:[],cpu:[],mem:[],rpm:[],vis:[],conns:[]};
 function _ddResetHistory(){_ddH={labels:[],cpu:[],mem:[],rpm:[],vis:[],conns:[]};}
 
 function closeSiteDetail(){
-    const ov=document.getElementById('siteDetailOverlay');
-    ov.style.display='none'; document.body.style.overflow='';
+    document.getElementById('siteDetailPage').style.display='none';
+    document.getElementById('dashboardMain').style.display='';
+    window.scrollTo(0,0);
     if(_ddInterval){clearInterval(_ddInterval);_ddInterval=null;}
     if(_ddClockInterval){clearInterval(_ddClockInterval);_ddClockInterval=null;}
     if(_ddChartSys){_ddChartSys.destroy();_ddChartSys=null;}
@@ -913,9 +974,10 @@ function closeSiteDetail(){
 
 async function openSiteDetail(id){
     _ddId=id;
-    const ov=document.getElementById('siteDetailOverlay');
-    ov.style.display='block'; ov.scrollTop=0;
-    document.body.style.overflow='hidden';
+    document.getElementById('dashboardMain').style.display='none';
+    const pg=document.getElementById('siteDetailPage');
+    pg.style.display='block';
+    window.scrollTo(0,0);
     _ddResetHistory();
     if(_ddChartSys){_ddChartSys.destroy();_ddChartSys=null;}
     if(_ddChartTraffic){_ddChartTraffic.destroy();_ddChartTraffic=null;}
