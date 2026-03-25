@@ -1120,6 +1120,53 @@ async def list_incidents(request: Request):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  Push Token Registration (Expo Push Notifications)
+# ═══════════════════════════════════════════════════════════════════
+
+@app.post("/api/push-tokens")
+async def register_push_token(request: Request):
+    """Register an Expo push token for this device."""
+    await _require_auth_or_401(request)
+    body = await request.json()
+    token = body.get("token", "").strip()
+    if not token or not token.startswith("ExponentPushToken["):
+        raise HTTPException(400, "Valid Expo push token required")
+    device_name = body.get("device_name", "")
+    platform = body.get("platform", "ios")
+    tid = await db.add_push_token(token, device_name, platform)
+    return {"ok": True, "id": tid}
+
+
+@app.delete("/api/push-tokens")
+async def unregister_push_token(request: Request):
+    """Remove an Expo push token (device unregister)."""
+    await _require_auth_or_401(request)
+    body = await request.json()
+    token = body.get("token", "").strip()
+    if not token:
+        raise HTTPException(400, "token is required")
+    ok = await db.remove_push_token(token)
+    return {"ok": ok}
+
+
+@app.get("/api/push-tokens")
+async def list_push_tokens(request: Request):
+    """List all registered push tokens."""
+    await _require_auth_or_401(request)
+    tokens = await db.list_push_tokens()
+    return {"ok": True, "tokens": tokens}
+
+
+@app.post("/api/push-tokens/test")
+async def test_push(request: Request):
+    """Send a test push to all registered devices."""
+    await _require_auth_or_401(request)
+    from .notifications import _send_expo_push
+    await _send_expo_push(db, "test", "Test Notification", "up", "Push notifications are working!")
+    return {"ok": True, "message": "Test push sent to all registered devices"}
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  Web Analytics API
 # ═══════════════════════════════════════════════════════════════════
 

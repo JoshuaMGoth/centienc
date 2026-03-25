@@ -142,6 +142,15 @@ CREATE TABLE IF NOT EXISTS incidents (
     notified    INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_incidents_target ON incidents(target_type, target_id, status);
+
+-- Push notification tokens (Expo push)
+CREATE TABLE IF NOT EXISTS push_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    token      TEXT UNIQUE NOT NULL,
+    device_name TEXT,
+    platform   TEXT DEFAULT 'ios',
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -572,3 +581,28 @@ class Database:
                 "SELECT * FROM incidents ORDER BY started_at DESC LIMIT ?", (limit,)
             )
             return [dict(r) for r in await cursor.fetchall()]
+
+    # ── Push Tokens ───────────────────────────────────────────────
+
+    async def add_push_token(self, token: str, device_name: str | None = None, platform: str = "ios") -> int:
+        """Register an Expo push token. Returns token row id."""
+        async with aiosqlite.connect(self.path) as conn:
+            # Upsert — if token already exists, just update device_name
+            await conn.execute(
+                "INSERT INTO push_tokens(token, device_name, platform) VALUES(?, ?, ?) "
+                "ON CONFLICT(token) DO UPDATE SET device_name = excluded.device_name",
+                (token, device_name, platform),
+            )
+            await conn.commit()
+            cursor = await conn.execute("SELECT id FROM push_tokens WHERE token = ?", (token,))
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
+    async def remove_push_token(self, token: str) -> bool:
+        async with aiosqlite.connect(self.path) as conn:
+            cursor = await conn.execute("DELETE FROM push_tokens WHERE token = ?", (token,))
+            await conn.commit()
+            return cursor.rowcount > 0
+
+    async def list_push_tokens(self) -> list[dict[str, Any]]:
+        return await self._list("push_tokens")

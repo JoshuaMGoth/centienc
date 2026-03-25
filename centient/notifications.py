@@ -1,4 +1,4 @@
-"""CentienC — Notification dispatcher (email, webhook, Discord)."""
+"""CentienC — Notification dispatcher (email, webhook, Discord, Expo push)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ import httpx
 from .database import Database
 
 logger = logging.getLogger("centient.notifications")
+
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 
 async def send_notification(
@@ -41,6 +43,9 @@ async def send_notification(
                 await _send_discord(ch, target_type, target_name, status, details)
         except Exception as e:
             logger.error("Notification failed (%s/%s): %s", ch["type"], ch["name"], e)
+
+    # Also send push notifications to all registered devices
+    await _send_expo_push(db, target_type, target_name, status, details)
 
 
 async def _send_email(
@@ -161,6 +166,69 @@ async def _send_discord(
         resp = await client.post(webhook_url, json=payload)
         resp.raise_for_status()
     logger.info("Discord notification sent")
+
+
+async def _send_expo_push(
+    db: Database,
+    target_type: str,
+    target_name: str,
+    status: str,
+    details: str | None,
+) -> None:
+    """Send push notifications to all registered Expo push tokens."""
+    tokens_rows = await db.list_push_tokens()
+    if not tokens_rows:
+        return
+
+    emoji = {"up": "\u2705", "down": "\U0001f534", "warning": "\u26a0\ufe0f"}.get(status, "\u2139\ufe0f")
+    title = f"{emoji} {target_type.title()} {status.upper()}"
+    body = target_name
+    if details:
+        body += f" — {details}"
+
+    # Expo accepts batches of up to 100
+    messages = []
+    for row in tokens_rows:
+        token = row.get("token", "")
+        if not token.startswith("ExponentPushToken["):
+            continue
+        messages.append({
+            "to": token,
+            "title": title,
+            "body": body,
+            "sound": "default" if status in ("down", "critical") else None,
+            "priority": "high" if status in ("down", "critical") else "default",
+            "data": {
+                "target_type": target_type,
+                "target_name": target_name,
+                "status": status,
+            },
+        })
+
+    if not messages:
+        return
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                EXPO_PUSH_URL,
+                json=messages,
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            # Clean up invalid tokens
+            for i, ticket in enumerate(result.get("data", [])):
+                if ticket.get("status") == "error" and ticket.get("details", {}).get("error") == "DeviceNotRegistered":
+                    bad_token = messages[i]["to"]
+                    logger.info("Removing invalid push token: %s", bad_token)
+                    await db.remove_push_token(bad_token)
+        logger.info("Expo push sent to %d device(s)", len(messages))
+    except Exception as e:
+        logger.error("Expo push notification failed: %s", e)
 
 
 async def test_channel(channel: dict[str, Any]) -> dict[str, Any]:
