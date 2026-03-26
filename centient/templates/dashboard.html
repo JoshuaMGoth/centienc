@@ -123,10 +123,12 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
 .site-card .sc-bar-mini span{padding:2px 6px;border-radius:4px;background:rgba(17,29,51,.6)}
 
 /* ── Grid ── */
-.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:0 22px 22px;max-width:1500px;margin:0 auto}
-.card{background:var(--card);border-radius:14px;padding:18px;backdrop-filter:blur(6px);border:1px solid var(--card-border)}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:0 22px 22px;max-width:1500px;margin:0 auto;align-items:start}
+.card{background:var(--card);border-radius:14px;padding:18px;backdrop-filter:blur(6px);border:1px solid var(--card-border);align-self:start}
 .card h3{margin-bottom:10px;color:var(--blue);font-size:1.05em}
 .card.full{grid-column:1/-1}
+.card.compact{padding:16px}
+.card.compact h3{margin-bottom:8px}
 
 /* ── Scrollable lists ── */
 .slist{max-height:170px;overflow-y:auto;background:rgba(10,22,40,.5);border-radius:8px;padding:8px;font-family:'SF Mono','Fira Code',monospace;font-size:.8em}
@@ -150,17 +152,18 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
 .rdev{flex-shrink:0;width:18px;text-align:center;font-size:.82em;opacity:.55}
 
 /* ── Device & Connection cards ── */
-.device-chart-wrap{display:flex;align-items:center;gap:18px;margin-top:8px}
+.device-chart-wrap{display:flex;align-items:center;gap:14px;margin-top:6px}
 .device-chart-wrap canvas{max-width:90px;max-height:90px}
-.device-legend{display:flex;flex-direction:column;gap:6px}
-.device-legend-item{display:flex;align-items:center;gap:6px;font-size:.78em}
+.device-legend{display:flex;flex-direction:column;gap:5px;flex:1;min-width:0}
+.device-legend-item{display:flex;align-items:center;gap:6px;font-size:.78em;line-height:1.2}
 .device-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.device-legend-item span:nth-child(2){flex:1;min-width:0}
 .device-legend-val{font-weight:700;margin-left:auto;min-width:28px;text-align:right}
 
 
 /* ── Status codes bar ── */
-.sc-bar{display:flex;gap:10px;margin-top:8px}
-.sc-item{text-align:center;flex:1}
+.sc-bar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:6px}
+.sc-item{text-align:center;background:rgba(10,22,40,.42);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:10px 8px}
 .sc-val{font-size:1.1em;font-weight:700}
 .sc-lbl{font-size:.65em;color:rgba(255,255,255,.45);text-transform:uppercase}
 
@@ -321,11 +324,11 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
         <h3>📡 Live Request Feed <span class="muted" style="font-size:.75em;font-weight:400">(all sites)</span></h3>
         <div id="feedList" class="slist" style="max-height:260px"><span class="muted">Waiting for data…</span></div>
     </div>
-    <div class="card">
+    <div class="card compact">
         <h3>📊 Device Analytics</h3>
         <div id="deviceChartContainer"><span class="muted">Waiting for data…</span></div>
     </div>
-    <div class="card">
+    <div class="card compact">
         <h3>📈 Response Codes (5 min)</h3>
         <div class="sc-bar">
             <div class="sc-item"><div class="sc-val g" id="sc2">0</div><div class="sc-lbl">2xx OK</div></div>
@@ -1100,9 +1103,20 @@ async function loadSiteDetail(id,init){
 
             /* Info footer: ssh tip */
             if(d.drilldown_reason){
-                h+='<div style="padding:10px 14px;font-size:.78em;color:var(--text2);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center">';
-                h+='<span>💡 '+esc(d.drilldown_reason)+' Link to a server with SSH to unlock nginx traffic logs, top pages &amp; request feed.</span>';
-                h+='<button class="btn btn-sm" style="margin-left:12px" onclick="closeSiteDetail();editWebsite('+id+')">⚙ Edit</button>';
+                h+='<div style="padding:16px;border-radius:10px;background:linear-gradient(135deg,rgba(45,127,249,.08),rgba(24,191,191,.06));border:1px solid rgba(45,127,249,.25);margin-top:8px">';
+                h+='<div style="font-size:.92em;font-weight:600;color:var(--blue);margin-bottom:8px">📊 Enable Live Traffic Analytics</div>';
+                h+='<div style="font-size:.82em;color:var(--text2);line-height:1.5">';
+                h+='<strong>Current:</strong> '+esc(d.drilldown_reason)+'<br><br>';
+                h+='To unlock <strong>live feed</strong>, <strong>visitor counts</strong>, <strong>device types</strong> (desktop/mobile/tablet), and <strong>connection types</strong> (HTTP/HTTPS/SSH), this website needs to be linked to a server with SSH access.<br><br>';
+                h+='<strong>How to set up:</strong><br>';
+                h+='<span style="margin-left:8px">1. Go to <strong>Admin → Websites</strong> and edit this website</span><br>';
+                h+='<span style="margin-left:8px">2. Select a <strong>Linked Server</strong> (the server hosting this site)</span><br>';
+                h+='<span style="margin-left:8px">3. Set the <strong>Access Log Path</strong> or click <strong>Auto-Detect</strong></span><br>';
+                h+='<span style="margin-left:8px">4. Save — live traffic data will appear within seconds</span>';
+                h+='</div>';
+                h+='<div style="margin-top:12px;display:flex;gap:8px">';
+                h+='<button class="btn btn-primary btn-sm" onclick="closeSiteDetail();editWebsite('+id+')">⚙ Configure Now</button>';
+                h+='</div>';
                 h+='</div>';
             }
 
