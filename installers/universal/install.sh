@@ -159,22 +159,22 @@ install_deps() {
 
     if command -v apt-get &>/dev/null; then
         apt-get update -qq
-        apt-get install -y -qq python3 python3-venv python3-pip python3-dev \
+        apt-get install -y -qq git python3 python3-venv python3-pip python3-dev \
             build-essential libffi-dev iputils-ping openssh-client curl 2>/dev/null
     elif command -v pacman &>/dev/null; then
-        pacman -Sy --noconfirm --needed python python-pip python-virtualenv \
+        pacman -Sy --noconfirm --needed git python python-pip python-virtualenv \
             iputils openssh curl base-devel
     elif command -v dnf &>/dev/null; then
-        dnf install -y python3 python3-pip python3-devel \
+        dnf install -y git python3 python3-pip python3-devel \
             gcc libffi-devel iputils openssh-clients curl
     elif command -v yum &>/dev/null; then
-        yum install -y python3 python3-pip python3-devel \
+        yum install -y git python3 python3-pip python3-devel \
             gcc libffi-devel iputils openssh-clients curl
     elif command -v zypper &>/dev/null; then
-        zypper install -y python3 python3-pip python3-devel \
+        zypper install -y git python3 python3-pip python3-devel \
             gcc libffi-devel iputils openssh curl
     elif command -v brew &>/dev/null; then
-        brew install python3 2>/dev/null || true
+        brew install git python3 2>/dev/null || true
     else
         warn "Unknown package manager — ensure Python 3.10+ and OpenSSH are installed"
     fi

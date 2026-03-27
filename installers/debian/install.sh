@@ -77,7 +77,7 @@ echo ""
 # ── System Packages ───────────────────────────────────────────
 info "Installing system packages..."
 apt-get update -qq
-apt-get install -y -qq python3 python3-venv python3-pip python3-dev \
+apt-get install -y -qq git python3 python3-venv python3-pip python3-dev \
     build-essential libffi-dev iputils-ping openssh-client curl 2>/dev/null
 ok "System packages installed"
 

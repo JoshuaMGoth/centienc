@@ -75,7 +75,7 @@ echo ""
 
 # ── System Packages ───────────────────────────────────────────
 info "Installing system packages..."
-pacman -Sy --noconfirm --needed python python-pip python-virtualenv \
+pacman -Sy --noconfirm --needed git python python-pip python-virtualenv \
     iputils openssh curl base-devel
 ok "System packages installed"
 

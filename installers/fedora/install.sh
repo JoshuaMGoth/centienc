@@ -80,10 +80,10 @@ echo ""
 # ── System Packages ───────────────────────────────────────────
 info "Installing system packages..."
 if command -v dnf &>/dev/null; then
-    dnf install -y python3 python3-pip python3-devel \
+    dnf install -y git python3 python3-pip python3-devel \
         gcc libffi-devel iputils openssh-clients curl
 elif command -v yum &>/dev/null; then
-    yum install -y python3 python3-pip python3-devel \
+    yum install -y git python3 python3-pip python3-devel \
         gcc libffi-devel iputils openssh-clients curl
 else
     err "Neither dnf nor yum found"
