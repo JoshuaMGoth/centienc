@@ -28,6 +28,7 @@ from .auth import (
 from .database import Database
 from .monitors import MonitorEngine
 from .notifications import send_notification, test_channel
+from .reports import build_report_data, export_csv, export_html, export_pdf_html
 
 logger = logging.getLogger("centient.app")
 
@@ -70,7 +71,23 @@ async def _build_overview_payload() -> dict[str, Any]:
     settings = await database.get_all_settings()
     incidents = await database.get_recent_incidents(10)
 
-    # Merge DB-sourced proxmox nodes with cache so new nodes appear immediately
+    # Merge DB-sourced targets with cache so newly-added items appear immediately
+    # (before the first monitoring cycle populates status_cache)
+    for ttype, list_fn in [("server", database.list_servers),
+                           ("service", database.list_services),
+                           ("website", database.list_websites)]:
+        key = ttype + "s" if ttype != "website" else "websites"
+        cache_ids = {t["id"] for t in overview.get(key, [])}
+        db_items = await list_fn()
+        for item in db_items:
+            if item["id"] not in cache_ids:
+                cache = monitor_engine.status_cache.get(f"{ttype}:{item['id']}", {})
+                item["status"] = cache.get("status", "unknown")
+                item["response_time"] = cache.get("response_time")
+                item["last_check"] = cache.get("last_check")
+                item["host"] = item.get("ip_address") or item.get("hostname") or item.get("url", "")
+                overview[key].append(item)
+
     db_pve_nodes = await database.list_proxmox_nodes()
     cache_ids = {n["id"] for n in overview.get("proxmox_nodes", [])}
     for node in db_pve_nodes:
@@ -353,6 +370,19 @@ async def analytics_page(request: Request):
     return _serve_template("analytics.html")
 
 
+@app.get("/reports", response_class=HTMLResponse)
+async def reports_page(request: Request):
+    setup_done = await db.get_setting("setup_complete", "false")
+    if setup_done != "true":
+        return RedirectResponse("/setup")
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled == "true":
+        user = await _require_auth(request)
+        if user is None:
+            return RedirectResponse("/login")
+    return _serve_template("reports.html")
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  WebSocket endpoint
 # ═══════════════════════════════════════════════════════════════════
@@ -523,7 +553,29 @@ async def add_server(request: Request):
     if "monitor_flags" in data and isinstance(data["monitor_flags"], dict):
         data["monitor_flags"] = json.dumps(data["monitor_flags"])
     sid = await db.add_server(data)
-    return {"ok": True, "id": sid}
+
+    # Auto-discover nginx sites if server has SSH credentials
+    discovered_sites = []
+    if data.get("ssh_user"):
+        try:
+            server = await db.get_server(sid)
+            if server:
+                sites = await engine.discover_nginx_sites(server)
+                # Get existing website URLs to avoid duplicates
+                existing = {w["url"].rstrip("/").lower() for w in await db.list_websites()}
+                for site in sites:
+                    if site["url"].rstrip("/").lower() not in existing:
+                        wid = await db.add_website({
+                            "name": site["name"],
+                            "url": site["url"],
+                            "server_id": sid,
+                            "enabled": 1,
+                        })
+                        discovered_sites.append({"id": wid, **site})
+        except Exception as e:
+            logger.warning("Auto-discovery failed for server %d: %s", sid, e)
+
+    return {"ok": True, "id": sid, "discovered_sites": discovered_sites}
 
 
 @app.put("/api/servers/{server_id}")
@@ -1205,6 +1257,90 @@ async def health():
         "version": __version__,
         "product": "CentienC",
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Reports API
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/reports/summary")
+async def api_reports_summary(request: Request):
+    """Overview report data for all targets."""
+    await _require_auth_or_401(request)
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    data = await build_report_data(db, engine, "overview", days)
+    return {"ok": True, **data}
+
+
+@app.get("/api/reports/detail/{target_type}/{target_id}")
+async def api_reports_detail(request: Request, target_type: str, target_id: int):
+    """Drillable detail report for a single target."""
+    await _require_auth_or_401(request)
+    if target_type not in ("server", "website", "service"):
+        raise HTTPException(400, "target_type must be server, website, or service")
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    data = await build_report_data(db, engine, target_type, days, target_type, target_id)
+    return {"ok": True, **data}
+
+
+@app.get("/api/reports/incidents")
+async def api_reports_incidents(request: Request):
+    """Incident report, optionally filtered by target."""
+    await _require_auth_or_401(request)
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    tt = request.query_params.get("target_type")
+    tid_str = request.query_params.get("target_id")
+    tid = int(tid_str) if tid_str else None
+    if tt and tt not in ("server", "website", "service"):
+        raise HTTPException(400, "target_type must be server, website, or service")
+    data = await build_report_data(db, engine, "incidents", days, tt, tid)
+    return {"ok": True, **data}
+
+
+@app.get("/api/reports/bans")
+async def api_reports_bans(request: Request):
+    """Fail2ban report across all servers."""
+    await _require_auth_or_401(request)
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    data = await build_report_data(db, engine, "bans", days)
+    return {"ok": True, **data}
+
+
+@app.get("/api/reports/export")
+async def api_reports_export(request: Request):
+    """Export a report as CSV, HTML, or PDF.
+
+    Query params:
+        format: csv | html | pdf
+        report_type: overview | server | website | service | incidents | bans
+        days: int (default 7)
+        target_type + target_id: optional drill-down filter
+    """
+    await _require_auth_or_401(request)
+    fmt = request.query_params.get("format", "csv").lower()
+    if fmt not in ("csv", "html", "pdf"):
+        raise HTTPException(400, "format must be csv, html, or pdf")
+    report_type = request.query_params.get("report_type", "overview")
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    tt = request.query_params.get("target_type")
+    tid_str = request.query_params.get("target_id")
+    tid = int(tid_str) if tid_str else None
+
+    data = await build_report_data(db, engine, report_type, days, tt, tid)
+    settings = await db.get_all_settings()
+    title = f"{settings.get('app_title', 'CentienC')} — {report_type.title()} Report"
+
+    if fmt == "csv":
+        content = export_csv(data)
+        return Response(content, media_type="text/csv",
+                        headers={"Content-Disposition": f'attachment; filename="centienc-{report_type}-report.csv"'})
+    elif fmt == "html":
+        content = export_html(data, title)
+        return Response(content, media_type="text/html",
+                        headers={"Content-Disposition": f'attachment; filename="centienc-{report_type}-report.html"'})
+    else:  # pdf
+        content = export_pdf_html(data, title)
+        return HTMLResponse(content)
 
 
 # ═══════════════════════════════════════════════════════════════════

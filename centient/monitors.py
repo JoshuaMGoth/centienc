@@ -434,6 +434,83 @@ class MonitorEngine:
             remote = f'sudo {cmd} 2>/dev/null'
         return await self._ssh_cmd(conn, remote, timeout)
 
+    async def discover_nginx_sites(self, server: dict[str, Any]) -> list[dict[str, str]]:
+        """SSH into a server, read nginx AND apache configs, and return discovered site domains.
+
+        Returns a list of dicts: [{"name": "example.com", "url": "https://example.com"}]
+        """
+        if not server.get("ssh_user"):
+            return []
+
+        discovered: list[dict[str, str]] = []
+        seen_domains: set[str] = set()
+
+        try:
+            conn = await self._get_ssh_conn(server)
+            sudo_pass = server.get("sudo_password")
+
+            # Read nginx site configs
+            nginx_cmd = (
+                "cat /etc/nginx/sites-enabled/* 2>/dev/null; "
+                "cat /etc/nginx/conf.d/*.conf 2>/dev/null; "
+                "cat /etc/nginx/vhosts.d/*.conf 2>/dev/null"
+            )
+            # Read apache site configs
+            apache_cmd = (
+                "cat /etc/apache2/sites-enabled/*.conf 2>/dev/null; "
+                "cat /etc/httpd/conf.d/*.conf 2>/dev/null; "
+                "cat /etc/apache2/vhosts.d/*.conf 2>/dev/null; "
+                "cat /etc/httpd/vhosts.d/*.conf 2>/dev/null"
+            )
+            combined_cmd = f"{{ {nginx_cmd}; {apache_cmd}; }}"
+
+            if sudo_pass:
+                raw = await self._ssh_sudo_cmd(conn, combined_cmd, sudo_pass)
+            else:
+                raw = await self._ssh_cmd(conn, combined_cmd, timeout=15)
+
+            if not raw.strip():
+                return []
+
+            import re
+
+            # Detect SSL presence broadly
+            has_ssl = 'ssl' in raw.lower()
+
+            # Extract nginx server_name directives
+            for match in re.finditer(r'server_name\s+([^;]+);', raw):
+                names = match.group(1).split()
+                for name in names:
+                    name = name.strip().lower()
+                    if not name or name in ('_', 'localhost', '""', "''", 'default_server'):
+                        continue
+                    if name.startswith('*') or name.startswith('.') or name.replace('.', '').isdigit():
+                        continue
+                    if name not in seen_domains:
+                        seen_domains.add(name)
+                        proto = 'https' if has_ssl else 'http'
+                        discovered.append({"name": name, "url": f"{proto}://{name}"})
+
+            # Extract Apache ServerName and ServerAlias directives
+            for match in re.finditer(r'(?:ServerName|ServerAlias)\s+(.+)', raw):
+                names = match.group(1).split()
+                for name in names:
+                    name = name.strip().lower()
+                    if not name or name in ('localhost', 'localhost.localdomain'):
+                        continue
+                    if name.startswith('*') or name.startswith('.') or name.replace('.', '').isdigit():
+                        continue
+                    if name not in seen_domains:
+                        seen_domains.add(name)
+                        proto = 'https' if has_ssl else 'http'
+                        discovered.append({"name": name, "url": f"{proto}://{name}"})
+
+        except Exception as e:
+            logger.warning("Site discovery failed for server %s: %s",
+                           server.get("name", server.get("id")), e)
+
+        return discovered
+
     async def _poll_ssh(self, server: dict[str, Any]) -> None:
         """Fetch metrics from a server via SSH."""
         sid = server["id"]
@@ -474,6 +551,9 @@ class MonitorEngine:
 
             if flags.get("nginx", flags.get("web_server", False)):
                 results["nginx"] = await self._ssh_nginx(conn, sudo_pass)
+
+            if flags.get("apache", False):
+                results["apache"] = await self._ssh_apache(conn, sudo_pass)
 
             if flags.get("fail2ban", False):
                 results["fail2ban"] = await self._ssh_fail2ban(conn, sudo_pass)
@@ -1309,9 +1389,110 @@ class MonitorEngine:
             "jails": jails,
         }
 
+    async def _ssh_apache(self, conn: asyncssh.SSHClientConnection, sudo_pass: str | None = None) -> dict[str, Any]:
+        """Parse recent Apache access logs via SSH."""
+        cmd = (
+            "tail -n 5000 /var/log/apache2/*access*.log 2>/dev/null || "
+            "tail -n 5000 /var/log/httpd/*access*.log 2>/dev/null || "
+            "tail -n 5000 /var/log/apache2/*.log 2>/dev/null || "
+            "tail -n 5000 /var/log/httpd/*.log 2>/dev/null || echo ''"
+        )
+        if sudo_pass:
+            raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass)
+        else:
+            raw = await self._ssh_cmd(conn, cmd)
+
+        window = 300
+        cutoff = time.time() - window
+        sites: dict[str, dict[str, Any]] = {}
+        recent_requests: list[dict[str, Any]] = []
+        total_requests = 0
+
+        # Apache combined/common log format:
+        #   IP - - [ts] "METHOD path HTTP/x.x" status bytes "ref" "ua"
+        # Also support vhost-prefixed: "vhost:port IP ..."
+        log_re = re.compile(
+            r'(?:(?P<vhost>[a-zA-Z0-9._-]+)(?::\d+)?\s+)?'
+            r'(?P<ip>[\d.]+)\s+\S+\s+\S+\s+'
+            r'\[(?P<ts>[^\]]+)\]\s+'
+            r'"(?P<method>\S+)\s+(?P<path>\S+)\s+\S+"\s+'
+            r'(?P<status>\d+)\s+(?P<bytes>\d+|-)'
+            r'(?:\s+"(?P<ref>[^"]*)"\s+"(?P<ua>[^"]*)")?'
+        )
+        file_header_re = re.compile(r'^==> .*/(?P<fname>[^/]+?)(?:\.access)?(?:_log|\.log) <==$')
+        _GENERIC_LOG_NAMES = {"access", "error", "default", "apache", "apache2", "httpd", "combined", "main", "other_vhosts_access"}
+        current_file_site: str | None = None
+
+        from datetime import datetime as _dt
+        for line in raw.strip().split("\n"):
+            fh = file_header_re.match(line.strip())
+            if fh:
+                fname = fh.group("fname")
+                current_file_site = None if fname in _GENERIC_LOG_NAMES else fname
+                continue
+            m = log_re.search(line)
+            if not m:
+                continue
+            try:
+                ts_str = m.group("ts")
+                dt = _dt.strptime(ts_str, "%d/%b/%Y:%H:%M:%S %z")
+                ts = dt.timestamp()
+            except (ValueError, TypeError):
+                continue
+            if ts < cutoff:
+                continue
+
+            total_requests += 1
+            status_code = int(m.group("status"))
+            ip = m.group("ip")
+
+            site_name = m.group("vhost") or current_file_site or "default"
+            site = sites.setdefault(site_name, {
+                "total_requests": 0,
+                "status_codes": {},
+                "unique_ips": set(),
+            })
+            site["total_requests"] += 1
+            code_bucket = str(status_code)
+            site["status_codes"][code_bucket] = site["status_codes"].get(code_bucket, 0) + 1
+            ua = m.group("ua") or ""
+            if not self._BOT_PATTERNS.search(ua):
+                site["unique_ips"].add(ip)
+
+            if len(recent_requests) < 50:
+                recent_requests.append({
+                    "ts": ts,
+                    "method": m.group("method"),
+                    "path": m.group("path"),
+                    "status": status_code,
+                    "ip": ip,
+                    "site": site_name,
+                    "ua": ua,
+                })
+
+        rpm = total_requests / (window / 60) if total_requests > 0 else 0
+
+        serialized_sites: dict[str, Any] = {}
+        for name, data in sites.items():
+            serialized_sites[name] = {
+                "total_requests": data["total_requests"],
+                "status_codes": data["status_codes"],
+                "unique_visitors": len(data["unique_ips"]),
+                "rpm": round(data["total_requests"] / (window / 60), 1),
+                "period_minutes": window // 60,
+            }
+
+        recent_requests.sort(key=lambda r: r.get("ts", 0), reverse=True)
+
+        return {
+            "sites": serialized_sites,
+            "totals": {"rpm": round(rpm, 1), "total_requests": total_requests},
+            "recent_requests": recent_requests[:50],
+        }
+
     # ══════════════════════════════════════════════════════════════
     #  Proxmox monitoring (API)
-    # ══════════════════════════════════════════════════════════════
+    #  ══════════════════════════════════════════════════════════════
 
     async def _proxmox_loop(self) -> None:
         """Poll each configured Proxmox node for container/VM stats."""
@@ -1579,7 +1760,7 @@ class MonitorEngine:
             if prefix and prefix != host:
                 site_alias.setdefault(prefix, host)
 
-        # Aggregate nginx + fail2ban across all SSH-monitored servers
+        # Aggregate nginx + apache + fail2ban across all SSH-monitored servers
         all_recent_requests: list[dict[str, Any]] = []
         total_rpm = 0.0
         fail2ban_total = 0
@@ -1588,25 +1769,25 @@ class MonitorEngine:
         connection_types: dict[str, int] = {}
         for srv in servers:
             ssh = srv.get("ssh") or {}
-            nginx = ssh.get("nginx") or {}
-            for req in nginx.get("recent_requests", []):
-                # Normalize site names to match configured website hostnames
-                raw_site = req.get("site", "default")
-                normalized = site_alias.get(raw_site, raw_site)
-                all_recent_requests.append({**req, "site": normalized, "server_name": srv.get("name", "")})
+            # Merge requests from both nginx and apache
+            for web_key in ("nginx", "apache"):
+                web_data = ssh.get(web_key) or {}
+                for req in web_data.get("recent_requests", []):
+                    raw_site = req.get("site", "default")
+                    normalized = site_alias.get(raw_site, raw_site)
+                    all_recent_requests.append({**req, "site": normalized, "server_name": srv.get("name", "")})
 
-                # Classify device type from user agent
-                ua = req.get("ua", "")
-                if ua and not self._BOT_PATTERNS.search(ua):
-                    ua_lower = ua.lower()
-                    if "ipad" in ua_lower or "tablet" in ua_lower or ("android" in ua_lower and "mobile" not in ua_lower):
-                        device_types["tablet"] += 1
-                    elif self._MOBILE_UA.search(ua):
-                        device_types["mobile"] += 1
-                    else:
-                        device_types["desktop"] += 1
+                    ua = req.get("ua", "")
+                    if ua and not self._BOT_PATTERNS.search(ua):
+                        ua_lower = ua.lower()
+                        if "ipad" in ua_lower or "tablet" in ua_lower or ("android" in ua_lower and "mobile" not in ua_lower):
+                            device_types["tablet"] += 1
+                        elif self._MOBILE_UA.search(ua):
+                            device_types["mobile"] += 1
+                        else:
+                            device_types["desktop"] += 1
 
-            total_rpm += (nginx.get("totals") or {}).get("rpm", 0)
+                total_rpm += (web_data.get("totals") or {}).get("rpm", 0)
             fb = ssh.get("fail2ban") or {}
             fail2ban_total += fb.get("total_banned", 0)
             fail2ban_active += fb.get("active_bans", 0)

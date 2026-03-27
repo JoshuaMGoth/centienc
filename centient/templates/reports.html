@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CentienC — Reports</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;color:#fff;min-height:100vh;overflow-x:hidden}
+
+/* ── Header ── */
+.header{background:rgba(0,0,0,.4);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.07)}
+.header h1{font-size:1.5em;font-weight:600;display:flex;align-items:center;gap:10px}
+.header .logo{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
+.header-right{display:flex;align-items:center;gap:16px;font-size:.82em;color:rgba(255,255,255,.65)}
+.header-links{display:flex;gap:10px}
+.header-links a{background:rgba(255,255,255,.05);padding:4px 12px;border-radius:8px;font-size:.82em;border:1px solid rgba(255,255,255,.07);text-decoration:none;color:rgba(255,255,255,.75);transition:.2s}
+.header-links a:hover,.header-links a.active{background:rgba(255,255,255,.07);border-color:rgba(88,166,255,.4);color:#fff}
+
+/* ── Controls bar ── */
+.controls{background:rgba(0,0,0,.3);padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.04)}
+.controls label{font-size:.82em;color:rgba(255,255,255,.55);margin-right:4px}
+.controls select,.controls button{border:1px solid rgba(255,255,255,.2);border-radius:8px;background:rgba(255,255,255,.05);color:#fff;padding:6px 14px;font-size:.85em;cursor:pointer;outline:none;transition:.2s}
+.controls select:hover,.controls button:hover{background:rgba(255,255,255,.07);border-color:rgba(88,166,255,.4)}
+.controls select option{background:#0d1117;color:#e6edf3}
+.controls .refresh-btn{background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4)}
+.controls .refresh-btn:hover{background:rgba(88,166,255,.3)}
+.days-pills{display:flex;gap:6px}
+.days-pill{border:1px solid rgba(255,255,255,.07);border-radius:20px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);padding:4px 14px;font-size:.82em;cursor:pointer;transition:.2s}
+.days-pill:hover{background:rgba(255,255,255,.08)}
+.days-pill.active{background:rgba(88,166,255,.22);border-color:rgba(88,166,255,.5);color:#fff;font-weight:600}
+.export-btns{display:flex;gap:6px;margin-left:auto}
+.export-btn{border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);padding:5px 14px;font-size:.82em;cursor:pointer;transition:.2s;text-decoration:none}
+.export-btn:hover{background:rgba(102,187,106,.15);border-color:rgba(102,187,106,.4);color:#66bb6a}
+
+/* ── Loading / Error ── */
+.state-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;opacity:.7}
+.spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.07);border-top-color:#58a6ff;border-radius:50%;animation:spin .85s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-box{background:rgba(244,67,54,.12);border:1px solid rgba(244,67,54,.3);border-radius:12px;padding:20px 28px;max-width:480px;text-align:center;color:#ef9a9a;line-height:1.6}
+
+/* ── Section title ── */
+.section-title{padding:4px 24px 8px;max-width:1500px;margin:10px auto 0;color:rgba(255,255,255,.45);font-size:.78em;text-transform:uppercase;letter-spacing:.06em}
+
+/* ── Summary strip ── */
+.metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:14px 24px;max-width:1500px;margin:0 auto}
+.mc{background:rgba(255,255,255,.05);border-radius:10px;padding:14px 16px;text-align:center;border:1px solid rgba(255,255,255,.07);transition:transform .2s}
+.mc:hover{transform:translateY(-2px)}
+.mc-label{font-size:.7em;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.mc-val{font-size:1.9em;font-weight:700}
+.mc-sub{font-size:.68em;color:rgba(255,255,255,.4);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-blue{color:#58a6ff}.c-green{color:#66bb6a}.c-orange{color:#ffa726}.c-purple{color:#ab47bc}.c-red{color:#f44336}.c-teal{color:#26c6da}
+
+/* ── Charts grid ── */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
+.chart-card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
+.chart-card h3{margin-bottom:14px;color:#58a6ff;font-size:1em;font-weight:600;display:flex;align-items:center;gap:7px}
+.chart-card h3 .icon{font-size:1.1em}
+.chart-card.full{grid-column:1/-1}
+.chart-wrap{position:relative;max-height:280px}
+.chart-wrap-tall{position:relative;max-height:340px}
+
+/* ── Tables ── */
+.report-table{width:100%;border-collapse:collapse;font-size:.88em;margin:0 auto;max-width:1500px}
+.report-table th{color:rgba(255,255,255,.5);font-weight:600;text-transform:uppercase;font-size:.72em;letter-spacing:.04em;padding:10px 14px;text-align:left;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08)}
+.report-table td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.report-table tr:hover td{background:rgba(255,255,255,.03)}
+.report-table tr.clickable{cursor:pointer}
+.report-table tr.clickable:hover td{background:rgba(88,166,255,.06)}
+.table-wrap{padding:0 24px 14px;max-width:1500px;margin:0 auto}
+
+/* ── Uptime bar ── */
+.uptime-bar{width:100%;height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;display:inline-block;min-width:80px}
+.uptime-fill{height:100%;border-radius:4px;transition:width .4s}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.78em;font-weight:600}
+.badge-up{background:rgba(102,187,106,.15);color:#66bb6a;border:1px solid rgba(102,187,106,.3)}
+.badge-down{background:rgba(244,67,54,.15);color:#f44336;border:1px solid rgba(244,67,54,.3)}
+.badge-open{background:rgba(255,167,38,.15);color:#ffa726;border:1px solid rgba(255,167,38,.3)}
+.badge-resolved{background:rgba(102,187,106,.15);color:#66bb6a;border:1px solid rgba(102,187,106,.3)}
+.badge-type{background:rgba(88,166,255,.12);color:#58a6ff;border:1px solid rgba(88,166,255,.25);font-size:.72em;padding:2px 8px;border-radius:12px;text-transform:uppercase}
+
+/* ── Back link ── */
+.back-link{display:inline-flex;align-items:center;gap:6px;color:#58a6ff;text-decoration:none;font-size:.88em;padding:10px 24px;transition:.2s}
+.back-link:hover{color:#fff}
+
+/* ── Detail panel ── */
+.detail-panel{padding:0 24px;max-width:1500px;margin:0 auto}
+
+/* ── Settings row ── */
+.settings-bar{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:12px 18px;margin:14px 24px 0;max-width:1500px;display:flex;align-items:center;gap:14px;font-size:.85em}
+.settings-bar label{color:rgba(255,255,255,.5)}
+.settings-bar input[type=number]{width:70px;border:1px solid rgba(255,255,255,.15);border-radius:6px;background:rgba(255,255,255,.05);color:#fff;padding:4px 8px;font-size:.9em;outline:none}
+.settings-bar .save-btn{background:rgba(102,187,106,.15);border:1px solid rgba(102,187,106,.35);color:#66bb6a;border-radius:8px;padding:5px 14px;cursor:pointer;font-size:.85em;transition:.2s}
+.settings-bar .save-btn:hover{background:rgba(102,187,106,.3)}
+
+@media(max-width:1100px){.charts-grid{grid-template-columns:1fr}.chart-card.full{grid-column:1}}
+@media(max-width:700px){.header{flex-direction:column;gap:8px;text-align:center}.header-links{display:none}.controls{flex-direction:column;align-items:flex-start}.mc-val{font-size:1.5em}.export-btns{margin-left:0}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <img src="/static/centienc-logo.png" alt="logo" class="logo" onerror="this.style.display='none'">
+    <span>CentienC</span>
+    <span style="font-weight:300;color:rgba(255,255,255,.55)">/ Reports</span>
+  </h1>
+  <div class="header-right">
+    <div class="header-links">
+      <a href="/">🏠 Dashboard</a>
+      <a href="/map">🗺️ Map</a>
+      <a href="/tv">📺 TV</a>
+      <a href="/analytics">📊 Analytics</a>
+      <a href="/reports" class="active">📋 Reports</a>
+      <a href="/admin">⚙️ Admin</a>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <div>
+    <label for="reportType">Report:</label>
+    <select id="reportType">
+      <option value="overview">📊 Overview</option>
+      <option value="server">🖥️ Servers</option>
+      <option value="website">🌐 Websites</option>
+      <option value="service">⚙️ Services</option>
+      <option value="incidents">🚨 Incidents</option>
+      <option value="bans">🛡️ Fail2Ban</option>
+    </select>
+  </div>
+  <div id="targetFilterWrap" style="display:none">
+    <label for="targetFilter">Target:</label>
+    <select id="targetFilter"><option value="">All</option></select>
+  </div>
+  <div>
+    <label>Period:</label>
+    <div class="days-pills" id="daysPills">
+      <span class="days-pill" data-days="1">24h</span>
+      <span class="days-pill active" data-days="7">7d</span>
+      <span class="days-pill" data-days="14">14d</span>
+      <span class="days-pill" data-days="30">30d</span>
+      <span class="days-pill" data-days="90">90d</span>
+    </div>
+  </div>
+  <button class="refresh-btn" onclick="loadReport()">↻ Refresh</button>
+  <div class="export-btns">
+    <a class="export-btn" onclick="exportReport('csv')">📄 CSV</a>
+    <a class="export-btn" onclick="exportReport('html')">🌐 HTML</a>
+    <a class="export-btn" onclick="exportReport('pdf')">📑 PDF</a>
+  </div>
+</div>
+
+<div class="settings-bar">
+  <label>Retention days:</label>
+  <input type="number" id="retentionDays" min="1" max="365" value="7">
+  <button class="save-btn" onclick="saveRetention()">Save</button>
+  <span id="retentionMsg" style="color:rgba(255,255,255,.35);font-size:.82em"></span>
+  <span id="lastUpdated" style="margin-left:auto;font-size:.78em;color:rgba(255,255,255,.35)"></span>
+</div>
+
+<div id="mainContent">
+  <div class="state-overlay">
+    <div class="spinner"></div>
+    <span style="color:rgba(255,255,255,.5)">Loading report…</span>
+  </div>
+</div>
+
+<script>
+let charts = {};
+let activeDays = 7;
+let targets = { server: [], website: [], service: [] };
+let currentDetail = null; // { type, id, name } when drilling in
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function fmt(n){ return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n) }
+function destroyCharts(){ Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}}); charts={} }
+function uptimeColor(pct){ return pct>=99?'#66bb6a':pct>=95?'#ffa726':'#f44336' }
+
+function formatDuration(seconds){
+  if(!seconds) return '—';
+  const s = Math.floor(seconds);
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return h ? `${h}h ${m}m ${sec}s` : m ? `${m}m ${sec}s` : `${sec}s`;
+}
+
+// ── Load settings ────────────────────────────────────────────
+async function loadSettings(){
+  try{
+    const r = await fetch('/api/settings');
+    const d = await r.json();
+    if(d.ok && d.settings){
+      document.getElementById('retentionDays').value = d.settings.retention_days || '7';
+    }
+  }catch(e){}
+}
+
+async function saveRetention(){
+  const val = parseInt(document.getElementById('retentionDays').value);
+  if(isNaN(val) || val < 1 || val > 365) return;
+  try{
+    const r = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ retention_days: String(val) })
+    });
+    const d = await r.json();
+    document.getElementById('retentionMsg').textContent = d.ok ? 'Saved ✓' : 'Error';
+    setTimeout(()=> document.getElementById('retentionMsg').textContent = '', 2000);
+  }catch(e){
+    document.getElementById('retentionMsg').textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Load targets for filter dropdown ──────────────────────────
+async function loadTargets(){
+  try{
+    const [sr, wr, svcr] = await Promise.all([
+      fetch('/api/servers').then(r=>r.json()),
+      fetch('/api/websites').then(r=>r.json()),
+      fetch('/api/services').then(r=>r.json()),
+    ]);
+    targets.server = (sr.servers||[]).map(s=>({id:s.id,name:s.name}));
+    targets.website = (wr.websites||[]).map(w=>({id:w.id,name:w.name}));
+    targets.service = (svcr.services||[]).map(s=>({id:s.id,name:s.name}));
+  }catch(e){}
+}
+
+function updateTargetFilter(){
+  const type = document.getElementById('reportType').value;
+  const wrap = document.getElementById('targetFilterWrap');
+  const sel = document.getElementById('targetFilter');
+  if(['server','website','service'].includes(type)){
+    wrap.style.display = '';
+    const items = targets[type] || [];
+    sel.innerHTML = '<option value="">All</option>' + items.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+// ── Load Report ──────────────────────────────────────────────
+async function loadReport(){
+  currentDetail = null;
+  const type = document.getElementById('reportType').value;
+  const tid = document.getElementById('targetFilter').value;
+
+  document.getElementById('mainContent').innerHTML =
+    '<div class="state-overlay"><div class="spinner"></div><span style="color:rgba(255,255,255,.5)">Loading report…</span></div>';
+  destroyCharts();
+
+  try{
+    let url;
+    if(type === 'overview'){
+      url = `/api/reports/summary?days=${activeDays}`;
+    } else if(type === 'incidents'){
+      url = `/api/reports/incidents?days=${activeDays}`;
+    } else if(type === 'bans'){
+      url = `/api/reports/bans?days=${activeDays}`;
+    } else if(tid){
+      url = `/api/reports/detail/${type}/${tid}?days=${activeDays}`;
+    } else {
+      url = `/api/reports/summary?days=${activeDays}`;
+    }
+
+    const r = await fetch(url);
+    const data = await r.json();
+    if(!data.ok) throw new Error(data.detail || 'API error');
+
+    if(type === 'overview' || (!tid && ['server','website','service'].includes(type))){
+      renderOverview(data);
+    } else if(type === 'incidents'){
+      renderIncidents(data);
+    } else if(type === 'bans'){
+      renderBans(data);
+    } else {
+      renderDetail(data, type, tid);
+    }
+
+    document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  }catch(e){
+    showError(e.message||'Unknown error');
+  }
+}
+
+// ── Drill into a specific target ─────────────────────────────
+async function drillInto(type, id, name){
+  currentDetail = {type, id, name};
+  document.getElementById('mainContent').innerHTML =
+    '<div class="state-overlay"><div class="spinner"></div><span style="color:rgba(255,255,255,.5)">Loading details…</span></div>';
+  destroyCharts();
+
+  try{
+    const r = await fetch(`/api/reports/detail/${type}/${id}?days=${activeDays}`);
+    const data = await r.json();
+    if(!data.ok) throw new Error(data.detail || 'API error');
+    renderDetail(data, type, id, name);
+  }catch(e){
+    showError(e.message||'Unknown error');
+  }
+}
+
+function showError(msg){
+  destroyCharts();
+  document.getElementById('mainContent').innerHTML =
+    `<div class="state-overlay"><div class="error-box">⚠️ ${esc(msg)}</div></div>`;
+}
+
+// ── Render: Overview ─────────────────────────────────────────
+function renderOverview(data){
+  const t = data.totals || {};
+  const summaries = data.summaries || [];
+
+  let html = `
+  <div class="section-title">Overview — Last ${activeDays} days</div>
+  <div class="metrics-strip">
+    <div class="mc"><div class="mc-label">Targets</div><div class="mc-val c-blue">${t.targets||0}</div></div>
+    <div class="mc"><div class="mc-label">Total Checks</div><div class="mc-val c-purple">${fmt(t.total_checks||0)}</div></div>
+    <div class="mc"><div class="mc-label">Avg Uptime</div><div class="mc-val c-green">${(t.avg_uptime||100).toFixed(1)}%</div></div>
+    <div class="mc"><div class="mc-label">Incidents</div><div class="mc-val c-orange">${t.total_incidents||0}</div></div>
+  </div>`;
+
+  if(summaries.length){
+    // Uptime chart
+    html += `
+    <div class="section-title">Uptime by Target</div>
+    <div style="padding:0 24px 14px;max-width:1500px;margin:0 auto">
+      <div class="chart-card full">
+        <h3><span class="icon">📊</span> Uptime (%)</h3>
+        <div class="chart-wrap-tall"><canvas id="chartUptime"></canvas></div>
+      </div>
+    </div>`;
+
+    // Table
+    html += `
+    <div class="section-title">All Targets</div>
+    <div class="table-wrap">
+    <table class="report-table">
+      <thead><tr><th>Type</th><th>Name</th><th style="width:180px">Uptime</th><th>Avg Response</th><th>Max Response</th><th>Checks</th></tr></thead>
+      <tbody>`;
+    for(const s of summaries){
+      const c = uptimeColor(s.uptime_pct);
+      html += `<tr class="clickable" onclick="drillInto('${s.target_type}',${s.target_id},'${esc(s.name)}')">
+        <td><span class="badge-type">${s.target_type}</span></td>
+        <td>${esc(s.name)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="uptime-bar"><div class="uptime-fill" style="width:${s.uptime_pct}%;background:${c}"></div></div>
+            <span style="color:${c};font-weight:600;font-size:.85em">${s.uptime_pct}%</span>
+          </div>
+        </td>
+        <td>${s.avg_response ? s.avg_response+' ms' : '—'}</td>
+        <td>${s.max_response ? s.max_response+' ms' : '—'}</td>
+        <td>${fmt(s.checks)}</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+  }
+
+  // Incidents
+  const incidents = data.incidents || [];
+  if(incidents.length){
+    html += renderIncidentTable(incidents, true);
+  }
+
+  document.getElementById('mainContent').innerHTML = html;
+  if(summaries.length) buildOverviewCharts(summaries);
+}
+
+function buildOverviewCharts(summaries){
+  const gridColor = 'rgba(255,255,255,.04)';
+  const textColor = 'rgba(255,255,255,.55)';
+
+  charts.uptime = new Chart(document.getElementById('chartUptime'), {
+    type: 'bar',
+    data: {
+      labels: summaries.map(s=>s.name),
+      datasets: [{
+        label: 'Uptime %',
+        data: summaries.map(s=>s.uptime_pct),
+        backgroundColor: summaries.map(s=>uptimeColor(s.uptime_pct)+'88'),
+        borderColor: summaries.map(s=>uptimeColor(s.uptime_pct)),
+        borderWidth: 1, borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, ticks: {color: textColor}, grid: {color: gridColor} },
+        x: { ticks: {color: textColor}, grid: {display: false} }
+      },
+      plugins: { legend: {display: false} }
+    }
+  });
+}
+
+// ── Render: Detail ───────────────────────────────────────────
+function renderDetail(data, type, id, name){
+  const daily = data.daily || [];
+  const hourly = data.hourly || [];
+  const timeline = data.timeline || [];
+  const incidents = data.incidents || [];
+
+  // Find name from targets if not passed
+  if(!name){
+    const tgt = (targets[type]||[]).find(t=>t.id==id);
+    name = tgt ? tgt.name : `#${id}`;
+  }
+
+  let html = `
+  <a class="back-link" href="javascript:void(0)" onclick="loadReport()">← Back to overview</a>
+  <div class="section-title">${esc(type)} — ${esc(name)} — Last ${activeDays} days</div>`;
+
+  // Summary cards from daily data
+  if(daily.length){
+    const totalChecks = daily.reduce((a,d)=>a+d.checks, 0);
+    const avgUptime = (daily.reduce((a,d)=>a+d.uptime_pct, 0) / daily.length).toFixed(1);
+    const avgResp = daily.filter(d=>d.avg_response).length ?
+      (daily.reduce((a,d)=>a+(d.avg_response||0), 0) / daily.filter(d=>d.avg_response).length).toFixed(0) : '—';
+    const maxResp = Math.max(...daily.map(d=>d.max_response||0));
+
+    html += `
+    <div class="metrics-strip">
+      <div class="mc"><div class="mc-label">Avg Uptime</div><div class="mc-val c-green">${avgUptime}%</div></div>
+      <div class="mc"><div class="mc-label">Total Checks</div><div class="mc-val c-blue">${fmt(totalChecks)}</div></div>
+      <div class="mc"><div class="mc-label">Avg Response</div><div class="mc-val c-purple">${avgResp} ms</div></div>
+      <div class="mc"><div class="mc-label">Peak Response</div><div class="mc-val c-orange">${maxResp} ms</div></div>
+      <div class="mc"><div class="mc-label">Incidents</div><div class="mc-val c-red">${incidents.length}</div></div>
+    </div>`;
+
+    // Charts row
+    html += `
+    <div class="charts-grid">
+      <div class="chart-card"><h3><span class="icon">📈</span> Daily Uptime %</h3><div class="chart-wrap-tall"><canvas id="chartDailyUptime"></canvas></div></div>
+      <div class="chart-card"><h3><span class="icon">⏱️</span> Response Time</h3><div class="chart-wrap-tall"><canvas id="chartDailyResp"></canvas></div></div>
+    </div>`;
+
+    // Daily table
+    html += `
+    <div class="section-title">Daily Breakdown</div>
+    <div class="table-wrap">
+    <table class="report-table">
+      <thead><tr><th>Date</th><th style="width:180px">Uptime</th><th>Avg Response</th><th>Min</th><th>Max</th><th>Checks</th></tr></thead>
+      <tbody>`;
+    for(const d of daily){
+      const c = uptimeColor(d.uptime_pct);
+      html += `<tr>
+        <td>${esc(d.day)}</td>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="uptime-bar"><div class="uptime-fill" style="width:${d.uptime_pct}%;background:${c}"></div></div><span style="color:${c};font-weight:600;font-size:.85em">${d.uptime_pct}%</span></div></td>
+        <td>${d.avg_response ? d.avg_response+' ms' : '—'}</td>
+        <td>${d.min_response ? d.min_response+' ms' : '—'}</td>
+        <td>${d.max_response ? d.max_response+' ms' : '—'}</td>
+        <td>${d.checks}</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+  }
+
+  // Hourly chart
+  if(hourly.length){
+    html += `
+    <div class="section-title">Hourly Breakdown</div>
+    <div style="padding:0 24px 14px;max-width:1500px;margin:0 auto">
+      <div class="chart-card full"><h3><span class="icon">🕐</span> Hourly Response Time</h3><div class="chart-wrap-tall"><canvas id="chartHourly"></canvas></div></div>
+    </div>`;
+  }
+
+  // Timeline
+  if(timeline.length){
+    html += `
+    <div class="section-title">Status Timeline</div>
+    <div class="table-wrap">
+    <table class="report-table">
+      <thead><tr><th>Time</th><th>Status</th><th>Response</th></tr></thead>
+      <tbody>`;
+    for(const t of timeline.slice(0, 100)){
+      const badge = t.status === 'up' ? 'badge-up' : 'badge-down';
+      html += `<tr><td>${esc(t.checked_at)}</td><td><span class="badge ${badge}">${t.status}</span></td><td>${t.response_time ? t.response_time+' ms' : '—'}</td></tr>`;
+    }
+    html += '</tbody></table></div>';
+  }
+
+  // Incidents
+  if(incidents.length){
+    html += renderIncidentTable(incidents, false);
+  }
+
+  document.getElementById('mainContent').innerHTML = html;
+
+  // Build charts
+  if(daily.length) buildDetailCharts(daily);
+  if(hourly.length) buildHourlyChart(hourly);
+}
+
+function buildDetailCharts(daily){
+  const gridColor = 'rgba(255,255,255,.04)';
+  const textColor = 'rgba(255,255,255,.55)';
+
+  charts.dailyUptime = new Chart(document.getElementById('chartDailyUptime'), {
+    type: 'line',
+    data: {
+      labels: daily.map(d=>d.day),
+      datasets: [{
+        label: 'Uptime %', data: daily.map(d=>d.uptime_pct),
+        fill: true, backgroundColor: 'rgba(102,187,106,.1)',
+        borderColor: '#66bb6a', borderWidth: 2, tension: .3, pointRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { min: 80, max: 100, ticks: {color: textColor}, grid: {color: gridColor} },
+        x: { ticks: {color: textColor, maxRotation: 45}, grid: {display: false} }
+      },
+      plugins: { legend: {display: false} }
+    }
+  });
+
+  charts.dailyResp = new Chart(document.getElementById('chartDailyResp'), {
+    type: 'line',
+    data: {
+      labels: daily.map(d=>d.day),
+      datasets: [
+        { label: 'Avg', data: daily.map(d=>d.avg_response), borderColor: '#58a6ff', tension: .3, pointRadius: 3 },
+        { label: 'Max', data: daily.map(d=>d.max_response), borderColor: 'rgba(255,167,38,.6)', borderDash: [5,3], tension: .3, pointRadius: 2 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { ticks: {color: textColor}, grid: {color: gridColor} },
+        x: { ticks: {color: textColor, maxRotation: 45}, grid: {display: false} }
+      },
+      plugins: { legend: { labels: {color: textColor} } }
+    }
+  });
+}
+
+function buildHourlyChart(hourly){
+  const gridColor = 'rgba(255,255,255,.04)';
+  const textColor = 'rgba(255,255,255,.55)';
+
+  charts.hourly = new Chart(document.getElementById('chartHourly'), {
+    type: 'bar',
+    data: {
+      labels: hourly.map(h=>h.hour),
+      datasets: [{
+        label: 'Avg Response (ms)', data: hourly.map(h=>h.avg_response),
+        backgroundColor: 'rgba(171,71,188,.55)', borderColor: 'rgba(171,71,188,.85)',
+        borderWidth: 1, borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { ticks: {color: textColor}, grid: {color: gridColor}, beginAtZero: true },
+        x: { ticks: {color: textColor, maxRotation: 0}, grid: {color: gridColor} }
+      },
+      plugins: { legend: {display: false} }
+    }
+  });
+}
+
+// ── Render: Incidents ────────────────────────────────────────
+function renderIncidents(data){
+  const incidents = data.incidents || [];
+  let html = `
+  <div class="section-title">Incidents — Last ${activeDays} days</div>
+  <div class="metrics-strip">
+    <div class="mc"><div class="mc-label">Total Incidents</div><div class="mc-val c-orange">${incidents.length}</div></div>
+    <div class="mc"><div class="mc-label">Open</div><div class="mc-val c-red">${incidents.filter(i=>i.status==='open').length}</div></div>
+    <div class="mc"><div class="mc-label">Resolved</div><div class="mc-val c-green">${incidents.filter(i=>i.status==='resolved').length}</div></div>
+  </div>`;
+
+  if(incidents.length){
+    html += renderIncidentTable(incidents, true);
+  } else {
+    html += '<div class="state-overlay" style="min-height:200px;opacity:.5">No incidents in this period 🎉</div>';
+  }
+
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+function renderIncidentTable(incidents, showTarget){
+  let html = `
+  <div class="section-title">Incident Log</div>
+  <div class="table-wrap">
+  <table class="report-table">
+    <thead><tr>`;
+  if(showTarget) html += '<th>Type</th><th>Target</th>';
+  html += '<th>Status</th><th>Started</th><th>Resolved</th><th>Duration</th></tr></thead><tbody>';
+  for(const inc of incidents){
+    const badge = inc.status === 'open' ? 'badge-open' : 'badge-resolved';
+    html += '<tr>';
+    if(showTarget){
+      html += `<td><span class="badge-type">${esc(inc.target_type)}</span></td>`;
+      html += `<td>${esc(inc.target_name || inc.target_id)}</td>`;
+    }
+    html += `<td><span class="badge ${badge}">${inc.status}</span></td>`;
+    html += `<td>${esc(inc.started_at)}</td>`;
+    html += `<td>${esc(inc.resolved_at || '—')}</td>`;
+    html += `<td>${formatDuration(inc.duration)}</td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+// ── Render: Bans ─────────────────────────────────────────────
+function renderBans(data){
+  const bans = data.ban_details || [];
+  const f2b = data.fail2ban || {};
+
+  let html = `
+  <div class="section-title">Fail2Ban Report</div>
+  <div class="metrics-strip">
+    <div class="mc"><div class="mc-label">Total Banned</div><div class="mc-val c-red">${f2b.total_banned||0}</div></div>
+    <div class="mc"><div class="mc-label">Currently Active</div><div class="mc-val c-orange">${f2b.currently_banned||0}</div></div>
+    <div class="mc"><div class="mc-label">Servers</div><div class="mc-val c-blue">${bans.length}</div></div>
+  </div>`;
+
+  if(bans.length){
+    html += `
+    <div class="table-wrap">
+    <table class="report-table">
+      <thead><tr><th>Server</th><th>Total Bans</th><th>Active Bans</th><th>Jails</th></tr></thead>
+      <tbody>`;
+    for(const b of bans){
+      html += `<tr>
+        <td>${esc(b.server_name)}</td>
+        <td>${b.total_banned||0}</td>
+        <td>${b.currently_banned||0}</td>
+        <td>${esc((b.jails||[]).join(', '))}</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+  } else {
+    html += '<div class="state-overlay" style="min-height:200px;opacity:.5">No fail2ban data available</div>';
+  }
+
+  document.getElementById('mainContent').innerHTML = html;
+}
+
+// ── Export ────────────────────────────────────────────────────
+function exportReport(format){
+  const type = document.getElementById('reportType').value;
+  const tid = document.getElementById('targetFilter').value;
+  let url = `/api/reports/export?format=${format}&report_type=${type}&days=${activeDays}`;
+  if(tid && ['server','website','service'].includes(type)){
+    url += `&target_type=${type}&target_id=${tid}`;
+  }
+  if(currentDetail){
+    url = `/api/reports/export?format=${format}&report_type=${currentDetail.type}&days=${activeDays}&target_type=${currentDetail.type}&target_id=${currentDetail.id}`;
+  }
+  if(format === 'pdf'){
+    window.open(url + '&autoprint=1', '_blank');
+  } else {
+    window.location.href = url;
+  }
+}
+
+// ── Days pill interaction ────────────────────────────────────
+document.getElementById('daysPills').addEventListener('click', e => {
+  const pill = e.target.closest('[data-days]');
+  if(!pill) return;
+  activeDays = parseInt(pill.dataset.days, 10);
+  document.querySelectorAll('.days-pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  if(currentDetail){
+    drillInto(currentDetail.type, currentDetail.id, currentDetail.name);
+  } else {
+    loadReport();
+  }
+});
+
+// ── Report type change ───────────────────────────────────────
+document.getElementById('reportType').addEventListener('change', () => {
+  updateTargetFilter();
+  loadReport();
+});
+document.getElementById('targetFilter').addEventListener('change', loadReport);
+
+// ── Boot ─────────────────────────────────────────────────────
+(async function(){
+  await Promise.all([loadTargets(), loadSettings()]);
+  updateTargetFilter();
+  loadReport();
+})();
+</script>
+</body>
+</html>

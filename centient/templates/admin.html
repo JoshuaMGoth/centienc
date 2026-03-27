@@ -330,6 +330,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmPm2" style="width:auto;flex:none;min-width:0"> PM2</label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmServices" style="width:auto;flex:none;min-width:0"> Systemd</label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmNginx" style="width:auto;flex:none;min-width:0"> Nginx</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmApache" style="width:auto;flex:none;min-width:0"> Apache</label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;min-width:auto;color:var(--text)"><input type="checkbox" id="fmFail2ban" style="width:auto;flex:none;min-width:0"> Fail2Ban</label>
       </div>
     </div>
@@ -434,7 +435,7 @@ async function loadServers(){
     const tb=document.getElementById('serverTableBody');
     tb.innerHTML=(d.servers||[]).map(s=>{
       let flags={};try{flags=typeof s.monitor_flags==='string'?JSON.parse(s.monitor_flags):(s.monitor_flags||{})}catch(e){}
-      const feats=[];if(flags.system!==false)feats.push('SYS');if(flags.pm2)feats.push('PM2');if(flags.services)feats.push('SVC');if(flags.nginx)feats.push('NGX');if(flags.fail2ban)feats.push('F2B');
+      const feats=[];if(flags.system!==false)feats.push('SYS');if(flags.pm2)feats.push('PM2');if(flags.services)feats.push('SVC');if(flags.nginx)feats.push('NGX');if(flags.apache)feats.push('APH');if(flags.fail2ban)feats.push('F2B');
       const st=s.live_status||'unknown';
       const stColor=st==='up'?'var(--green)':st==='down'?'var(--red)':'var(--text2)';
       return `<tr>
@@ -462,7 +463,7 @@ function openServerModal(id=null){
     ['fsName','fsHostname','fsSshUser','fsSshKeyPath','fsSshPassword','fsSudoPassword'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('fsPort').value='22';document.getElementById('fsSshPort').value='22';
     document.getElementById('fmSystem').checked=true;
-    ['fmPm2','fmServices','fmNginx','fmFail2ban'].forEach(i=>document.getElementById(i).checked=false);
+    ['fmPm2','fmServices','fmNginx','fmApache','fmFail2ban'].forEach(i=>document.getElementById(i).checked=false);
   }
   document.getElementById('serverModalOverlay').classList.add('active');
   if(id)loadServerEdit(id);
@@ -484,6 +485,7 @@ async function loadServerEdit(id){
     document.getElementById('fmPm2').checked=!!f.pm2;
     document.getElementById('fmServices').checked=!!f.services;
     document.getElementById('fmNginx').checked=!!f.nginx;
+    document.getElementById('fmApache').checked=!!f.apache;
     document.getElementById('fmFail2ban').checked=!!f.fail2ban;
   }catch(e){}
 }
@@ -503,6 +505,7 @@ async function saveServer(){
       pm2:document.getElementById('fmPm2').checked,
       services:document.getElementById('fmServices').checked,
       nginx:document.getElementById('fmNginx').checked,
+      apache:document.getElementById('fmApache').checked,
       fail2ban:document.getElementById('fmFail2ban').checked
     }
   };

@@ -225,7 +225,7 @@ class Database:
                     "auth_enabled": "false",
                     "theme": "dark",
                     "check_interval": "60",
-                    "retention_days": "30",
+                    "retention_days": "7",
                     "app_title": "CentienC",
                     "notifications_enabled": "false",
                 }
@@ -606,3 +606,126 @@ class Database:
 
     async def list_push_tokens(self) -> list[dict[str, Any]]:
         return await self._list("push_tokens")
+
+    # ── Reporting & Historical Aggregation ────────────────────────
+
+    async def get_daily_summary(
+        self, target_type: str, target_id: int, days: int = 7,
+    ) -> list[dict[str, Any]]:
+        """Per-day aggregation: uptime %, avg response time, check count, incidents."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                """
+                SELECT date(checked_at) as day,
+                       COUNT(*) as checks,
+                       SUM(CASE WHEN status='up' THEN 1 ELSE 0 END) as up_count,
+                       ROUND(AVG(response_time), 2) as avg_response,
+                       ROUND(MIN(response_time), 2) as min_response,
+                       ROUND(MAX(response_time), 2) as max_response
+                FROM check_results
+                WHERE target_type = ? AND target_id = ?
+                  AND checked_at >= datetime('now', ? || ' days')
+                GROUP BY date(checked_at)
+                ORDER BY day
+                """,
+                (target_type, target_id, f"-{days}"),
+            )
+            rows = [dict(r) for r in await cursor.fetchall()]
+            for r in rows:
+                r["uptime_pct"] = round(r["up_count"] / r["checks"] * 100, 2) if r["checks"] else 100.0
+            return rows
+
+    async def get_hourly_summary(
+        self, target_type: str, target_id: int, days: int = 1,
+    ) -> list[dict[str, Any]]:
+        """Per-hour aggregation for detailed drill-down charts."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                """
+                SELECT strftime('%Y-%m-%d %H:00', checked_at) as hour,
+                       COUNT(*) as checks,
+                       SUM(CASE WHEN status='up' THEN 1 ELSE 0 END) as up_count,
+                       ROUND(AVG(response_time), 2) as avg_response
+                FROM check_results
+                WHERE target_type = ? AND target_id = ?
+                  AND checked_at >= datetime('now', ? || ' days')
+                GROUP BY strftime('%Y-%m-%d %H:00', checked_at)
+                ORDER BY hour
+                """,
+                (target_type, target_id, f"-{days}"),
+            )
+            rows = [dict(r) for r in await cursor.fetchall()]
+            for r in rows:
+                r["uptime_pct"] = round(r["up_count"] / r["checks"] * 100, 2) if r["checks"] else 100.0
+            return rows
+
+    async def get_all_targets_summary(self, days: int = 7) -> list[dict[str, Any]]:
+        """Cross-target summary: uptime %, avg response, incident count per target."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                """
+                SELECT target_type, target_id,
+                       COUNT(*) as checks,
+                       SUM(CASE WHEN status='up' THEN 1 ELSE 0 END) as up_count,
+                       ROUND(AVG(response_time), 2) as avg_response,
+                       ROUND(MAX(response_time), 2) as max_response,
+                       MIN(checked_at) as first_check,
+                       MAX(checked_at) as last_check
+                FROM check_results
+                WHERE checked_at >= datetime('now', ? || ' days')
+                GROUP BY target_type, target_id
+                ORDER BY target_type, target_id
+                """,
+                (f"-{days}",),
+            )
+            rows = [dict(r) for r in await cursor.fetchall()]
+            for r in rows:
+                r["uptime_pct"] = round(r["up_count"] / r["checks"] * 100, 2) if r["checks"] else 100.0
+            return rows
+
+    async def get_incidents_for_period(
+        self, days: int = 7, target_type: str | None = None, target_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """All incidents within a time range, optionally filtered by target."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            query = "SELECT * FROM incidents WHERE started_at >= datetime('now', ? || ' days')"
+            params: list[Any] = [f"-{days}"]
+            if target_type:
+                query += " AND target_type = ?"
+                params.append(target_type)
+            if target_id is not None:
+                query += " AND target_id = ?"
+                params.append(target_id)
+            query += " ORDER BY started_at DESC"
+            cursor = await conn.execute(query, params)
+            return [dict(r) for r in await cursor.fetchall()]
+
+    async def get_status_timeline(
+        self, target_type: str, target_id: int, days: int = 7,
+    ) -> list[dict[str, Any]]:
+        """Status change events for timeline visualisation."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                """
+                SELECT checked_at, status, response_time, status_code, details
+                FROM check_results
+                WHERE target_type = ? AND target_id = ?
+                  AND checked_at >= datetime('now', ? || ' days')
+                ORDER BY checked_at
+                """,
+                (target_type, target_id, f"-{days}"),
+            )
+            rows = [dict(r) for r in await cursor.fetchall()]
+            # Compress to status-change events only
+            changes = []
+            prev_status = None
+            for r in rows:
+                if r["status"] != prev_status:
+                    changes.append(r)
+                    prev_status = r["status"]
+            return changes
