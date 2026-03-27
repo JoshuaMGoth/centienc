@@ -97,7 +97,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
 .dd-stat-box{padding:12px;border-radius:12px;text-align:center;border:1px solid var(--card-border)}
 .dd-stat-box .dd-sv{font-size:1.6em;font-weight:700;letter-spacing:-.02em}
 .dd-stat-box .dd-sl{font-size:.7em;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
-.dd-feed{max-height:400px;overflow-y:auto;border-radius:12px;border:1px solid var(--card-border);background:rgba(10,22,40,.6);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
+.dd-feed{max-height:176px;overflow-y:auto;border-radius:12px;border:1px solid var(--card-border);background:rgba(10,22,40,.6);scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
 .dd-feed-row{display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.8em;font-family:'SF Mono',Menlo,Consolas,monospace;transition:background .15s}
 .dd-feed-row:hover{background:rgba(255,255,255,.04)}
 .dd-feed-row .dd-ts{color:var(--text2);min-width:72px;flex-shrink:0}
@@ -150,6 +150,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
 .ban-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:.9em;padding:0 4px;flex-shrink:0}
 .ban-btn:hover{color:#FF3B30}
 .rdev{flex-shrink:0;width:18px;text-align:center;font-size:.82em;opacity:.55}
+.live-feed-5{max-height:122px}
 
 /* ── Device & Connection cards ── */
 .device-chart-wrap{display:flex;align-items:center;gap:14px;margin-top:6px}
@@ -322,7 +323,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
 <div class="grid">
     <div class="card full">
         <h3>📡 Live Request Feed <span class="muted" style="font-size:.75em;font-weight:400">(all sites)</span></h3>
-        <div id="feedList" class="slist" style="max-height:260px"><span class="muted">Waiting for data…</span></div>
+        <div id="feedList" class="slist live-feed-5"><span class="muted">Waiting for data…</span></div>
     </div>
     <div class="card compact">
         <h3>📊 Device Analytics</h3>
@@ -684,7 +685,7 @@ function _devIcon(ua){
 function renderFeed(nginx){
     const el=document.getElementById('feedList'),reqs=nginx.recent_requests||[];
     if(!reqs.length){el.innerHTML='<span class="muted">No recent requests</span>';return}
-    el.innerHTML=reqs.slice(0,50).map(r=>{
+    el.innerHTML=reqs.slice(0,20).map(r=>{
         const ts=r.ts?new Date(r.ts*1000).toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'}):'--';
         const sc=r.status<300?'s2':r.status<400?'s3':r.status<500?'s4':'s5';
         const dev=_devIcon(r.ua);
@@ -1107,7 +1108,7 @@ async function loadSiteDetail(id,init){
                 h+='<div style="font-size:.92em;font-weight:600;color:var(--blue);margin-bottom:8px">📊 Enable Live Traffic Analytics</div>';
                 h+='<div style="font-size:.82em;color:var(--text2);line-height:1.5">';
                 h+='<strong>Current:</strong> '+esc(d.drilldown_reason)+'<br><br>';
-                h+='To unlock <strong>live feed</strong>, <strong>visitor counts</strong>, <strong>device types</strong> (desktop/mobile/tablet), and <strong>connection types</strong> (HTTP/HTTPS/SSH), this website needs to be linked to a server with SSH access.<br><br>';
+                h+='To unlock <strong>live feed</strong>, <strong>visitor counts</strong>, <strong>device types</strong> (desktop/mobile/tablet), and <strong>connection types</strong> (ftp/ssh/http/https/sql), this website needs to be linked to a server with SSH access.<br><br>';
                 h+='<strong>How to set up:</strong><br>';
                 h+='<span style="margin-left:8px">1. Go to <strong>Admin → Websites</strong> and edit this website</span><br>';
                 h+='<span style="margin-left:8px">2. Select a <strong>Linked Server</strong> (the server hosting this site)</span><br>';
@@ -1221,9 +1222,9 @@ async function loadSiteDetail(id,init){
 
         /* ── Row 2: Live Request Feed (prominent, full width) ── */
         if(reqs.length){
-            h+='<div class="dd-card" style="margin-bottom:16px"><h4>📡 Live Request Feed <span style="font-weight:400;color:var(--text2);font-size:.9em">('+reqs.length+' recent)</span></h4>';
+            h+='<div class="dd-card" style="margin-bottom:16px"><h4>📡 Live Request Feed <span style="font-weight:400;color:var(--text2);font-size:.9em">('+Math.min(reqs.length,20)+' recent)</span></h4>';
             h+='<div class="dd-feed">';
-            for(const req of reqs.slice(0,80)){
+            for(const req of reqs.slice(0,20)){
                 const sc2=req.status>=500?'#FF3B30':req.status>=400?'#FF9500':req.status>=300?'#2D7FF9':'#34C759';
                 const ts=new Date(req.ts*1000).toLocaleTimeString();
                 const devIcon=_devIcon(req.ua||'');

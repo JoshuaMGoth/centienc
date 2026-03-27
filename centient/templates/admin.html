@@ -352,7 +352,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <label>Linked Server (optional)</label><select id="fwServerId" onchange="onAdminWebsiteServerSelect()"><option value="">None (basic monitor only)</option></select>
     <div id="fwServerHint" style="padding:8px 12px;margin:6px 0;border-radius:8px;background:rgba(45,127,249,.08);border:1px solid rgba(45,127,249,.2);font-size:.82em;color:var(--text2);display:none">
       <strong style="color:var(--blue)">💡 Why link a server?</strong><br>
-      Linking a website to a server with SSH access enables <strong>live traffic feed</strong>, <strong>visitor counts</strong>, <strong>device types</strong>, and <strong>connection types</strong> by parsing your web server's access logs (nginx/Apache).<br>
+      Linking a website to a server with SSH access enables <strong>live traffic feed</strong>, <strong>visitor counts</strong>, <strong>device types</strong>, and <strong>connection types</strong> (ftp/ssh/http/https/sql) by parsing your web server's access logs (nginx/Apache).<br>
       Without a linked server, only uptime and response time monitoring is available.
     </div>
     <div id="fwLogPathWrap" style="display:none">

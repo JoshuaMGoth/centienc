@@ -28,6 +28,18 @@ logger = logging.getLogger("centient.monitors")
 class MonitorEngine:
     """Runs background monitoring loops for all configured targets."""
 
+    _MAIN_CONNECTION_PORTS: dict[int, str] = {
+        20: "ftp",
+        21: "ftp",
+        22: "ssh",
+        80: "http",
+        443: "https",
+        3306: "sql",
+        5432: "sql",
+        1433: "sql",
+        1521: "sql",
+    }
+
     def __init__(self, db: Database):
         self.db = db
         self._tasks: list[asyncio.Task[None]] = []
@@ -172,6 +184,33 @@ class MonitorEngine:
             if m:
                 return float(m.group(1))
         return None
+
+    @classmethod
+    def _connection_type_from_port(cls, port: int) -> str | None:
+        """Map a local port to a simplified protocol label."""
+        return cls._MAIN_CONNECTION_PORTS.get(port)
+
+    @classmethod
+    def _summarize_connection_types(cls, raw_connections: str) -> dict[str, int]:
+        """Count only supported high-level connection protocol types."""
+        connection_types: dict[str, int] = {}
+        if not raw_connections:
+            return connection_types
+
+        for line in raw_connections.strip().splitlines():
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            local_addr = parts[3]
+            port_str = local_addr.rsplit(":", 1)[-1] if ":" in local_addr else ""
+            if not port_str.isdigit():
+                continue
+            proto = cls._connection_type_from_port(int(port_str))
+            if proto is None:
+                continue
+            connection_types[proto] = connection_types.get(proto, 0) + 1
+
+        return connection_types
 
     # ══════════════════════════════════════════════════════════════
     #  Service monitoring (TCP port check)
@@ -921,13 +960,17 @@ class MonitorEngine:
                 continue
 
             # Filter to this specific site
-            vhost = m.group("vhost") or current_file_site or "default"
-            vhost_lower = vhost.lower()
-            # Match by exact hostname, or by prefix (e.g. "25cent" matches "25cent.cloud")
-            if url_host and vhost_lower != url_host:
-                prefix = url_host.split(".")[0]
-                if vhost_lower != prefix and not url_host.startswith(vhost_lower + "."):
-                    continue
+            vhost = m.group("vhost") or current_file_site
+            if vhost:
+                vhost_lower = vhost.lower()
+                # Match by exact hostname, or by prefix (e.g. "25cent" matches "25cent.cloud")
+                if url_host and vhost_lower != url_host:
+                    prefix = url_host.split(".")[0]
+                    if vhost_lower != prefix and not url_host.startswith(vhost_lower + "."):
+                        continue
+            # else: no vhost in log line and no file-header hint — standard
+            # combined format; assume traffic belongs to this website (the
+            # user pointed the log_path at the correct file).
 
             total_requests += 1
             status_code = int(m.group("status"))
@@ -990,19 +1033,9 @@ class MonitorEngine:
         pm2 = ssh_data.get("pm2", [])
         fail2ban = ssh_data.get("fail2ban", {})
 
-        # Parse active connections by port from cached ss output
-        connection_types: dict[str, int] = {}
+        # Parse active connections and keep only core protocol types
         raw_connections = system_metrics.get("raw_connections", "")
-        if raw_connections:
-            for cline in raw_connections.strip().split("\n"):
-                parts = cline.split()
-                if len(parts) >= 4:
-                    local_addr = parts[3]
-                    # Extract port from address like "0.0.0.0:80" or "[::]:443"
-                    port_str = local_addr.rsplit(":", 1)[-1] if ":" in local_addr else ""
-                    if port_str.isdigit():
-                        port_label = port_str
-                        connection_types[port_label] = connection_types.get(port_label, 0) + 1
+        connection_types = self._summarize_connection_types(raw_connections)
 
         return {
             "traffic": {
@@ -1015,7 +1048,7 @@ class MonitorEngine:
                 "user_agents": user_agents,
                 "device_types": device_types,
                 "bytes": total_bytes,
-                "recent_requests": recent_requests[:50],
+                "recent_requests": recent_requests[:20],
                 "period_minutes": minutes,
             },
             "connection_types": connection_types,
@@ -1578,16 +1611,10 @@ class MonitorEngine:
             fail2ban_total += fb.get("total_banned", 0)
             fail2ban_active += fb.get("active_bans", 0)
 
-            # Aggregate connection types from SSH metrics
+            # Aggregate simplified connection types from SSH metrics
             raw_conns = (ssh.get("metrics") or {}).get("raw_connections", "")
-            if raw_conns:
-                for line in raw_conns.strip().splitlines():
-                    parts = line.split()
-                    if len(parts) >= 4:
-                        local_addr = parts[3]
-                        port = local_addr.rsplit(":", 1)[-1] if ":" in local_addr else ""
-                        if port.isdigit() and int(port) < 10000:
-                            connection_types[port] = connection_types.get(port, 0) + 1
+            for proto, count in self._summarize_connection_types(raw_conns).items():
+                connection_types[proto] = connection_types.get(proto, 0) + count
 
         all_recent_requests.sort(key=lambda r: r.get("ts", 0), reverse=True)
 
@@ -1598,7 +1625,7 @@ class MonitorEngine:
             "proxmox_nodes": proxmox_nodes,
             "nginx": {
                 "total_rpm": round(total_rpm, 1),
-                "recent_requests": all_recent_requests[:50],
+                "recent_requests": all_recent_requests[:20],
             },
             "fail2ban": {
                 "total_banned": fail2ban_total,
