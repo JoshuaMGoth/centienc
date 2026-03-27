@@ -2,7 +2,7 @@
 # ══════════════════════════════════════════════════════════════════
 #  CentienC — Patch running LXC container(s)
 #
-#  Run this on the Proxmox HOST to push updated centient files
+#  Run this on the Proxmox HOST to push updated centienc files
 #  and the ICMP sysctl fix into an existing container.
 #
 #  Repository: https://github.com/JoshuaMGoth/centienc
@@ -31,11 +31,11 @@ CTID="${1:-}"
 pct status "$CTID" &>/dev/null || err "Container $CTID not found"
 pct exec "$CTID" -- true &>/dev/null || err "Container $CTID is not running"
 
-# ── Locate installed centient package inside container ────────────
-info "Locating centient installation inside container $CTID..."
+# ── Locate installed centienc package inside container ────────────
+info "Locating centienc installation inside container $CTID..."
 PKG_DIR=$(pct exec "$CTID" -- bash -c \
-    "/opt/centient/venv/bin/python -c 'import centient,os; print(os.path.dirname(centient.__file__))'" \
-    2>/dev/null) || err "Could not find centient package. Is it installed in /opt/centient/venv?"
+    "/opt/centienc/venv/bin/python -c 'import centient,os; print(os.path.dirname(centient.__file__))'" \
+    2>/dev/null) || err "Could not find centienc package. Is it installed in /opt/centienc/venv?"
 ok "Found package at: $PKG_DIR"
 
 # ── Determine where to find source files ─────────────────────────
@@ -66,23 +66,23 @@ fi
 # ── Fix ICMP ping group range (allows service user to ping) ───────
 info "Applying ICMP ping fix (net.ipv4.ping_group_range)..."
 pct exec "$CTID" -- bash -c "
-    echo 'net.ipv4.ping_group_range = 0 2147483647' > /etc/sysctl.d/99-centient.conf
-    sysctl -p /etc/sysctl.d/99-centient.conf >/dev/null 2>&1 || true
+    echo 'net.ipv4.ping_group_range = 0 2147483647' > /etc/sysctl.d/99-centienc.conf
+    sysctl -p /etc/sysctl.d/99-centienc.conf >/dev/null 2>&1 || true
 "
 ok "Ping group range configured"
 
 # ── Set correct ownership ─────────────────────────────────────────
 info "Fixing ownership..."
-pct exec "$CTID" -- chown -R centient:centient "$PKG_DIR"
+pct exec "$CTID" -- chown -R centienc:centienc "$PKG_DIR"
 
 # ── Restart service ───────────────────────────────────────────────
-info "Restarting centient service..."
-pct exec "$CTID" -- systemctl restart centient
+info "Restarting centienc service..."
+pct exec "$CTID" -- systemctl restart centienc
 sleep 3
-if pct exec "$CTID" -- systemctl is-active --quiet centient; then
-    ok "centient is running"
+if pct exec "$CTID" -- systemctl is-active --quiet centienc; then
+    ok "centienc is running"
 else
-    err "Service failed to restart. Check logs:\n  pct exec $CTID -- journalctl -u centient -n 30 --no-pager"
+    err "Service failed to restart. Check logs:\n  pct exec $CTID -- journalctl -u centienc -n 30 --no-pager"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────

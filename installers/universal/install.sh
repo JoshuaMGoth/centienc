@@ -26,15 +26,15 @@ MODE="service"
 UNINSTALL=false
 
 # Linux paths
-L_INSTALL_DIR="/opt/centient"
-L_DATA_DIR="/var/lib/centient"
+L_INSTALL_DIR="/opt/centienc"
+L_DATA_DIR="/var/lib/centienc"
 L_VENV_DIR="${L_INSTALL_DIR}/venv"
-L_SERVICE_USER="centient"
+L_SERVICE_USER="centienc"
 
 # macOS paths
-M_INSTALL_DIR="$HOME/.centient"
+M_INSTALL_DIR="$HOME/.centienc"
 M_VENV_DIR="${M_INSTALL_DIR}/venv"
-M_PLIST_LABEL="com.centient.monitor"
+M_PLIST_LABEL="com.centienc.monitor"
 
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -103,9 +103,9 @@ if $UNINSTALL; then
         ok "CentienC removed (macOS)"
     else
         [[ $EUID -ne 0 ]] && err "Run as root: sudo bash $0 --uninstall"
-        systemctl stop centient 2>/dev/null || true
-        systemctl disable centient 2>/dev/null || true
-        rm -f /etc/systemd/system/centient.service
+        systemctl stop centienc 2>/dev/null || true
+        systemctl disable centienc 2>/dev/null || true
+        rm -f /etc/systemd/system/centienc.service
         systemctl daemon-reload 2>/dev/null || true
         rm -rf "$L_INSTALL_DIR"
         # Ask before removing data
@@ -120,7 +120,7 @@ if $UNINSTALL; then
             fi
         fi
         userdel "$L_SERVICE_USER" 2>/dev/null || true
-        rm -f /etc/sysctl.d/99-centient.conf 2>/dev/null || true
+        rm -f /etc/sysctl.d/99-centienc.conf 2>/dev/null || true
         # Remove firewall rules
         if command -v ufw &>/dev/null; then
             ufw delete allow "${PORT}/tcp" 2>/dev/null || true
@@ -201,7 +201,7 @@ create_user() {
 }
 
 # ── Install CentienC ─────────────────────────────────────────
-install_centient() {
+install_centienc() {
     info "Installing CentienC into ${INSTALL_DIR}..."
 
     mkdir -p "$INSTALL_DIR" "$DATA_DIR"
@@ -245,7 +245,7 @@ generate_ssh_key() {
         SSH_DIR="${DATA_DIR}/.ssh"
     fi
 
-    local KEY_FILE="${SSH_DIR}/centient_ed25519"
+    local KEY_FILE="${SSH_DIR}/centienc_ed25519"
 
     if [[ -f "$KEY_FILE" ]]; then
         info "SSH key already exists: ${KEY_FILE}"
@@ -254,11 +254,11 @@ generate_ssh_key() {
 
     info "Generating SSH keypair for remote server monitoring..."
     mkdir -p "$SSH_DIR"
-    ssh-keygen -t ed25519 -f "$KEY_FILE" -N "" -C "centient@$(hostname)" -q
+    ssh-keygen -t ed25519 -f "$KEY_FILE" -N "" -C "centienc@$(hostname)" -q
 
-    # Write SSH config for centient connections
+    # Write SSH config for centienc connections
     local SSH_CONFIG="${SSH_DIR}/config"
-    if [[ ! -f "$SSH_CONFIG" ]] || ! grep -q "centient" "$SSH_CONFIG" 2>/dev/null; then
+    if [[ ! -f "$SSH_CONFIG" ]] || ! grep -q "centienc" "$SSH_CONFIG" 2>/dev/null; then
         cat >> "$SSH_CONFIG" << 'SSHCONF'
 
 # CentienC monitoring connections
@@ -295,7 +295,7 @@ install_systemd() {
 
     local SSH_DIR="${DATA_DIR}/.ssh"
 
-    cat > /etc/systemd/system/centient.service << EOF
+    cat > /etc/systemd/system/centienc.service << EOF
 [Unit]
 Description=CentienC — Server Monitoring Dashboard
 After=network-online.target
@@ -330,15 +330,15 @@ WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    systemctl enable centient --quiet
-    systemctl start centient
+    systemctl enable centienc --quiet
+    systemctl start centienc
 
     # Verify it started
     sleep 2
-    if systemctl is-active --quiet centient; then
+    if systemctl is-active --quiet centienc; then
         ok "systemd service running"
     else
-        warn "Service may not have started. Check: journalctl -u centient -n 20"
+        warn "Service may not have started. Check: journalctl -u centienc -n 20"
     fi
 }
 
@@ -390,10 +390,10 @@ EOF
     </dict>
 
     <key>StandardOutPath</key>
-    <string>${INSTALL_DIR}/centient.log</string>
+    <string>${INSTALL_DIR}/centienc.log</string>
 
     <key>StandardErrorPath</key>
-    <string>${INSTALL_DIR}/centient.err</string>
+    <string>${INSTALL_DIR}/centienc.err</string>
 
     <key>ProcessType</key>
     <string>Background</string>
@@ -413,7 +413,7 @@ configure_firewall() {
     if $IS_MACOS; then return; fi
 
     if command -v ufw &>/dev/null; then
-        ufw allow "$PORT"/tcp comment "centient" 2>/dev/null || true
+        ufw allow "$PORT"/tcp comment "centienc" 2>/dev/null || true
         ok "UFW: allowed port ${PORT}"
     elif command -v firewall-cmd &>/dev/null; then
         firewall-cmd --permanent --add-port="${PORT}/tcp" 2>/dev/null || true
@@ -427,8 +427,8 @@ configure_ping() {
     if $IS_MACOS; then return; fi
 
     if [[ -d /etc/sysctl.d ]]; then
-        echo "net.ipv4.ping_group_range = 0 2147483647" > /etc/sysctl.d/99-centient.conf
-        sysctl -p /etc/sysctl.d/99-centient.conf >/dev/null 2>&1 || true
+        echo "net.ipv4.ping_group_range = 0 2147483647" > /etc/sysctl.d/99-centienc.conf
+        sysctl -p /etc/sysctl.d/99-centienc.conf >/dev/null 2>&1 || true
         ok "ICMP ping enabled for service user"
     fi
 }
@@ -444,9 +444,9 @@ print_summary() {
 
     local KEY_FILE
     if $IS_MACOS; then
-        KEY_FILE="$HOME/.ssh/centient_ed25519.pub"
+        KEY_FILE="$HOME/.ssh/centienc_ed25519.pub"
     else
-        KEY_FILE="${DATA_DIR}/.ssh/centient_ed25519.pub"
+        KEY_FILE="${DATA_DIR}/.ssh/centienc_ed25519.pub"
     fi
 
     echo ""
@@ -472,15 +472,15 @@ print_summary() {
 
     if $IS_LINUX; then
         echo -e "  ${BOLD}Management${NC}"
-        echo -e "    systemctl status centient       # Check status"
-        echo -e "    journalctl -u centient -f       # View logs"
-        echo -e "    systemctl restart centient       # Restart"
+        echo -e "    systemctl status centienc       # Check status"
+        echo -e "    journalctl -u centienc -f       # View logs"
+        echo -e "    systemctl restart centienc       # Restart"
         echo -e "    sudo bash install.sh --uninstall # Remove"
     else
         echo -e "  ${BOLD}Management${NC}"
         echo -e "    launchctl stop ${M_PLIST_LABEL}"
         echo -e "    launchctl start ${M_PLIST_LABEL}"
-        echo -e "    tail -f ${INSTALL_DIR}/centient.log"
+        echo -e "    tail -f ${INSTALL_DIR}/centienc.log"
         echo -e "    bash install.sh --uninstall"
     fi
     echo ""
@@ -500,7 +500,7 @@ print_summary() {
 # ══════════════════════════════════════════════════════════════
 install_deps
 create_user
-install_centient
+install_centienc
 generate_ssh_key
 configure_ping
 

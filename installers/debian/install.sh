@@ -18,9 +18,9 @@
 set -euo pipefail
 
 VERSION="1.0.0"
-INSTALL_DIR="/opt/centient"
-DATA_DIR="/var/lib/centient"
-SERVICE_USER="centient"
+INSTALL_DIR="/opt/centienc"
+DATA_DIR="/var/lib/centienc"
+SERVICE_USER="centienc"
 VENV_DIR="${INSTALL_DIR}/venv"
 PORT=9099
 MODE="service"
@@ -50,9 +50,9 @@ done
 # ── Uninstall ─────────────────────────────────────────────────
 if $UNINSTALL; then
     echo -e "\n${YELLOW}CentienC${NC} — Uninstalling...\n"
-    systemctl stop centient 2>/dev/null || true
-    systemctl disable centient 2>/dev/null || true
-    rm -f /etc/systemd/system/centient.service
+    systemctl stop centienc 2>/dev/null || true
+    systemctl disable centienc 2>/dev/null || true
+    rm -f /etc/systemd/system/centienc.service
     systemctl daemon-reload 2>/dev/null || true
     rm -rf "$INSTALL_DIR"
     if [[ -d "$DATA_DIR" ]]; then
@@ -61,7 +61,7 @@ if $UNINSTALL; then
         [[ "$REPLY" =~ ^[Yy]$ ]] && rm -rf "$DATA_DIR" && ok "Data removed" || info "Data preserved"
     fi
     userdel "$SERVICE_USER" 2>/dev/null || true
-    rm -f /etc/sysctl.d/99-centient.conf 2>/dev/null || true
+    rm -f /etc/sysctl.d/99-centienc.conf 2>/dev/null || true
     ufw delete allow "${PORT}/tcp" 2>/dev/null || true
     ok "CentienC removed"
     echo ""
@@ -114,12 +114,12 @@ ok "CentienC installed to ${INSTALL_DIR}"
 
 # ── SSH Keypair ───────────────────────────────────────────────
 SSH_DIR="${DATA_DIR}/.ssh"
-KEY_FILE="${SSH_DIR}/centient_ed25519"
+KEY_FILE="${SSH_DIR}/centienc_ed25519"
 
 if [[ ! -f "$KEY_FILE" ]]; then
     info "Generating SSH keypair..."
     mkdir -p "$SSH_DIR"
-    ssh-keygen -t ed25519 -f "$KEY_FILE" -N "" -C "centient@$(hostname)" -q
+    ssh-keygen -t ed25519 -f "$KEY_FILE" -N "" -C "centienc@$(hostname)" -q
 
     cat >> "${SSH_DIR}/config" << 'SSHCONF'
 Host *
@@ -139,12 +139,12 @@ else
 fi
 
 # ── ICMP Ping ─────────────────────────────────────────────────
-echo "net.ipv4.ping_group_range = 0 2147483647" > /etc/sysctl.d/99-centient.conf
-sysctl -p /etc/sysctl.d/99-centient.conf >/dev/null 2>&1 || true
+echo "net.ipv4.ping_group_range = 0 2147483647" > /etc/sysctl.d/99-centienc.conf
+sysctl -p /etc/sysctl.d/99-centienc.conf >/dev/null 2>&1 || true
 ok "ICMP ping enabled"
 
 # ── Systemd Service ──────────────────────────────────────────
-cat > /etc/systemd/system/centient.service << EOF
+cat > /etc/systemd/system/centienc.service << EOF
 [Unit]
 Description=CentienC — Server Monitoring Dashboard
 After=network-online.target
@@ -173,19 +173,19 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable centient --quiet
-systemctl start centient
+systemctl enable centienc --quiet
+systemctl start centienc
 
 sleep 2
-if systemctl is-active --quiet centient; then
+if systemctl is-active --quiet centienc; then
     ok "Service running"
 else
-    warn "Service may not have started — check: journalctl -u centient -n 20"
+    warn "Service may not have started — check: journalctl -u centienc -n 20"
 fi
 
 # ── Firewall ──────────────────────────────────────────────────
 if command -v ufw &>/dev/null; then
-    ufw allow "$PORT"/tcp comment "centient" 2>/dev/null || true
+    ufw allow "$PORT"/tcp comment "centienc" 2>/dev/null || true
     ok "UFW: allowed port ${PORT}"
 fi
 
@@ -212,9 +212,9 @@ if [[ -f "${KEY_FILE}.pub" ]]; then
 fi
 
 echo -e "  ${BOLD}Management${NC}"
-echo -e "    systemctl status centient       # Check status"
-echo -e "    journalctl -u centient -f       # View logs"
-echo -e "    systemctl restart centient       # Restart"
+echo -e "    systemctl status centienc       # Check status"
+echo -e "    journalctl -u centienc -f       # View logs"
+echo -e "    systemctl restart centienc       # Restart"
 echo -e "    sudo bash $0 --uninstall        # Remove"
 echo ""
 echo -e "  Open ${BLUE}http://${IP}:${PORT}${NC} to run the setup wizard."

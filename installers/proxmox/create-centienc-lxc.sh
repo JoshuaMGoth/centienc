@@ -14,7 +14,7 @@
 #
 #  Options:
 #    --ctid    NUM    Container ID       (default: next available)
-#    --name    STR    Container hostname  (default: centient)
+#    --name    STR    Container hostname  (default: centienc)
 #    --cores   NUM    CPU cores           (default: 1)
 #    --memory  NUM    RAM in MB           (default: 512)
 #    --disk    NUM    Disk size in GB     (default: 4)
@@ -39,7 +39,7 @@ set -euo pipefail
 
 # ── Defaults ──────────────────────────────────────────────────
 CTID=""
-CT_NAME="centient"
+CT_NAME="centienc"
 CORES=1
 MEMORY=512
 SWAP=256
@@ -331,8 +331,8 @@ ok "System packages installed"
 # Allow non-root users to send ICMP ping (required in unprivileged LXC containers)
 info "Configuring ICMP ping permissions for service user..."
 pct exec "$CTID" -- bash -c "
-    echo 'net.ipv4.ping_group_range = 0 2147483647' > /etc/sysctl.d/99-centient.conf
-    sysctl -p /etc/sysctl.d/99-centient.conf >/dev/null 2>&1 || true
+    echo 'net.ipv4.ping_group_range = 0 2147483647' > /etc/sysctl.d/99-centienc.conf
+    sysctl -p /etc/sysctl.d/99-centienc.conf >/dev/null 2>&1 || true
 "
 ok "Ping group range configured"
 
@@ -340,10 +340,10 @@ ok "Ping group range configured"
 info "Creating venv and system user..."
 pct exec "$CTID" -- bash -c "
     set -e
-    mkdir -p /opt/centient /var/lib/centient
-    python3 -m venv /opt/centient/venv
-    /opt/centient/venv/bin/pip install --upgrade pip --quiet
-    useradd -r -s /usr/sbin/nologin -d /var/lib/centient -M centient 2>/dev/null || true
+    mkdir -p /opt/centienc /var/lib/centienc
+    python3 -m venv /opt/centienc/venv
+    /opt/centienc/venv/bin/pip install --upgrade pip --quiet
+    useradd -r -s /usr/sbin/nologin -d /var/lib/centienc -M centienc 2>/dev/null || true
 "
 ok "Environment ready"
 
@@ -374,7 +374,7 @@ if [[ -n "$PROJECT_ROOT" && -f "${PROJECT_ROOT}/pyproject.toml" ]]; then
     pct exec "$CTID" -- bash -c "
         set -e
         tar -xzf /tmp/centient-src.tar.gz -C /tmp/
-        /opt/centient/venv/bin/pip install /tmp/centient-src/ --no-cache-dir
+        /opt/centienc/venv/bin/pip install /tmp/centient-src/ --no-cache-dir
         rm -rf /tmp/centient-src.tar.gz /tmp/centient-src/
     "
     ok "CentienC installed from local source"
@@ -382,53 +382,53 @@ else
     info "No local source found — installing CentienC from GitHub..."
     pct exec "$CTID" -- bash -c "
         set -e
-        /opt/centient/venv/bin/pip install 'centient @ git+https://github.com/JoshuaMGoth/centienc.git' --no-cache-dir
+        /opt/centienc/venv/bin/pip install 'centient @ git+https://github.com/JoshuaMGoth/centienc.git' --no-cache-dir
     " || err "Failed to install CentienC. Verify this Proxmox host can reach https://github.com"
     ok "CentienC installed from GitHub"
 fi
 
 # Fix ownership now that pip install is done
-pct exec "$CTID" -- chown -R centient:centient /opt/centient /var/lib/centient
+pct exec "$CTID" -- chown -R centienc:centienc /opt/centienc /var/lib/centienc
 
-# ── Generate SSH keypair for the centient service user ───────
+# ── Generate SSH keypair for the centienc service user ───────
 header "SSH Keys"
 
-info "Generating SSH keypair for centient user..."
+info "Generating SSH keypair for centienc user..."
 pct exec "$CTID" -- bash -c "
-    mkdir -p /var/lib/centient/.ssh
-    chmod 700 /var/lib/centient/.ssh
-    ssh-keygen -t ed25519 -f /var/lib/centient/.ssh/id_ed25519 -N '' -C 'centient@${CT_NAME}' -q
-    chown -R centient:centient /var/lib/centient/.ssh
-    chmod 600 /var/lib/centient/.ssh/id_ed25519
-    chmod 644 /var/lib/centient/.ssh/id_ed25519.pub
+    mkdir -p /var/lib/centienc/.ssh
+    chmod 700 /var/lib/centienc/.ssh
+    ssh-keygen -t ed25519 -f /var/lib/centienc/.ssh/id_ed25519 -N '' -C 'centienc@${CT_NAME}' -q
+    chown -R centienc:centienc /var/lib/centienc/.ssh
+    chmod 600 /var/lib/centienc/.ssh/id_ed25519
+    chmod 644 /var/lib/centienc/.ssh/id_ed25519.pub
 "
-SSH_PUBKEY=$(pct exec "$CTID" -- cat /var/lib/centient/.ssh/id_ed25519.pub 2>/dev/null || echo "[key generation failed]")
+SSH_PUBKEY=$(pct exec "$CTID" -- cat /var/lib/centienc/.ssh/id_ed25519.pub 2>/dev/null || echo "[key generation failed]")
 ok "SSH keypair created"
 
 # ── Verify the installation is runnable ──────────────────────
 header "Verifying Installation"
 
-pct exec "$CTID" -- /opt/centient/venv/bin/python -m centient --help > /dev/null \
+pct exec "$CTID" -- /opt/centienc/venv/bin/python -m centient --help > /dev/null \
     || err "Installation check failed — \"python -m centient\" is not runnable. The pip install likely failed above."
 
-ok "CentienC is runnable — using /opt/centient/venv/bin/python -m centient"
+ok "CentienC is runnable — using /opt/centienc/venv/bin/python -m centient"
 
 # ── Create systemd service inside container ──────────────────
 header "Configuring Service"
 
 pct exec "$CTID" -- bash -c "
-cat > /etc/systemd/system/centient.service << 'SVCEOF'
+cat > /etc/systemd/system/centienc.service << 'SVCEOF'
 [Unit]
 Description=CentienC — Server Monitoring Dashboard
 After=network.target
 
 [Service]
 Type=simple
-User=centient
-Group=centient
-WorkingDirectory=/var/lib/centient
-Environment=CENTIENT_DATA_DIR=/var/lib/centient
-ExecStart=/opt/centient/venv/bin/python -m centient --host 0.0.0.0 --port ${PORT}
+User=centienc
+Group=centienc
+WorkingDirectory=/var/lib/centienc
+Environment=CENTIENT_DATA_DIR=/var/lib/centienc
+ExecStart=/opt/centienc/venv/bin/python -m centient --host 0.0.0.0 --port ${PORT}
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -439,13 +439,13 @@ WantedBy=multi-user.target
 SVCEOF
 
 systemctl daemon-reload
-systemctl enable centient
-systemctl start centient
+systemctl enable centienc
+systemctl start centienc
 sleep 3
-if ! systemctl is-active --quiet centient; then
+if ! systemctl is-active --quiet centienc; then
     echo '--- SERVICE FAILED TO START ---'
-    systemctl status centient --no-pager -l
-    journalctl -u centient -n 20 --no-pager
+    systemctl status centienc --no-pager -l
+    journalctl -u centienc -n 20 --no-pager
     exit 1
 fi
 "
@@ -464,7 +464,7 @@ for i in $(seq 1 20); do
 done
 
 if [[ "$APP_READY" != "true" ]]; then
-    err "CentienC did not respond after 20 seconds. Check logs with:\n  pct exec ${CTID} -- journalctl -u centient -n 30 --no-pager"
+    err "CentienC did not respond after 20 seconds. Check logs with:\n  pct exec ${CTID} -- journalctl -u centienc -n 30 --no-pager"
 fi
 
 # ── Get container IP ─────────────────────────────────────────
@@ -485,7 +485,7 @@ echo -e "    Disk:         ${DISK_SIZE} GB (${STORAGE})"
 echo ""
 echo -e "  ${BOLD}CentienC:${NC}"
 echo -e "    Dashboard:    ${BLUE}http://${CT_IP}:${PORT}${NC}"
-echo -e "    Data Dir:     /var/lib/centient"
+echo -e "    Data Dir:     /var/lib/centienc"
 echo -e "    Root Pass:    ${YELLOW}${ROOT_PASS}${NC}"
 echo ""
 echo -e "  ${BOLD}SSH Public Key (copy to monitored servers):${NC}"
@@ -496,8 +496,8 @@ echo -e "    ${BOLD}ssh USER@SERVER 'mkdir -p ~/.ssh && echo \"${SSH_PUBKEY}\" >
 echo ""
 echo -e "  ${BOLD}Management:${NC}"
 echo -e "    pct enter ${CTID}"
-echo -e "    pct exec ${CTID} -- systemctl status centient"
-echo -e "    pct exec ${CTID} -- journalctl -u centient -f"
+echo -e "    pct exec ${CTID} -- systemctl status centienc"
+echo -e "    pct exec ${CTID} -- journalctl -u centienc -f"
 echo ""
 echo -e "  Open ${BLUE}http://${CT_IP}:${PORT}${NC} to run the setup wizard."
 echo ""
