@@ -18,12 +18,12 @@
 set -euo pipefail
 
 VERSION="1.0.0"
-INSTALL_DIR="$HOME/.centient"
+INSTALL_DIR="$HOME/.centienc"
 VENV_DIR="${INSTALL_DIR}/venv"
 PORT=9099
 MODE="tray"
 UNINSTALL=false
-PLIST_LABEL="com.centient.monitor"
+PLIST_LABEL="com.centienc.monitor"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 
 GREEN='\033[0;32m'; BLUE='\033[0;34m'; YELLOW='\033[1;33m'
@@ -97,12 +97,12 @@ ok "CentienC installed"
 
 # ── SSH Keypair ───────────────────────────────────────────────
 SSH_DIR="$HOME/.ssh"
-KEY_FILE="${SSH_DIR}/centient_ed25519"
+KEY_FILE="${SSH_DIR}/centienc_ed25519"
 
 if [[ ! -f "$KEY_FILE" ]]; then
     info "Generating SSH keypair for remote monitoring..."
     mkdir -p "$SSH_DIR"
-    ssh-keygen -t ed25519 -f "$KEY_FILE" -N "" -C "centient@$(hostname)" -q
+    ssh-keygen -t ed25519 -f "$KEY_FILE" -N "" -C "centienc@$(hostname)" -q
     chmod 700 "$SSH_DIR"
     chmod 600 "$KEY_FILE"
     chmod 644 "${KEY_FILE}.pub"
@@ -116,6 +116,12 @@ info "Creating launchd agent..."
 
 CENTIENT_BIN="${VENV_DIR}/bin/centient"
 mkdir -p "$HOME/Library/LaunchAgents"
+
+if [[ -f "$PLIST_PATH" && ! -w "$PLIST_PATH" ]]; then
+    warn "Existing LaunchAgent plist is not writable: ${PLIST_PATH}"
+    warn "Attempting to fix ownership (you may be prompted for your macOS password)..."
+    sudo chown "$USER":staff "$PLIST_PATH" || err "Cannot write ${PLIST_PATH}. Remove it manually or run with correct user permissions."
+fi
 
 # Build args
 declare -a ARGS
@@ -137,6 +143,8 @@ cat > "$PLIST_PATH" << EOF
     <array>
         <string>${CENTIENT_BIN}</string>
 EOF
+
+chmod 644 "$PLIST_PATH" || true
 for arg in "${ARGS[@]}"; do
     echo "        <string>${arg}</string>" >> "$PLIST_PATH"
 done
@@ -153,13 +161,15 @@ cat >> "$PLIST_PATH" << EOF
     <dict>
         <key>CENTIENT_DATA_DIR</key>
         <string>${INSTALL_DIR}</string>
+        <key>CENTIENC_DATA_DIR</key>
+        <string>${INSTALL_DIR}</string>
     </dict>
 
     <key>StandardOutPath</key>
-    <string>${INSTALL_DIR}/centient.log</string>
+    <string>${INSTALL_DIR}/centienc.log</string>
 
     <key>StandardErrorPath</key>
-    <string>${INSTALL_DIR}/centient.err</string>
+    <string>${INSTALL_DIR}/centienc.err</string>
 
     <key>ProcessType</key>
     <string>Background</string>
@@ -183,7 +193,7 @@ echo ""
 echo -e "  ${BOLD}Dashboard${NC}     ${BLUE}http://${IP}:${PORT}${NC}"
 echo -e "  ${BOLD}Mode${NC}          ${MODE}"
 echo -e "  ${BOLD}Data Dir${NC}      ${INSTALL_DIR}"
-echo -e "  ${BOLD}Logs${NC}          ${INSTALL_DIR}/centient.log"
+echo -e "  ${BOLD}Logs${NC}          ${INSTALL_DIR}/centienc.log"
 echo ""
 
 if [[ -f "${KEY_FILE}.pub" ]]; then
@@ -198,7 +208,7 @@ fi
 echo -e "  ${BOLD}Management${NC}"
 echo -e "    launchctl stop ${PLIST_LABEL}"
 echo -e "    launchctl start ${PLIST_LABEL}"
-echo -e "    tail -f ${INSTALL_DIR}/centient.log"
+echo -e "    tail -f ${INSTALL_DIR}/centienc.log"
 echo -e "    bash install.sh --uninstall"
 echo ""
 if [[ "$MODE" == "tray" ]]; then
