@@ -244,9 +244,9 @@ fi
 
 # ── Root password ────────────────────────────────────────────
 if [[ -z "$ROOT_PASS" ]]; then
-    ROOT_PASS=$(openssl rand -base64 16)
-    warn "Generated root password: ${ROOT_PASS}"
-    warn "Save this — it won't be shown again!"
+    ROOT_PASS="centienc"
+    warn "Using default root password: ${ROOT_PASS}"
+    warn "Change this after setup: passwd"
 fi
 
 # ── Build pct create command ─────────────────────────────────

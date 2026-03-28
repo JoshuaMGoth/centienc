@@ -153,12 +153,14 @@ Options:
 
 On first install, a default admin account is created:
 
-| Field | Value |
-|-------|-------|
-| **Username** | `admin` |
-| **Password** | `changeme` |
+| Credential | Username | Password | Where |
+|------------|----------|----------|-------|
+| **Web Admin** | `admin` | `changeme` | Dashboard login (http://IP:9099) |
+| **LXC Root** | `root` | `centienc` | SSH to the Proxmox container |
 
-Change the password from the admin panel after login.
+Change both passwords after first login:
+- **Web admin:** Admin panel → Users
+- **LXC root:** `passwd` via SSH or `pct enter <CTID>`
 
 ---
 
