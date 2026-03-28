@@ -19,14 +19,6 @@
 
 ---
 
-## Screenshots
-
-| Dashboard | Infrastructure | Settings |
-|:---------:|:--------------:|:--------:|
-| ![Dashboard](centienc-dashboard-one.png) | ![Infrastructure](centienc-dashboard-two.png) | ![Settings](centienc-settings.png) |
-
----
-
 ## About
 
 **CentienC** is a professional-grade, self-hosted monitoring dashboard that tracks your servers, services, websites, and Proxmox infrastructure — all from a single lightweight process. Inspired by **Prometheus**, CentienC was customized for web developers in mind — delivering real-time infrastructure visibility without the complexity of deploying and configuring multiple services.
@@ -166,7 +158,7 @@ On first install, a default admin account is created:
 | **Username** | `admin` |
 | **Password** | `changeme` |
 
-Change the password from the admin panel after login, or choose open-access mode during setup.
+Change the password from the admin panel after login.
 
 ---
 

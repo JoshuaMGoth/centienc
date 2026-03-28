@@ -155,6 +155,19 @@ async def lifespan(application: FastAPI):
         secret = get_jwt_secret()
         await db.set_setting("jwt_secret", secret)
 
+    # Ensure there is always at least one admin user (default: admin / changeme).
+    # This runs on every startup so that headless installs and migrated databases
+    # always have a usable login without going through the setup wizard.
+    existing_users = await db.list_users()
+    if not existing_users:
+        default_hash = hash_password("changeme")
+        await db.create_user("admin", default_hash, "admin")
+        await db.update_settings({
+            "auth_enabled": "true",
+            "setup_complete": "true",
+        })
+        logger.info("Created default admin account (username: admin, password: changeme). Change this immediately.")
+
     engine = MonitorEngine(db)
     await engine.start()
 

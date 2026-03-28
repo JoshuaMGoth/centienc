@@ -72,27 +72,16 @@ select option{background:#0d1117;color:#e6edf3}
     <div class="dot" id="d3"></div>
   </div>
 
-  <!-- Step 1: Access Mode -->
+  <!-- Step 1: Create Admin Account -->
   <div class="step active" id="step1">
-    <h2>Step 1 — Access Mode</h2>
-    <p style="font-size:.82em;color:rgba(255,255,255,.5);margin-bottom:8px">Choose how you'd like to secure your dashboard.</p>
-    <div class="mode-cards">
-      <div class="mode-card selected" onclick="selectMode('open')" id="modeOpen">
-        <div class="mc-icon">🌐</div>
-        <div class="mc-title">Open Access</div>
-        <div class="mc-desc">No login required. Anyone with the URL can view.</div>
-      </div>
-      <div class="mode-card" onclick="selectMode('secured')" id="modeSecured">
-        <div class="mc-icon">🔒</div>
-        <div class="mc-title">Secured</div>
-        <div class="mc-desc">Create an admin account with username &amp; password.</div>
-      </div>
-    </div>
-    <div class="cred-fields" id="credFields">
+    <h2>Step 1 — Create Admin Account</h2>
+    <p style="font-size:.82em;color:rgba(255,255,255,.5);margin-bottom:8px">Create your admin credentials to secure the dashboard.</p>
+    <div class="cred-fields active" id="credFields">
       <label>Username</label>
-      <input id="sUsername" placeholder="admin">
+      <input id="sUsername" placeholder="admin" value="admin">
       <label>Password</label>
-      <input id="sPassword" type="password" placeholder="••••••••">
+      <input id="sPassword" type="password" placeholder="changeme">
+      <p style="font-size:.72em;color:rgba(255,255,255,.35);margin-top:8px">Default password is <strong style="color:rgba(255,255,255,.6)">changeme</strong> — change it to something secure.</p>
     </div>
     <div class="actions"><button class="btn btn-primary" onclick="goStep(2)">Continue →</button></div>
   </div>
@@ -124,19 +113,14 @@ select option{background:#0d1117;color:#e6edf3}
 </div>
 
 <script>
-let mode='open';
-
-function selectMode(m){
-  mode=m;
-  document.getElementById('modeOpen').classList.toggle('selected',m==='open');
-  document.getElementById('modeSecured').classList.toggle('selected',m==='secured');
-  document.getElementById('credFields').classList.toggle('active',m==='secured');
-}
+let mode='secured';
 
 function goStep(n){
-  if(n===2 && mode==='secured'){
-    if(!document.getElementById('sUsername').value.trim()){alert('Please enter a username');return}
-    if(!document.getElementById('sPassword').value){alert('Please enter a password');return}
+  if(n===2){
+    const u=document.getElementById('sUsername').value.trim();
+    const p=document.getElementById('sPassword').value;
+    if(!u){alert('Please enter a username');return}
+    if(!p){alert('Please enter a password');return}
   }
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
   document.getElementById('step'+n).classList.add('active');
@@ -152,8 +136,8 @@ function goStep(n){
 function buildReview(){
   const title=document.getElementById('sTitle').value||'CentienC';
   const interval=document.getElementById('sCheckInterval').value||'60';
-  let html=`<strong>Mode:</strong> ${mode==='secured'?'🔒 Secured (admin account)':'🌐 Open Access'}<br>`;
-  if(mode==='secured')html+=`<strong>Admin User:</strong> ${document.getElementById('sUsername').value}<br>`;
+  let html=`<strong>Mode:</strong> 🔒 Secured (admin account)<br>`;
+  html+=`<strong>Admin User:</strong> ${document.getElementById('sUsername').value}<br>`;
   html+=`<strong>Title:</strong> ${title}<br>`;
   html+=`<strong>Check Interval:</strong> ${interval}s<br>`;
   document.getElementById('reviewSummary').innerHTML=html;
@@ -163,15 +147,13 @@ async function finishSetup(){
   const btn=document.getElementById('finishBtn');
   btn.disabled=true;btn.textContent='Setting up…';
   const body={
-    mode,
+    mode:'secured',
     title:document.getElementById('sTitle').value||'CentienC',
     theme:'dark',
     check_interval:parseInt(document.getElementById('sCheckInterval').value)||60,
+    username:document.getElementById('sUsername').value,
+    password:document.getElementById('sPassword').value,
   };
-  if(mode==='secured'){
-    body.username=document.getElementById('sUsername').value;
-    body.password=document.getElementById('sPassword').value;
-  }
   try{
     const r=await fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
