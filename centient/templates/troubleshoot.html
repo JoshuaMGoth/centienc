@@ -125,7 +125,17 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 
 <div class="page">
   <div class="page-title">🛠️ Troubleshooting Guide</div>
-  <p class="page-sub">Common issues and solutions for CentienC. If your problem isn't listed here, open an issue on GitHub.</p>
+  <p class="page-sub">Common issues and solutions for CentienC. If your problem isn't listed here, open an issue on GitHub or email <a href="mailto:me@joshuagoth.com" style="color:var(--accent);text-decoration:none">me@joshuagoth.com</a>.</p>
+
+  <!-- Getting Started banner -->
+  <div class="alert-box info" style="display:flex;align-items:flex-start;gap:14px;margin-bottom:8px">
+    <span style="font-size:1.5em;flex-shrink:0">🧭</span>
+    <div>
+      <strong>New here? Use the Setup Wizard.</strong>
+      It walks you through adding a server or website step by step — including SSH credentials, monitoring features, live-traffic log detection, and a connection test — all from one guided flow.<br>
+      <a href="/admin" style="color:var(--accent);text-decoration:none;font-weight:600">Open Admin → Setup Wizard →</a>
+    </div>
+  </div>
 
   <!-- SSH Issues -->
   <div class="section-label">SSH & Connectivity</div>
@@ -217,6 +227,29 @@ firewall-cmd --add-port=22/tcp --permanent  # RHEL/Fedora</div></div></div>
     </div>
   </div>
 
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🛡️</span>
+      <span class="issue-title">SSH fails with "Permission denied: /root/.ssh/id_ed25519"</span>
+      <span class="issue-tag tag-ssh">SSH</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>The CentienC service runs as the <code>centienc</code> system user, not as <code>root</code>. If the SSH key path points to <code>/root/.ssh/</code>, the service user cannot read it and all SSH-dependent features (metrics, log reading, auto-detect) will fail.</p>
+      <div class="alert-box" style="margin-bottom:12px">⚠️ Symptom: errors in <code>journalctl -u centienc</code> like <code>PermissionError: [Errno 13] Permission denied: '/root/.ssh/id_ed25519'</code></div>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Use the correct key location.</strong> Keys for CentienC should live in <code>/var/lib/centienc/.ssh/</code> which is owned by the <code>centienc</code> user. The Setup Wizard's <strong>🔑 Generate Key</strong> button creates the key there automatically.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>If you already have a key in /root/.ssh/</strong>, copy it to the right place: <div class="code-block">mkdir -p /var/lib/centienc/.ssh
+cp /root/.ssh/id_ed25519 /var/lib/centienc/.ssh/id_ed25519
+cp /root/.ssh/id_ed25519.pub /var/lib/centienc/.ssh/id_ed25519.pub
+chown -R centienc:centienc /var/lib/centienc/.ssh
+chmod 700 /var/lib/centienc/.ssh && chmod 600 /var/lib/centienc/.ssh/id_ed25519</div></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Update the key path in Admin.</strong> Edit the server → set SSH Key Path to <code>/var/lib/centienc/.ssh/id_ed25519</code> → save.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Test the connection.</strong> Click <strong>🔌 Test SSH</strong> — a ✅ green response confirms the credentials and permissions are now correct.</div></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Server status -->
   <div class="section-label">Server Status & Metrics</div>
 
@@ -269,6 +302,106 @@ firewall-cmd --add-port=22/tcp --permanent  # RHEL/Fedora</div></div></div>
         <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Network difference.</strong> Your browser may be on a different network than the CentienC server. If the site is on an internal network, the CentienC server must also be on that network to reach it.</div></div>
         <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Check the expected status code.</strong> If the site redirects (301/302) but you have Expected Status set to 200, the check will fail. Set it to the actual response code, or enable <em>Follow Redirects</em>.</div></div>
         <div class="step"><div class="step-num">3</div><div class="step-text"><strong>SSL certificate errors.</strong> If the site has an invalid or self-signed cert, CentienC will report an error unless you disable <em>Verify SSL</em> in the website settings.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Website Analytics -->
+  <div class="section-label">Website Analytics & Live Traffic Feed</div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🔢</span>
+      <span class="issue-title">Live traffic drilldown shows 0 requests or "No traffic found"</span>
+      <span class="issue-tag tag-metric">Analytics</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>The live traffic feed reads your web server's access log in real time. Zero results usually means one of the following:</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>The log path is wrong.</strong> The most common cause — see the next card for details on how to fix it.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>No recent traffic.</strong> The feed searches the last 30 minutes by default. If the site has genuinely had no visitors in that window, the result will be empty. Try opening the site in your browser and refreshing the drilldown.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>The website isn't linked to a server.</strong> Open Admin → Websites → edit the website. The <em>Server</em> field must point to a configured server with working SSH. Without a server link, CentienC can't read its logs.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Click on the website card.</strong> From the dashboard, clicking the website row/card opens the drilldown. Make sure you're opening the right site.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">📂</span>
+      <span class="issue-title">Log path is set to a project folder, not an access log file</span>
+      <span class="issue-tag tag-metric">Analytics</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>The <em>Log Path</em> field must point to the nginx (or Apache) <strong>access log file</strong> — not a directory and not your site's project folder.</p>
+      <p><strong>Incorrect examples:</strong></p>
+      <div class="code-block">/home/deploy/joshuagoth          ← website project directory (wrong)
+/var/www/html/mysite             ← document root (wrong)
+/etc/nginx/sites-available       ← config directory (wrong)</div>
+      <p><strong>Correct examples:</strong></p>
+      <div class="code-block">/var/log/nginx/access.log               ← global nginx log (most common)
+/var/log/nginx/joshuagoth.access.log    ← per-vhost log
+/var/log/apache2/access.log             ← Apache
+/var/log/httpd/access_log               ← RHEL/CentOS Apache</div>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Fix it:</strong> Admin → Websites → edit the site → update the <em>Log Path</em> field to the correct <code>.log</code> file path.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Not sure of the path?</strong> Use the auto-detect feature (see below). Or SSH into the server and run: <div class="code-block">ls /var/log/nginx/</div></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Per-vhost logs?</strong> Check your nginx config with <code>grep -r "access_log" /etc/nginx/</code> to find the exact file name for each site.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🌐</span>
+      <span class="issue-title">Traffic data shows for the wrong website / vhost mismatch</span>
+      <span class="issue-tag tag-metric">Analytics</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>When multiple sites share a single access log (e.g. <code>/var/log/nginx/access.log</code>), CentienC filters entries by matching the <em>Host</em> header against your website's URL. A mismatch means no filtered results.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Check the website URL.</strong> Open Admin → Websites → edit. The URL should match the <em>Host</em> header your server sends, e.g. <code>https://joshuagoth.com</code>. The <code>www.</code> prefix is stripped automatically during matching.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Use the vhost picker.</strong> If your server has multiple virtual hosts, click the <strong>↻ Detect Logs</strong> button in the website edit form or in the Setup Wizard. It scans the server's nginx config and presents each vhost with its log file — click one to auto-fill the log path.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Per-site logs are the cleanest solution.</strong> In your nginx vhost config add: <div class="code-block">access_log /var/log/nginx/yourdomain.access.log;</div> Then set that path in CentienC — no host filtering needed.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🔍</span>
+      <span class="issue-title">How to use auto-detect to find the correct log path</span>
+      <span class="issue-tag tag-metric">Analytics</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>CentienC can scan your server's nginx configuration over SSH and suggest the correct log file for each virtual host, so you don't have to find paths manually.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>From the Setup Wizard:</strong> on the "Web Server & Log File" step, click <strong>↻ Detect Logs / Virtual Hosts</strong>. It queries your server and lists each vhost with its access log path as a clickable card.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>From Admin → Websites:</strong> edit an existing website, choose its linked server, then click the <strong>↻ Detect</strong> button next to the log path field.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Click a result card</strong> to auto-fill the log path. Then save the website to apply.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Requires working SSH.</strong> Auto-detect runs via SSH so the linked server must have valid SSH credentials configured first.</div></div>
+      </div>
+      <div class="alert-box info">If auto-detect returns no results, your nginx config may use a non-standard location. Run <code>nginx -T 2>/dev/null | grep access_log</code> on the server to list all configured log paths.</div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🔒</span>
+      <span class="issue-title">Live feed fails — "Permission denied reading log file"</span>
+      <span class="issue-tag tag-ssh">Permissions</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>CentienC reads log files over SSH as the configured SSH user. That user must have read access to the log file.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Check log file permissions.</strong> On the target server run: <div class="code-block">ls -l /var/log/nginx/access.log</div> If it's <code>-rw-r-----</code> and owned by <code>root:adm</code>, your SSH user needs to be in the <code>adm</code> group.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Add the SSH user to the adm group:</strong> <div class="code-block">usermod -aG adm deploy   # replace 'deploy' with your SSH user</div> The user must log out and back in (or reconnect SSH) for the group to take effect.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Or grant direct read access:</strong> <div class="code-block">chmod o+r /var/log/nginx/access.log</div> Note this makes the log readable by all users on the system.</div></div>
       </div>
     </div>
   </div>
@@ -351,6 +484,7 @@ firewall-cmd --add-port=22/tcp --permanent  # RHEL/Fedora</div></div></div>
       <a class="support-link" href="https://github.com/JoshuaMGoth/centienc/issues" target="_blank" rel="noopener noreferrer">🐛 Open an Issue</a>
       <a class="support-link" href="https://github.com/JoshuaMGoth/centienc" target="_blank" rel="noopener noreferrer">📖 GitHub Repo</a>
       <a class="support-link" href="/updates">📣 Latest Updates</a>
+      <a class="support-link" href="mailto:me@joshuagoth.com">✉️ me@joshuagoth.com</a>
     </div>
   </div>
 </div>
