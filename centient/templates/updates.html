@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Updates — CentienC</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+<link rel="apple-touch-icon" href="/static/centienc-logo.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--surface:#0f1923;--surface2:#162032;--border:rgba(255,255,255,.08);--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922}
+html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.header h1{font-size:1.05em;font-weight:700;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.header .logo{width:28px;height:28px;border-radius:6px;object-fit:cover}
+.header-sub{color:rgba(255,255,255,.4);font-weight:300;font-size:.9em}
+.header-right{display:flex;align-items:center;gap:8px}
+.header-links{display:flex;gap:6px;flex-wrap:wrap}
+.header-links a{color:var(--text2);text-decoration:none;font-size:.82em;padding:4px 11px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.03);transition:.15s;white-space:nowrap}
+.header-links a:hover,.header-links a.active{color:var(--accent);border-color:rgba(88,166,255,.35);background:rgba(88,166,255,.08)}
+
+/* ── Page ── */
+.page{max-width:860px;margin:0 auto;padding:32px 24px 60px}
+.page-title{font-size:1.5em;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.page-sub{color:var(--text2);font-size:.9em;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.page-sub a{color:var(--accent);text-decoration:none;font-size:.9em}
+.page-sub a:hover{text-decoration:underline}
+
+/* ── State ── */
+.state-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;opacity:.7}
+.spinner{width:38px;height:38px;border:3px solid rgba(255,255,255,.07);border-top-color:#58a6ff;border-radius:50%;animation:spin .85s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-box{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);border-radius:10px;padding:18px 24px;max-width:480px;text-align:center;color:#ff9b96;line-height:1.6;font-size:.9em}
+
+/* ── Release feed ── */
+.releases{display:flex;flex-direction:column;gap:16px}
+.release-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:.15s}
+.release-card:hover{border-color:rgba(88,166,255,.25)}
+.release-header{display:flex;align-items:center;gap:14px;padding:18px 22px;cursor:pointer}
+.release-version{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.version-tag{font-size:.9em;font-weight:700;color:var(--accent);background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.25);padding:3px 12px;border-radius:20px;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace}
+.version-tag.latest{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.3);color:#7ee787}
+.release-name{color:var(--text);font-size:.9em;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.release-meta{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.release-date{color:var(--text2);font-size:.8em}
+.prerelease-badge{font-size:.72em;padding:2px 8px;border-radius:10px;background:rgba(210,153,34,.12);color:#d29922;border:1px solid rgba(210,153,34,.25);font-weight:600}
+.release-toggle{color:var(--text2);font-size:.75em;flex-shrink:0;transition:transform .2s}
+.release-toggle.open{transform:rotate(90deg)}
+
+.release-body{display:none;padding:0 22px 20px;border-top:1px solid var(--border)}
+.release-body.open{display:block}
+.release-body-inner{padding-top:16px;font-size:.875em;color:var(--text2);line-height:1.65}
+.release-body-inner h1,.release-body-inner h2,.release-body-inner h3{color:var(--text);margin:14px 0 6px;font-size:1em;font-weight:600}
+.release-body-inner h1:first-child,.release-body-inner h2:first-child,.release-body-inner h3:first-child{margin-top:0}
+.release-body-inner ul,.release-body-inner ol{padding-left:18px;margin:6px 0}
+.release-body-inner li{margin:3px 0}
+.release-body-inner code{font-family:'SF Mono','Fira Code',monospace;background:rgba(0,0,0,.35);padding:1px 5px;border-radius:4px;font-size:.9em;color:#a8d4ff}
+.release-body-inner pre{background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 14px;overflow-x:auto;margin:8px 0}
+.release-body-inner pre code{background:none;padding:0;color:#a8d4ff}
+.release-body-inner a{color:var(--accent);text-decoration:none}
+.release-body-inner a:hover{text-decoration:underline}
+.release-body-inner strong{color:var(--text);font-weight:600}
+.release-body-inner hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.release-footer{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.gh-link{display:inline-flex;align-items:center;gap:5px;color:var(--text2);text-decoration:none;font-size:.82em;padding:4px 12px;border:1px solid var(--border);border-radius:8px;transition:.15s}
+.gh-link:hover{color:var(--accent);border-color:rgba(88,166,255,.4)}
+
+/* ── Empty state ── */
+.empty-state{text-align:center;padding:48px 24px;color:var(--text2)}
+.empty-state .icon{font-size:2.5em;margin-bottom:12px}
+.empty-state p{font-size:.9em;line-height:1.5}
+
+/* ── Mobile bottom nav ── */
+.mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:100;padding:8px 0 env(safe-area-inset-bottom)}
+.mob-nav-items{display:flex;justify-content:space-around}
+.mob-nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 8px;color:var(--text2);text-decoration:none;font-size:.68em;min-width:50px}
+.mob-nav-item:hover,.mob-nav-item.active{color:var(--accent)}
+.mob-nav-item span:first-child{font-size:1.4em}
+
+@media(max-width:700px){
+  .header-links{display:none}
+  .mob-nav{display:block}
+  .page{padding:20px 16px 80px}
+  .page-title{font-size:1.25em}
+  .release-header{padding:14px 16px;flex-wrap:wrap}
+  .release-body{padding:0 16px 16px}
+  .release-meta{width:100%;justify-content:flex-start}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <img src="/static/centienc-logo.png" alt="CentienC" class="logo" onerror="this.style.display='none'">
+    <span>CentienC</span>
+    <span class="header-sub">/ Updates</span>
+  </h1>
+  <div class="header-right">
+    <div class="header-links">
+      <a href="/">🏠 Dashboard</a>
+      <a href="/map">🗺️ Map</a>
+      <a href="/tv">📺 TV</a>
+      <a href="/analytics">📊 Analytics</a>
+      <a href="/reports">📋 Reports</a>
+      <a href="/troubleshoot">🛠️ Troubleshoot</a>
+      <a href="/updates" class="active">📣 Updates</a>
+      <a href="/admin">⚙️ Admin</a>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="mob-nav">
+  <div class="mob-nav-items">
+    <a class="mob-nav-item" href="/"><span>🏠</span><span>Dashboard</span></a>
+    <a class="mob-nav-item" href="/analytics"><span>📊</span><span>Analytics</span></a>
+    <a class="mob-nav-item" href="/reports"><span>📋</span><span>Reports</span></a>
+    <a class="mob-nav-item" href="/troubleshoot"><span>🛠️</span><span>Help</span></a>
+    <a class="mob-nav-item active" href="/updates"><span>📣</span><span>Updates</span></a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-title">📣 News &amp; Updates</div>
+  <div class="page-sub">
+    <span>Release history from GitHub. Latest version is shown first.</span>
+    <a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noopener noreferrer">View all on GitHub →</a>
+  </div>
+  <div id="releaseFeed">
+    <div class="state-overlay">
+      <div class="spinner"></div>
+      <span style="color:rgba(255,255,255,.5)">Loading releases…</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Simple Markdown → HTML (subset: headings, bold, italic, code, lists, hr, links) ──
+function md(src){
+  if(!src)return '';
+  return src
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/```([\s\S]*?)```/gm,(_,c)=>'<pre><code>'+c.trim()+'</code></pre>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^---+$/gm,'<hr>')
+    .replace(/^\s*[-*] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>')
+    .replace(/<\/ul>\s*<ul>/g,'')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/\n/g,'<br>')
+    .replace(/^(?!<[h|u|p|l|h])/,'<p>')
+    .replace(/(?<![>])$/,'</p>');
+}
+
+function relDate(iso){
+  const d=new Date(iso);
+  const diff=(Date.now()-d)/1000;
+  if(diff<86400)return 'today';
+  if(diff<172800)return 'yesterday';
+  if(diff<604800)return Math.floor(diff/86400)+' days ago';
+  if(diff<2592000)return Math.floor(diff/604800)+' weeks ago';
+  if(diff<31536000)return Math.floor(diff/2592000)+' months ago';
+  return Math.floor(diff/31536000)+' years ago';
+}
+
+function toggle(header){
+  const chevron=header.querySelector('.release-toggle');
+  const body=header.nextElementSibling;
+  const open=body.classList.toggle('open');
+  chevron.classList.toggle('open',open);
+}
+
+async function loadReleases(){
+  const feed=document.getElementById('releaseFeed');
+  try{
+    const r=await fetch('/api/updates');
+    const d=await r.json();
+    if(!d.ok) throw new Error(d.error||'API error');
+    const releases=d.releases||[];
+    if(!releases.length){
+      feed.innerHTML=`<div class="empty-state"><div class="icon">📭</div><p>No releases found.<br>Check <a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank">GitHub</a> directly.</p></div>`;
+      return;
+    }
+    let html='<div class="releases">';
+    releases.forEach((rel,i)=>{
+      const isLatest=i===0&&!rel.prerelease;
+      const bodyHtml=md(rel.body||'');
+      html+=`
+      <div class="release-card">
+        <div class="release-header" onclick="toggle(this)">
+          <div class="release-version">
+            <span class="version-tag${isLatest?' latest':''}">${rel.tag_name}</span>
+            <span class="release-name">${rel.name||rel.tag_name}</span>
+          </div>
+          <div class="release-meta">
+            ${rel.prerelease?'<span class="prerelease-badge">Pre-release</span>':''}
+            <span class="release-date">${relDate(rel.published_at)}</span>
+          </div>
+          <span class="release-toggle">▶</span>
+        </div>
+        <div class="release-body${i===0?' open':''}">
+          <div class="release-body-inner">${bodyHtml||'<em style="color:var(--text2)">No release notes provided.</em>'}</div>
+          <div class="release-footer">
+            <a class="gh-link" href="${rel.html_url}" target="_blank" rel="noopener noreferrer">🐙 View on GitHub</a>
+            <span style="color:var(--text2);font-size:.8em">Published ${new Date(rel.published_at).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</span>
+          </div>
+        </div>
+      </div>`;
+    });
+    html+='</div>';
+    feed.innerHTML=html;
+  }catch(e){
+    feed.innerHTML=`<div class="state-overlay"><div class="error-box">⚠️ Could not load releases: ${e.message}<br><br><a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noopener noreferrer" style="color:#58a6ff">View releases directly on GitHub →</a></div></div>`;
+  }
+}
+
+loadReleases();
+</script>
+</body>
+</html>

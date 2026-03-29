@@ -397,6 +397,32 @@ async def reports_page(request: Request):
     return _serve_template("reports.html")
 
 
+@app.get("/troubleshoot", response_class=HTMLResponse)
+async def troubleshoot_page(request: Request):
+    setup_done = await db.get_setting("setup_complete", "false")
+    if setup_done != "true":
+        return RedirectResponse("/setup")
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled == "true":
+        user = await _require_auth(request)
+        if user is None:
+            return RedirectResponse("/login")
+    return _serve_template("troubleshoot.html")
+
+
+@app.get("/updates", response_class=HTMLResponse)
+async def updates_page(request: Request):
+    setup_done = await db.get_setting("setup_complete", "false")
+    if setup_done != "true":
+        return RedirectResponse("/setup")
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled == "true":
+        user = await _require_auth(request)
+        if user is None:
+            return RedirectResponse("/login")
+    return _serve_template("updates.html")
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  WebSocket endpoint
 # ═══════════════════════════════════════════════════════════════════
@@ -1321,6 +1347,50 @@ async def api_analytics(request: Request):
 
     result = await engine.get_analytics(server, days=days)
     return {"ok": True, **result}
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Updates / GitHub releases (no auth — public data)
+# ═══════════════════════════════════════════════════════════════════
+
+_updates_cache: dict[str, Any] = {"ts": 0.0, "data": None}
+_UPDATES_TTL = 300  # cache for 5 minutes
+
+@app.get("/api/updates")
+async def api_updates():
+    """Proxy GitHub releases for the /updates page (no auth required)."""
+    import time
+    now = time.monotonic()
+    if _updates_cache["data"] and now - _updates_cache["ts"] < _UPDATES_TTL:
+        return _updates_cache["data"]
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://api.github.com/repos/JoshuaMGoth/centienc/releases",
+                headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+            )
+        if resp.status_code != 200:
+            return {"ok": False, "error": f"GitHub returned {resp.status_code}"}
+        releases = resp.json()
+        result: dict[str, Any] = {
+            "ok": True,
+            "releases": [
+                {
+                    "tag_name": r.get("tag_name"),
+                    "name": r.get("name"),
+                    "published_at": r.get("published_at"),
+                    "body": r.get("body"),
+                    "html_url": r.get("html_url"),
+                    "prerelease": r.get("prerelease", False),
+                }
+                for r in releases
+            ],
+        }
+        _updates_cache["ts"] = now
+        _updates_cache["data"] = result
+        return result
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 # ═══════════════════════════════════════════════════════════════════

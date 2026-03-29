@@ -290,7 +290,7 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
         <div class="header-sub" id="headerSub">Loading…</div>
     </div>
     <div class="header-right">
-        <div class="header-links"><a href="/map">🗺️ Map</a><a href="/tv">📺 TV</a><a href="/analytics">📊 Analytics</a><a href="/reports">📋 Reports</a></div>
+        <div class="header-links"><a href="/map">🗺️ Map</a><a href="/tv">📺 TV</a><a href="/analytics">📊 Analytics</a><a href="/reports">📋 Reports</a><a href="/troubleshoot">🛠️ Troubleshoot</a><a href="/updates">📣 Updates</a></div>
         <div class="uptime-badge" id="pm2Badge">⚙ PM2: --</div>
         <span class="ws-dot disconnected" id="wsDot" title="WebSocket"></span>
         <div id="clock">--:--:--</div>
@@ -917,10 +917,10 @@ async function testSSHConn(){
         else{
             const msg=d.error||'';
             let hint='';
-            if(msg.toLowerCase().includes('permission denied')){hint=' — Try key auth: click "🔑 Generate Key" above.';}
-            else if(msg.toLowerCase().includes('connection refused')){hint=' — Is the SSH port correct?';}
-            else if(msg.toLowerCase().includes('timed out')||msg.toLowerCase().includes('no route')){hint=' — Host unreachable. Check IP/hostname.';}
-            el.textContent='❌ '+esc(msg)+hint;el.style.color='#FF3B30';
+            if(msg.toLowerCase().includes('permission denied')){hint=' — Try key auth: click "🔑 Generate Key" above, or see <a href="/troubleshoot" target="_blank">Troubleshooting</a>.';}
+            else if(msg.toLowerCase().includes('connection refused')){hint=' — Is the SSH port correct? See <a href="/troubleshoot" target="_blank">Troubleshooting</a>.';}
+            else if(msg.toLowerCase().includes('timed out')||msg.toLowerCase().includes('no route')){hint=' — Host unreachable. Check IP/hostname. See <a href="/troubleshoot" target="_blank">Troubleshooting</a>.';}
+            el.innerHTML='❌ '+esc(msg)+hint;el.style.color='#FF3B30';
         }
     }catch(e){el.textContent='❌ '+esc(e.message);el.style.color='#FF3B30';}
 }

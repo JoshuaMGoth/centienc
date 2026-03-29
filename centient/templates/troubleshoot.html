@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Troubleshooting — CentienC</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+<link rel="apple-touch-icon" href="/static/centienc-logo.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0d1117;--surface:#0f1923;--surface2:#162032;--border:rgba(255,255,255,.08);--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--logo-text:#fff}
+html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.header h1{font-size:1.05em;font-weight:700;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.header .logo{width:28px;height:28px;border-radius:6px;object-fit:cover}
+.header-sub{color:rgba(255,255,255,.4);font-weight:300;font-size:.9em}
+.header-right{display:flex;align-items:center;gap:8px}
+.header-links{display:flex;gap:6px;flex-wrap:wrap}
+.header-links a{color:var(--text2);text-decoration:none;font-size:.82em;padding:4px 11px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.03);transition:.15s;white-space:nowrap}
+.header-links a:hover,.header-links a.active{color:var(--accent);border-color:rgba(88,166,255,.35);background:rgba(88,166,255,.08)}
+
+/* ── Page ── */
+.page{max-width:900px;margin:0 auto;padding:32px 24px 60px}
+.page-title{font-size:1.5em;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.page-sub{color:var(--text2);font-size:.9em;margin-bottom:32px}
+
+/* ── Issue cards ── */
+.section-label{font-size:.72em;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text2);margin-bottom:12px;margin-top:32px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.issue-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.issue-header{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;transition:.15s}
+.issue-header:hover{background:var(--surface2)}
+.issue-icon{font-size:1.3em;flex-shrink:0;width:32px;text-align:center}
+.issue-title{font-size:.95em;font-weight:600;flex:1}
+.issue-tag{font-size:.72em;padding:2px 10px;border-radius:20px;font-weight:600;flex-shrink:0}
+.tag-ssh{background:rgba(248,81,73,.12);color:#f85149;border:1px solid rgba(248,81,73,.25)}
+.tag-connect{background:rgba(210,153,34,.12);color:#d29922;border:1px solid rgba(210,153,34,.25)}
+.tag-metric{background:rgba(88,166,255,.12);color:#58a6ff;border:1px solid rgba(88,166,255,.25)}
+.tag-install{background:rgba(63,185,80,.12);color:#3fb950;border:1px solid rgba(63,185,80,.25)}
+.tag-mobile{background:rgba(171,71,188,.12);color:#ba68c8;border:1px solid rgba(171,71,188,.25)}
+.issue-chevron{color:var(--text2);font-size:.7em;transition:transform .2s;flex-shrink:0}
+.issue-chevron.open{transform:rotate(90deg)}
+.issue-body{display:none;padding:0 20px 20px}
+.issue-body.open{display:block}
+.issue-body p{font-size:.88em;color:var(--text2);line-height:1.65;margin-bottom:10px}
+.issue-body p:last-child{margin-bottom:0}
+.issue-body strong{color:var(--text)}
+
+/* ── Steps ── */
+.steps{margin:12px 0;display:flex;flex-direction:column;gap:8px}
+.step{display:flex;gap:12px;align-items:flex-start;font-size:.875em}
+.step-num{width:22px;height:22px;border-radius:50%;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.35);color:var(--accent);font-size:.78em;font-weight:700;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.step-text{color:var(--text2);line-height:1.55;flex:1}
+.step-text strong{color:var(--text)}
+.step-text a{color:var(--accent);text-decoration:none}
+.step-text a:hover{text-decoration:underline}
+
+/* ── Code blocks ── */
+.code-block{background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 14px;font-family:'SF Mono','Fira Code',monospace;font-size:.82em;color:#a8d4ff;margin:8px 0;overflow-x:auto;white-space:pre}
+
+/* ── Alert box ── */
+.alert-box{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:8px;padding:12px 16px;font-size:.85em;color:#e0c560;margin:10px 0;line-height:1.5}
+.alert-box.info{background:rgba(88,166,255,.08);border-color:rgba(88,166,255,.25);color:#90caff}
+.alert-box.success{background:rgba(63,185,80,.08);border-color:rgba(63,185,80,.25);color:#7ee787}
+
+/* ── Support footer ── */
+.support-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center;margin-top:40px}
+.support-box h3{margin-bottom:8px;font-size:1em}
+.support-box p{color:var(--text2);font-size:.88em;margin-bottom:14px}
+.support-links{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.support-link{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border:1px solid var(--border);border-radius:8px;color:var(--text2);text-decoration:none;font-size:.85em;transition:.15s}
+.support-link:hover{border-color:rgba(88,166,255,.4);color:var(--accent)}
+
+/* ── Mobile hamburger ── */
+.mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:100;padding:8px 0 env(safe-area-inset-bottom)}
+.mob-nav-items{display:flex;justify-content:space-around}
+.mob-nav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 8px;color:var(--text2);text-decoration:none;font-size:.68em;min-width:50px}
+.mob-nav-item:hover,.mob-nav-item.active{color:var(--accent)}
+.mob-nav-item span:first-child{font-size:1.4em}
+
+@media(max-width:700px){
+  .header-links{display:none}
+  .mob-nav{display:block}
+  .page{padding:20px 16px 80px}
+  .page-title{font-size:1.25em}
+  .issue-header{padding:14px 16px}
+  .issue-body{padding:0 16px 16px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <img src="/static/centienc-logo.png" alt="CentienC" class="logo" onerror="this.style.display='none'">
+    <span>CentienC</span>
+    <span class="header-sub">/ Troubleshooting</span>
+  </h1>
+  <div class="header-right">
+    <div class="header-links">
+      <a href="/">🏠 Dashboard</a>
+      <a href="/map">🗺️ Map</a>
+      <a href="/tv">📺 TV</a>
+      <a href="/analytics">📊 Analytics</a>
+      <a href="/reports">📋 Reports</a>
+      <a href="/troubleshoot" class="active">🛠️ Troubleshoot</a>
+      <a href="/updates">📣 Updates</a>
+      <a href="/admin">⚙️ Admin</a>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<nav class="mob-nav">
+  <div class="mob-nav-items">
+    <a class="mob-nav-item" href="/"><span>🏠</span><span>Dashboard</span></a>
+    <a class="mob-nav-item" href="/analytics"><span>📊</span><span>Analytics</span></a>
+    <a class="mob-nav-item" href="/reports"><span>📋</span><span>Reports</span></a>
+    <a class="mob-nav-item active" href="/troubleshoot"><span>🛠️</span><span>Help</span></a>
+    <a class="mob-nav-item" href="/updates"><span>📣</span><span>Updates</span></a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-title">🛠️ Troubleshooting Guide</div>
+  <p class="page-sub">Common issues and solutions for CentienC. If your problem isn't listed here, open an issue on GitHub.</p>
+
+  <!-- SSH Issues -->
+  <div class="section-label">SSH & Connectivity</div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🔐</span>
+      <span class="issue-title">SSH: "Permission denied (publickey)" or "Permission denied (password)"</span>
+      <span class="issue-tag tag-ssh">SSH</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>This is the most common SSH error. It almost always means one of two things:</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text"><strong>The server requires key auth, not password.</strong> Many VPS/cloud servers disable password authentication by default (<code>PasswordAuthentication no</code> in <code>/etc/ssh/sshd_config</code>). You must use an SSH key even if the password field looks correct.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text"><strong>Generate a key from the dashboard.</strong> Open the server edit form → find the <em>SSH Key Path</em> field → click <strong>🔑 Generate Key</strong>. This creates an ed25519 keypair and shows you the public key.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text"><strong>Add the public key to your remote server.</strong> SSH into the target server and run:
+            <div class="code-block">echo 'your-public-key-here' >> ~/.ssh/authorized_keys
+chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text"><strong>Test the connection.</strong> In the server edit form, click <strong>🔌 Test SSH</strong>. If it returns a green ✅ response, SSH is working.</div>
+        </div>
+      </div>
+      <div class="alert-box">💡 You do <strong>not</strong> need to type a path manually — the Generate Key button auto-fills it. The path is where the key lives on the <em>CentienC server</em>, not your local machine.</div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🚫</span>
+      <span class="issue-title">SSH: "Connection refused" on port 22</span>
+      <span class="issue-tag tag-connect">Connection</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>The target machine is reachable but nothing is listening on that port.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Check the SSH port.</strong> Some servers run SSH on a custom port (e.g. 2222). Edit the server and set the correct <em>SSH Port</em>.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Is SSH running on the target?</strong> Run <code>systemctl status sshd</code> on the target machine. If it's stopped, start it with <code>systemctl start sshd</code>.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Check firewall rules.</strong> Ensure port 22 (or the custom port) is open: <div class="code-block">ufw allow 22/tcp   # Debian/Ubuntu
+firewall-cmd --add-port=22/tcp --permanent  # RHEL/Fedora</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">⏱️</span>
+      <span class="issue-title">SSH: "Timed out" or "No route to host"</span>
+      <span class="issue-tag tag-connect">Connection</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>The CentienC server can't reach the target host at all.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Verify the hostname/IP.</strong> Make sure you typed the correct IP address or hostname. If using a domain name, check that DNS resolves correctly.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Check network routing.</strong> CentienC must be able to reach the target. If the target is on an internal network (e.g. <code>192.168.x.x</code>), make sure CentienC is on the same LAN or VPN.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Check if the server is actually up.</strong> Ping the IP from the CentienC machine's network — if ping also fails, the machine is off or unreachable.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🔑</span>
+      <span class="issue-title">SSH key not found — "private key file does not exist"</span>
+      <span class="issue-tag tag-ssh">SSH</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>The SSH Key Path you entered doesn't point to a real file on the CentienC server.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Use the Generate Key button</strong> instead of typing a path manually. Open the server edit form and click <strong>🔑 Generate Key</strong> — it creates the key and auto-fills the correct path.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>If you have an existing key</strong>, verify the path on the CentienC server: <div class="code-block">ls -la ~/.ssh/id_*</div> Common default path: <code>/var/lib/centienc/.ssh/id_ed25519</code></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Permissions matter.</strong> The key must be readable by the CentienC service user (<code>centienc</code>). If the file is in <code>/root/.ssh/</code>, CentienC may not be able to read it. Move or copy it to <code>/var/lib/centienc/.ssh/</code>.</div></div>
+      </div>
+      <div class="alert-box info">The CentienC service runs as a limited user (<code>centienc</code>), not as root. Keys stored in <code>/root/.ssh/</code> are not accessible to this user.</div>
+    </div>
+  </div>
+
+  <!-- Server status -->
+  <div class="section-label">Server Status & Metrics</div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🔴</span>
+      <span class="issue-title">Server shows "down" but it's definitely up</span>
+      <span class="issue-tag tag-connect">Status</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>CentienC performs TCP/ICMP pings to check if a server is reachable. A "down" status means the connection attempt failed.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Check the hostname/IP.</strong> Edit the server and confirm the IP address is correct and reachable from the CentienC machine.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Check the port.</strong> CentienC tries the SSH port by default. If SSH is blocked or not running, the server will appear down even if it's responding on other ports.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Force a re-check.</strong> Click the server pill on the dashboard → click <strong>Check Now</strong> to trigger an immediate check instead of waiting for the next interval.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Increase check interval.</strong> If the server has intermittent brief downtime, a short check interval may catch those momentary blips. Adjust in Admin → Servers.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">📊</span>
+      <span class="issue-title">CPU / memory / disk metrics not showing or stuck at 0</span>
+      <span class="issue-tag tag-metric">Metrics</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>Rich system metrics are collected over SSH. If SSH is not configured or failing, metrics will be empty.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Confirm SSH credentials are set.</strong> Edit the server — the SSH Username field must be filled in, and either an SSH Key Path or SSH Password must be provided.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Test SSH.</strong> Click <strong>🔌 Test SSH</strong> in the server edit form. A ✅ result means SSH is working and metrics should start appearing within the next check cycle.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Enable System Metrics.</strong> In the server edit form, make sure <em>System Metrics</em> is checked under Monitoring Features.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Wait one check cycle.</strong> Metrics are collected on the check interval (default 60s). After fixing credentials, wait a cycle for data to populate.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🌐</span>
+      <span class="issue-title">Website shows as "down" but I can access it in my browser</span>
+      <span class="issue-tag tag-connect">Websites</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>CentienC checks websites from the server it's running on, not your browser's location.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Network difference.</strong> Your browser may be on a different network than the CentienC server. If the site is on an internal network, the CentienC server must also be on that network to reach it.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Check the expected status code.</strong> If the site redirects (301/302) but you have Expected Status set to 200, the check will fail. Set it to the actual response code, or enable <em>Follow Redirects</em>.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>SSL certificate errors.</strong> If the site has an invalid or self-signed cert, CentienC will report an error unless you disable <em>Verify SSL</em> in the website settings.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Installation -->
+  <div class="section-label">Installation & Updates</div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">📦</span>
+      <span class="issue-title">Service won't start after install — "address already in use"</span>
+      <span class="issue-tag tag-install">Install</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>Another process is already using the port CentienC needs.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Find what's using the port:</strong><div class="code-block">ss -tlnp | grep 8000</div></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Stop the conflicting process</strong> or change CentienC's port in <code>/etc/centienc/config.env</code> by setting <code>PORT=8001</code>, then restart: <code>systemctl restart centienc</code>.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🔄</span>
+      <span class="issue-title">How do I update CentienC to the latest version?</span>
+      <span class="issue-tag tag-install">Update</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>CentienC is installed as a pip package from GitHub. Updating is a one-liner:</p>
+      <div class="code-block">/opt/centienc/venv/bin/pip install 'centient @ git+https://github.com/JoshuaMGoth/centienc.git' \
+  --no-cache-dir --force-reinstall && systemctl restart centienc</div>
+      <div class="alert-box success">Check the <a href="/updates">📣 Updates</a> page to see what's new before upgrading.</div>
+    </div>
+  </div>
+
+  <!-- Mobile -->
+  <div class="section-label">Mobile & Browser</div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">📱</span>
+      <span class="issue-title">Dashboard doesn't update on mobile / page looks broken</span>
+      <span class="issue-tag tag-mobile">Mobile</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>CentienC uses WebSockets for real-time updates. On mobile, background tabs can disconnect the WebSocket.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Pull to refresh</strong> or tap the reload button. CentienC will reconnect and fetch a fresh snapshot.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Keep the tab active.</strong> When the browser tab is backgrounded on iOS/Android, the WebSocket may disconnect. This is normal — the UI reconnects automatically when you switch back.</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Use "Add to Home Screen"</strong> for the best mobile experience. Open CentienC in Safari/Chrome → share → Add to Home Screen. This gives a full-screen app with better keep-alive behavior.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="issue-card">
+    <div class="issue-header" onclick="toggle(this)">
+      <span class="issue-icon">🍪</span>
+      <span class="issue-title">Logged out unexpectedly / "Authentication required" error</span>
+      <span class="issue-tag tag-mobile">Auth</span>
+      <span class="issue-chevron">▶</span>
+    </div>
+    <div class="issue-body">
+      <p>CentienC uses a JWT stored in a browser cookie. The cookie expires after 24 hours by default.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>Log back in.</strong> Navigate to <code>/login</code> and authenticate. The session will be restored.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>On mobile</strong>, if cookies are being cleared by the browser's privacy settings, add the CentienC URL to your browser's "always allow cookies" list.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Support footer -->
+  <div class="support-box">
+    <h3>Still stuck?</h3>
+    <p>Check the project documentation or open an issue on GitHub — include your CentienC version and a description of what you've already tried.</p>
+    <div class="support-links">
+      <a class="support-link" href="https://github.com/JoshuaMGoth/centienc/issues" target="_blank" rel="noopener noreferrer">🐛 Open an Issue</a>
+      <a class="support-link" href="https://github.com/JoshuaMGoth/centienc" target="_blank" rel="noopener noreferrer">📖 GitHub Repo</a>
+      <a class="support-link" href="/updates">📣 Latest Updates</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggle(header){
+  const chevron=header.querySelector('.issue-chevron');
+  const body=header.nextElementSibling;
+  const open=body.classList.toggle('open');
+  chevron.classList.toggle('open',open);
+}
+// Auto-open if URL has a hash matching an issue
+window.addEventListener('DOMContentLoaded',()=>{
+  const hash=location.hash.slice(1);
+  if(hash){
+    const card=document.querySelector('[data-id="'+hash+'"]');
+    if(card)toggle(card.querySelector('.issue-header'));
+  }
+  // Auto-open first SSH card on mobile (likely came from a failed SSH test)
+  const ref=document.referrer;
+  if(/Mobi|Android/i.test(navigator.userAgent)&&ref&&ref.includes(location.host)){
+    const firstSSH=document.querySelector('.tag-ssh');
+    if(firstSSH){toggle(firstSSH.closest('.issue-card').querySelector('.issue-header'));}
+  }
+});
+</script>
+</body>
+</html>
