@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Updates — CentienC</title>
+<title>Update Center — CentienC</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="shortcut icon" href="/static/favicon.ico">
 <link rel="apple-touch-icon" href="/static/centienc-logo.png">
 <style>
+/* ═══════ FULL REPLACEMENT BELOW ═══════ */
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0d1117;--surface:#0f1923;--surface2:#162032;--border:rgba(255,255,255,.08);--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922}
+:root{--bg:#0d1117;--surface:#0f1923;--surface2:#162032;--border:rgba(255,255,255,.08);--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--orange:#f0883e}
 html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 
 /* ── Header ── */
@@ -25,34 +26,78 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 /* ── Page ── */
 .page{max-width:860px;margin:0 auto;padding:32px 24px 60px}
 .page-title{font-size:1.5em;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px}
-.page-sub{color:var(--text2);font-size:.9em;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.page-sub a{color:var(--accent);text-decoration:none;font-size:.9em}
+.page-sub{color:var(--text2);font-size:.9em;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.page-sub a{color:var(--accent);text-decoration:none}
 .page-sub a:hover{text-decoration:underline}
 
-/* ── State ── */
-.state-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;opacity:.7}
+/* ── Update Center card ── */
+.update-center{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:28px}
+.update-center-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;flex-wrap:wrap}
+.version-block{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ver-pill{display:inline-flex;align-items:center;gap:6px;font-family:'SF Mono','Fira Code',monospace;font-size:.88em;font-weight:700;padding:5px 14px;border-radius:20px}
+.ver-pill.installed{background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.3);color:var(--accent)}
+.ver-pill.latest-ok{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);color:#7ee787}
+.ver-pill.latest-new{background:rgba(240,136,62,.1);border:1px solid rgba(240,136,62,.35);color:var(--orange)}
+.ver-pill.loading{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2)}
+.ver-arrow{color:var(--text2);font-size:.9em}
+.update-status-badge{display:inline-flex;align-items:center;gap:7px;font-size:.82em;font-weight:600;padding:6px 14px;border-radius:20px}
+.status-ok{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);color:#7ee787}
+.status-new{background:rgba(240,136,62,.1);border:1px solid rgba(240,136,62,.35);color:var(--orange)}
+.status-loading{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text2)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ── Update available panel ── */
+.update-avail-panel{border-top:1px solid var(--border);padding:20px 24px;background:rgba(240,136,62,.04)}
+.update-avail-panel h3{font-size:.95em;font-weight:700;color:var(--orange);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.update-avail-panel p{font-size:.85em;color:var(--text2);line-height:1.5;margin-bottom:14px}
+.update-avail-panel p strong{color:var(--text)}
+.update-btn{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#0d1117;font-weight:700;font-size:.9em;padding:10px 22px;border-radius:10px;border:none;cursor:pointer;transition:.15s}
+.update-btn:hover{background:#e07020;transform:translateY(-1px)}
+.update-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.update-warn{display:flex;align-items:flex-start;gap:8px;font-size:.8em;color:var(--text2);margin-top:12px;line-height:1.5}
+
+/* ── Progress panel ── */
+.progress-panel{border-top:1px solid var(--border);padding:20px 24px;background:rgba(0,0,0,.25);display:none}
+.progress-panel.visible{display:block}
+.progress-title{font-size:.78em;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.07em}
+.progress-log{background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px 14px;font-family:'SF Mono','Fira Code',monospace;font-size:.8em;color:#a8d4ff;min-height:80px;max-height:220px;overflow-y:auto;line-height:1.75}
+.progress-log .log-ok{color:#7ee787}
+.progress-log .log-err{color:#f85149}
+.progress-log .log-warn{color:#e0c560}
+.progress-bar-wrap{margin-top:12px;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.progress-bar{height:100%;border-radius:2px;transition:width .5s ease;background:linear-gradient(90deg,var(--accent),var(--orange))}
+.progress-bar.pulse{animation:bar-pulse 1.2s ease-in-out infinite}
+@keyframes bar-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.reconnect-box{display:none;margin-top:14px;padding:12px 16px;background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.25);border-radius:8px;font-size:.85em;color:#7ee787;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.reconnect-box.visible{display:flex}
+.reconnect-counter{font-weight:700}
+
+/* ── Section label ── */
+.section-label{font-size:.72em;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--text2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+/* ── State overlays ── */
+.state-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:240px;gap:14px;opacity:.7}
 .spinner{width:38px;height:38px;border:3px solid rgba(255,255,255,.07);border-top-color:#58a6ff;border-radius:50%;animation:spin .85s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .error-box{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);border-radius:10px;padding:18px 24px;max-width:480px;text-align:center;color:#ff9b96;line-height:1.6;font-size:.9em}
 
 /* ── Release feed ── */
-.releases{display:flex;flex-direction:column;gap:16px}
+.releases{display:flex;flex-direction:column;gap:14px}
 .release-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:.15s}
-.release-card:hover{border-color:rgba(88,166,255,.25)}
-.release-header{display:flex;align-items:center;gap:14px;padding:18px 22px;cursor:pointer}
+.release-card:hover{border-color:rgba(88,166,255,.2)}
+.release-header{display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer;user-select:none}
 .release-version{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
-.version-tag{font-size:.9em;font-weight:700;color:var(--accent);background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.25);padding:3px 12px;border-radius:20px;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace}
-.version-tag.latest{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.3);color:#7ee787}
-.release-name{color:var(--text);font-size:.9em;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.version-tag{font-size:.88em;font-weight:700;color:var(--accent);background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.25);padding:3px 12px;border-radius:20px;white-space:nowrap;font-family:'SF Mono','Fira Code',monospace}
+.version-tag.current{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.3);color:#7ee787}
+.release-name{color:var(--text);font-size:.88em;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .release-meta{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.release-date{color:var(--text2);font-size:.8em}
+.release-date{color:var(--text2);font-size:.78em}
 .prerelease-badge{font-size:.72em;padding:2px 8px;border-radius:10px;background:rgba(210,153,34,.12);color:#d29922;border:1px solid rgba(210,153,34,.25);font-weight:600}
-.release-toggle{color:var(--text2);font-size:.75em;flex-shrink:0;transition:transform .2s}
+.release-toggle{color:var(--text2);font-size:.72em;flex-shrink:0;transition:transform .2s}
 .release-toggle.open{transform:rotate(90deg)}
-
-.release-body{display:none;padding:0 22px 20px;border-top:1px solid var(--border)}
+.release-body{display:none;padding:0 20px 18px;border-top:1px solid var(--border)}
 .release-body.open{display:block}
-.release-body-inner{padding-top:16px;font-size:.875em;color:var(--text2);line-height:1.65}
+.release-body-inner{padding-top:14px;font-size:.875em;color:var(--text2);line-height:1.65}
 .release-body-inner h1,.release-body-inner h2,.release-body-inner h3{color:var(--text);margin:14px 0 6px;font-size:1em;font-weight:600}
 .release-body-inner h1:first-child,.release-body-inner h2:first-child,.release-body-inner h3:first-child{margin-top:0}
 .release-body-inner ul,.release-body-inner ol{padding-left:18px;margin:6px 0}
@@ -64,14 +109,11 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 .release-body-inner a:hover{text-decoration:underline}
 .release-body-inner strong{color:var(--text);font-weight:600}
 .release-body-inner hr{border:none;border-top:1px solid var(--border);margin:12px 0}
-.release-footer{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.release-footer{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .gh-link{display:inline-flex;align-items:center;gap:5px;color:var(--text2);text-decoration:none;font-size:.82em;padding:4px 12px;border:1px solid var(--border);border-radius:8px;transition:.15s}
 .gh-link:hover{color:var(--accent);border-color:rgba(88,166,255,.4)}
-
-/* ── Empty state ── */
 .empty-state{text-align:center;padding:48px 24px;color:var(--text2)}
 .empty-state .icon{font-size:2.5em;margin-bottom:12px}
-.empty-state p{font-size:.9em;line-height:1.5}
 
 /* ── Mobile bottom nav ── */
 .mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:100;padding:8px 0 env(safe-area-inset-bottom)}
@@ -85,6 +127,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
   .mob-nav{display:block}
   .page{padding:20px 16px 80px}
   .page-title{font-size:1.25em}
+  .update-center-head{padding:16px}
+  .update-avail-panel,.progress-panel{padding:16px}
   .release-header{padding:14px 16px;flex-wrap:wrap}
   .release-body{padding:0 16px 16px}
   .release-meta{width:100%;justify-content:flex-start}
@@ -125,11 +169,52 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 </nav>
 
 <div class="page">
-  <div class="page-title">📣 News &amp; Updates</div>
+  <div class="page-title">📣 Update Center</div>
   <div class="page-sub">
-    <span>Release history from GitHub. Latest version is shown first.</span>
-    <a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noopener noreferrer">View all on GitHub →</a>
+    <span>Keep CentienC up to date with one click.</span>
+    <a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noopener noreferrer">View all releases on GitHub →</a>
   </div>
+
+  <!-- ── Update Center Card ── -->
+  <div class="update-center" id="updateCenter">
+    <div class="update-center-head">
+      <div class="version-block">
+        <span class="ver-pill installed">📦 Installed: <span id="installedVer">…</span></span>
+        <span class="ver-arrow" id="verArrow" style="display:none">→</span>
+        <span class="ver-pill loading" id="latestPill" style="display:none">⬡ Latest: <span id="latestVer">…</span></span>
+      </div>
+      <span class="update-status-badge status-loading" id="statusBadge">
+        <span class="status-dot"></span>
+        <span id="statusText">Checking…</span>
+      </span>
+    </div>
+
+    <!-- Update available panel -->
+    <div class="update-avail-panel" id="availPanel" style="display:none">
+      <h3>⬆️ Update Available</h3>
+      <p>A new version of CentienC is ready to install. The update downloads from GitHub, installs, and restarts the service automatically. <strong>The dashboard will be unavailable for ~30 seconds</strong> during the restart.</p>
+      <button class="update-btn" id="updateBtn" onclick="startUpdate()">
+        ⬆️ Update to v<span id="updateTargetVer">…</span>
+      </button>
+      <div class="update-warn">⚠️ Make sure no one else is actively using the dashboard before updating.</div>
+    </div>
+
+    <!-- Progress panel -->
+    <div class="progress-panel" id="progressPanel">
+      <div class="progress-title">Update Progress</div>
+      <div class="progress-log" id="progressLog"></div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar pulse" id="progressBar" style="width:5%"></div>
+      </div>
+      <div class="reconnect-box" id="reconnectBox">
+        <span>✅ Installed! Reconnecting in <strong class="reconnect-counter" id="reconnectCount">15</strong>s…</span>
+        <button onclick="location.reload()" style="background:none;border:1px solid rgba(63,185,80,.4);color:#7ee787;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:.85em">Reload now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Release Feed ── -->
+  <div class="section-label">Release History</div>
   <div id="releaseFeed">
     <div class="state-overlay">
       <div class="spinner"></div>
@@ -139,7 +224,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 </div>
 
 <script>
-// ── Simple Markdown → HTML (subset: headings, bold, italic, code, lists, hr, links) ──
+// ── Tiny Markdown → HTML renderer ──
 function md(src){
   if(!src)return '';
   return src
@@ -158,7 +243,7 @@ function md(src){
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/\n{2,}/g,'</p><p>')
     .replace(/\n/g,'<br>')
-    .replace(/^(?!<[h|u|p|l|h])/,'<p>')
+    .replace(/^(?!<[hup])/,'<p>')
     .replace(/(?<![>])$/,'</p>');
 }
 
@@ -173,33 +258,182 @@ function relDate(iso){
   return Math.floor(diff/31536000)+' years ago';
 }
 
-function toggle(header){
+function toggleRelease(header){
   const chevron=header.querySelector('.release-toggle');
   const body=header.nextElementSibling;
   const open=body.classList.toggle('open');
   chevron.classList.toggle('open',open);
 }
 
+// ── Update Center state ──
+let _currentVer='';
+let _latestVer='';
+let _updatePollTimer=null;
+
+async function checkUpdate(){
+  const badge=document.getElementById('statusBadge');
+  const statusTxt=document.getElementById('statusText');
+  const installedEl=document.getElementById('installedVer');
+  const latestPill=document.getElementById('latestPill');
+  const latestEl=document.getElementById('latestVer');
+  const arrowEl=document.getElementById('verArrow');
+  const availPanel=document.getElementById('availPanel');
+  const targetVerEl=document.getElementById('updateTargetVer');
+  try{
+    const r=await fetch('/api/update-check?fresh=1');
+    const d=await r.json();
+    if(!d.ok) throw new Error(d.error||'API error');
+    _currentVer=d.current_version||'?';
+    _latestVer=d.latest_version||'?';
+    installedEl.textContent='v'+_currentVer;
+    latestEl.textContent='v'+_latestVer;
+    latestPill.style.display='inline-flex';
+    arrowEl.style.display='inline';
+    if(d.update_available){
+      latestPill.className='ver-pill latest-new';
+      badge.className='update-status-badge status-new';
+      statusTxt.textContent='Update available';
+      targetVerEl.textContent=_latestVer;
+      availPanel.style.display='block';
+      try{sessionStorage.removeItem('centc_upd_v1');}catch(e){}
+    }else{
+      latestPill.className='ver-pill latest-ok';
+      badge.className='update-status-badge status-ok';
+      statusTxt.textContent='Up to date';
+      availPanel.style.display='none';
+    }
+  }catch(e){
+    badge.className='update-status-badge status-loading';
+    statusTxt.textContent='Check failed';
+    installedEl.textContent='unknown';
+  }
+}
+
+function log(msg,cls=''){
+  const el=document.getElementById('progressLog');
+  const ts=new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const line=document.createElement('div');
+  if(cls)line.className=cls;
+  line.textContent=`[${ts}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop=el.scrollHeight;
+}
+
+function setProgress(pct,pulse=true){
+  const bar=document.getElementById('progressBar');
+  bar.style.width=pct+'%';
+  pulse?bar.classList.add('pulse'):bar.classList.remove('pulse');
+}
+
+function startReconnectCountdown(){
+  const box=document.getElementById('reconnectBox');
+  const counter=document.getElementById('reconnectCount');
+  box.classList.add('visible');
+  let secs=15;
+  counter.textContent=secs;
+  const t=setInterval(()=>{
+    secs--;
+    counter.textContent=secs;
+    if(secs<=0){clearInterval(t);location.reload();}
+  },1000);
+}
+
+async function startUpdate(){
+  const btn=document.getElementById('updateBtn');
+  const progressPanel=document.getElementById('progressPanel');
+  btn.disabled=true;
+  btn.textContent='Starting…';
+  progressPanel.classList.add('visible');
+  progressPanel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  document.getElementById('progressLog').textContent='';
+  log('Starting update to v'+_latestVer+'…');
+  setProgress(8);
+  try{
+    const r=await fetch('/api/update-install',{method:'POST',headers:{'Content-Type':'application/json'}});
+    const d=await r.json();
+    if(!d.ok){
+      if(d.error==='Already running the latest version'){
+        log('Already on the latest version.','log-ok');
+        setProgress(100,false);
+        document.getElementById('statusBadge').className='update-status-badge status-ok';
+        document.getElementById('statusText').textContent='Up to date';
+        document.getElementById('availPanel').style.display='none';
+        btn.disabled=false;
+        btn.textContent='⬆️ Update to v'+_latestVer;
+      }else{
+        log('✗ '+(d.error||'Update failed'),'log-err');
+        btn.disabled=false;
+        btn.innerHTML='⬆️ Retry Update';
+      }
+      return;
+    }
+    log('📦 Download & install initiated for v'+(d.new_version||_latestVer),'log-ok');
+    setProgress(65);
+    // Poll progress until restarting or connection drops
+    let polls=0;
+    _updatePollTimer=setInterval(async()=>{
+      polls++;
+      let p=null;
+      try{
+        const pr=await fetch('/api/update-progress');
+        p=await pr.json();
+      }catch(e){
+        // Server gone — must be restarting
+        clearInterval(_updatePollTimer);
+        log('🔄 Server restarting (connection dropped)…','log-warn');
+        setProgress(100,false);
+        setTimeout(()=>{log('✅ All done. Reconnecting…','log-ok');startReconnectCountdown();},800);
+        return;
+      }
+      if(p&&p.step)log(p.step);
+      if(p&&(p.status==='restarting'||p.status==='done')){
+        clearInterval(_updatePollTimer);
+        setProgress(90);
+        setTimeout(()=>{setProgress(100,false);log('✅ Done. Reconnecting…','log-ok');startReconnectCountdown();},2000);
+      }
+      if(p&&p.status==='error'){
+        clearInterval(_updatePollTimer);
+        log('✗ '+(p.detail||p.step||'unknown error'),'log-err');
+        btn.disabled=false;
+        btn.textContent='⬆️ Retry';
+        setProgress(100,false);
+      }
+      // Safety: after 6 polls with no terminal state, assume server is restarting
+      if(polls>12){
+        clearInterval(_updatePollTimer);
+        log('🔄 Service restarting…','log-warn');
+        setProgress(100,false);
+        setTimeout(()=>{log('✅ Reconnecting…','log-ok');startReconnectCountdown();},1000);
+      }
+    },500);
+  }catch(e){
+    // Network error = server already restarted
+    log('🔄 Service restarting (network closed)…','log-warn');
+    setProgress(100,false);
+    setTimeout(()=>{log('✅ Reconnecting…','log-ok');startReconnectCountdown();},1500);
+  }
+}
+
+// ── Release Feed ──
 async function loadReleases(){
   const feed=document.getElementById('releaseFeed');
   try{
     const r=await fetch('/api/updates');
     const d=await r.json();
-    if(!d.ok) throw new Error(d.error||'API error');
+    if(!d.ok)throw new Error(d.error||'API error');
     const releases=d.releases||[];
     if(!releases.length){
-      feed.innerHTML=`<div class="empty-state"><div class="icon">📭</div><p>No releases found.<br>Check <a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank">GitHub</a> directly.</p></div>`;
+      feed.innerHTML=`<div class="empty-state"><div class="icon">📭</div><p>No releases found on GitHub.</p></div>`;
       return;
     }
     let html='<div class="releases">';
     releases.forEach((rel,i)=>{
-      const isLatest=i===0&&!rel.prerelease;
-      const bodyHtml=md(rel.body||'');
+      const isCurrent=rel.tag_name.replace(/^v/,'')===_currentVer||('v'+_currentVer)===rel.tag_name;
       html+=`
       <div class="release-card">
-        <div class="release-header" onclick="toggle(this)">
+        <div class="release-header" onclick="toggleRelease(this)">
           <div class="release-version">
-            <span class="version-tag${isLatest?' latest':''}">${rel.tag_name}</span>
+            <span class="version-tag${isCurrent?' current':''}">${rel.tag_name}${isCurrent?' ✓ installed':''}</span>
             <span class="release-name">${rel.name||rel.tag_name}</span>
           </div>
           <div class="release-meta">
@@ -209,7 +443,7 @@ async function loadReleases(){
           <span class="release-toggle">▶</span>
         </div>
         <div class="release-body${i===0?' open':''}">
-          <div class="release-body-inner">${bodyHtml||'<em style="color:var(--text2)">No release notes provided.</em>'}</div>
+          <div class="release-body-inner">${md(rel.body||'')||'<em style="color:var(--text2)">No release notes provided.</em>'}</div>
           <div class="release-footer">
             <a class="gh-link" href="${rel.html_url}" target="_blank" rel="noopener noreferrer">🐙 View on GitHub</a>
             <span style="color:var(--text2);font-size:.8em">Published ${new Date(rel.published_at).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</span>
@@ -220,11 +454,16 @@ async function loadReleases(){
     html+='</div>';
     feed.innerHTML=html;
   }catch(e){
-    feed.innerHTML=`<div class="state-overlay"><div class="error-box">⚠️ Could not load releases: ${e.message}<br><br><a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noopener noreferrer" style="color:#58a6ff">View releases directly on GitHub →</a></div></div>`;
+    feed.innerHTML=`<div class="state-overlay"><div class="error-box">⚠️ Could not load releases: ${e.message}<br><br><a href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noopener noreferrer" style="color:#58a6ff">View on GitHub →</a></div></div>`;
   }
 }
 
-loadReleases();
+// Boot — check update first so _currentVer is set before rendering feed
+(async()=>{
+  await checkUpdate();
+  await loadReleases();
+})();
 </script>
+<script src="/static/update-notifier.js"></script>
 </body>
 </html>

@@ -1736,12 +1736,19 @@ async def update_install(request: Request):
         async def _do_restart():
             await asyncio.sleep(1)  # give time for the response to be sent
             try:
-                # Try sudo first (for unprivileged service user with sudoers rule)
-                subprocess.run(["sudo", "systemctl", "restart", "centient"], timeout=10)
+                # Try both service names (centienc is the deployed name; centient fallback)
+                for svc in ("centienc", "centient"):
+                    r = subprocess.run(
+                        ["sudo", "systemctl", "restart", svc],
+                        capture_output=True, timeout=10,
+                    )
+                    if r.returncode == 0:
+                        return
             except Exception:
-                # Not running under systemd — send SIGHUP to ourselves
-                import signal
-                os.kill(os.getpid(), signal.SIGHUP)
+                pass
+            # Not running under systemd — send SIGHUP to ourselves
+            import signal
+            os.kill(os.getpid(), signal.SIGHUP)
 
         asyncio.create_task(_do_restart())
 
