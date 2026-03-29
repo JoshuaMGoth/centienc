@@ -645,6 +645,41 @@ async def test_ssh_connection(server_id: int, request: Request):
         return {"ok": False, "error": str(exc)}
 
 
+@app.post("/api/servers/generate-ssh-key")
+async def generate_ssh_key(request: Request):
+    """Generate an ed25519 SSH keypair for CentienC outgoing SSH connections.
+
+    The keypair is created in the running user's ~/.ssh/ directory if it does
+    not already exist.  Returns the public key so the admin can copy it into
+    authorized_keys on monitored servers.
+    """
+    await _require_auth_or_401(request)
+    import subprocess  # stdlib — already available
+
+    home = Path.home()
+    ssh_dir = home / ".ssh"
+    key_path = ssh_dir / "id_ed25519"
+    pub_path = ssh_dir / "id_ed25519.pub"
+
+    if not key_path.exists():
+        ssh_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        import socket
+        comment = f"centienc@{socket.gethostname()}"
+        proc = subprocess.run(
+            ["ssh-keygen", "-t", "ed25519", "-f", str(key_path), "-N", "", "-C", comment],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            return {"ok": False, "error": proc.stderr.strip() or "ssh-keygen failed"}
+
+    if not pub_path.exists():
+        return {"ok": False, "error": "Key file not found after generation"}
+
+    public_key = pub_path.read_text().strip()
+    return {"ok": True, "public_key": public_key, "key_path": str(key_path)}
+
+
 @app.get("/api/servers/{server_id}/history")
 async def server_history(server_id: int, request: Request):
     await _require_auth_or_401(request)

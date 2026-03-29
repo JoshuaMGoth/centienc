@@ -378,7 +378,17 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
             <label>SSH Port</label>
             <input id="sSshPort" type="number" value="22">
             <label>SSH Key Path (on this machine)</label>
-            <input id="sSshKeyPath" placeholder="/root/.ssh/id_ed25519">
+            <div style="display:flex;gap:6px;align-items:center">
+                <input id="sSshKeyPath" placeholder="/root/.ssh/id_ed25519" style="flex:1">
+                <button class="btn btn-sm" onclick="generateSSHKey()" type="button" title="Generate an SSH keypair on this monitoring server" style="white-space:nowrap;flex-shrink:0">🔑 Generate Key</button>
+            </div>
+            <div id="sshKeyGenResult" style="display:none;margin:6px 0 10px;padding:10px;background:rgba(0,100,0,.18);border:1px solid rgba(52,199,89,.35);border-radius:6px;font-size:.78em">
+                <strong style="color:#34C759">Public key — paste this into <code style="font-size:1em">~/.ssh/authorized_keys</code> on your server:</strong>
+                <div style="display:flex;align-items:flex-start;gap:6px;margin-top:6px">
+                    <code id="sshPubKeyText" style="word-break:break-all;flex:1;color:#ccc;background:rgba(0,0,0,.35);padding:6px 8px;border-radius:4px;display:block;font-size:.95em;line-height:1.4"></code>
+                    <button class="btn btn-sm" onclick="copyPubKey()" type="button" id="copyPubKeyBtn" style="flex-shrink:0">📋 Copy</button>
+                </div>
+            </div>
             <label>SSH Password (if no key)</label>
             <input id="sSshPassword" type="password" placeholder="Leave blank if using key">
             <label>Sudo Password (for nginx logs, fail2ban)</label>
@@ -834,6 +844,7 @@ function clearForms(){
     document.getElementById('detectResult').textContent='';
     document.getElementById('sshTestRow').style.display='none';
     document.getElementById('sshTestResult').textContent='';
+    document.getElementById('sshKeyGenResult').style.display='none';
     populateServerDropdown();
 }
 function onServerSelect(){
@@ -903,8 +914,41 @@ async function testSSHConn(){
         const r=await fetch('/api/servers/'+eid+'/test-ssh',{method:'POST'});
         const d=await r.json();
         if(d.ok){el.textContent='✅ '+esc(d.output);el.style.color='#34C759';}
-        else{el.textContent='❌ '+esc(d.error);el.style.color='#FF3B30';}
+        else{
+            const msg=d.error||'';
+            let hint='';
+            if(msg.toLowerCase().includes('permission denied')){hint=' — Try key auth: click "🔑 Generate Key" above.';}
+            else if(msg.toLowerCase().includes('connection refused')){hint=' — Is the SSH port correct?';}
+            else if(msg.toLowerCase().includes('timed out')||msg.toLowerCase().includes('no route')){hint=' — Host unreachable. Check IP/hostname.';}
+            el.textContent='❌ '+esc(msg)+hint;el.style.color='#FF3B30';
+        }
     }catch(e){el.textContent='❌ '+esc(e.message);el.style.color='#FF3B30';}
+}
+
+async function generateSSHKey(){
+    const el=document.getElementById('sshKeyGenResult');
+    el.style.display='none';
+    const btn=event.currentTarget;
+    btn.disabled=true;btn.textContent='⏳ Generating…';
+    try{
+        const r=await fetch('/api/servers/generate-ssh-key',{method:'POST'});
+        const d=await r.json();
+        if(!d.ok){toast('Key generation failed: '+(d.error||'Unknown error'),'error');return;}
+        document.getElementById('sSshKeyPath').value=d.key_path;
+        document.getElementById('sshPubKeyText').textContent=d.public_key;
+        el.style.display='block';
+        toast('SSH keypair ready. Copy the public key to your server\'s authorized_keys.','success');
+    }catch(e){toast('Key generation error: '+e.message,'error');}
+    finally{btn.disabled=false;btn.textContent='🔑 Generate Key';}
+}
+
+function copyPubKey(){
+    const txt=document.getElementById('sshPubKeyText').textContent;
+    navigator.clipboard.writeText(txt).then(()=>{
+        const btn=document.getElementById('copyPubKeyBtn');
+        btn.textContent='✅ Copied';
+        setTimeout(()=>{btn.textContent='📋 Copy';},2000);
+    }).catch(()=>toast('Copy failed — select the key text and copy manually','error'));
 }
 
 async function editWebsite(id){
