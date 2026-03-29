@@ -627,6 +627,24 @@ async def check_server_now(server_id: int, request: Request):
     return {"ok": True, **result}
 
 
+@app.post("/api/servers/{server_id}/test-ssh")
+async def test_ssh_connection(server_id: int, request: Request):
+    """Test SSH connectivity to a server and return connection info or error."""
+    await _require_auth_or_401(request)
+    servers = await db.list_servers()
+    server = next((s for s in servers if s["id"] == server_id), None)
+    if not server:
+        raise HTTPException(404, "Server not found")
+    if not server.get("ssh_user"):
+        return {"ok": False, "error": "No SSH credentials configured for this server."}
+    try:
+        conn = await engine._get_ssh_conn(server)
+        result = await conn.run("echo ok && whoami && hostname", check=False)
+        return {"ok": True, "output": result.stdout.strip()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 @app.get("/api/servers/{server_id}/history")
 async def server_history(server_id: int, request: Request):
     await _require_auth_or_401(request)

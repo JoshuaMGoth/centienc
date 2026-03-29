@@ -412,9 +412,18 @@ class MonitorEngine:
         }
 
         if key_path:
+            # Key-based auth: use only the specified key, no SSH agent fallback
             connect_kwargs["client_keys"] = [key_path]
+            connect_kwargs["preferred_auth"] = "publickey"
         elif password:
+            # Password auth: disable SSH agent/default key discovery to avoid
+            # exhausting the server's MaxAuthTries before the password is tried
             connect_kwargs["password"] = password
+            connect_kwargs["client_keys"] = []
+            connect_kwargs["preferred_auth"] = "password,keyboard-interactive"
+        else:
+            # No explicit credentials: allow SSH agent / default key files only
+            connect_kwargs["preferred_auth"] = "publickey"
 
         conn = await asyncssh.connect(**connect_kwargs)
         self._ssh_conns[sid] = conn

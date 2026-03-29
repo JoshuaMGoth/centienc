@@ -391,6 +391,10 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
                 <label><input type="checkbox" id="fNginx"> Nginx Logs</label>
                 <label><input type="checkbox" id="fFail2ban"> Fail2Ban</label>
             </div>
+            <div id="sshTestRow" style="display:none;margin-top:12px;align-items:center;gap:10px">
+                <button class="btn btn-sm" onclick="testSSHConn()" type="button">🔌 Test SSH</button>
+                <span id="sshTestResult" style="font-size:.82em"></span>
+            </div>
         </div>
     </div>
     <div id="formWebsite" style="display:none">
@@ -828,6 +832,8 @@ function clearForms(){
     document.getElementById('wServerId').value='';document.getElementById('wLogPath').value='';
     document.getElementById('wLogPathGroup').style.display='none';
     document.getElementById('detectResult').textContent='';
+    document.getElementById('sshTestRow').style.display='none';
+    document.getElementById('sshTestResult').textContent='';
     populateServerDropdown();
 }
 function onServerSelect(){
@@ -883,7 +889,22 @@ async function editServer(id){
         document.getElementById('fSystem').checked=f.system!==false;document.getElementById('fPm2').checked=!!f.pm2;
         document.getElementById('fServices').checked=!!f.services;document.getElementById('fNginx').checked=!!f.nginx;
         document.getElementById('fFail2ban').checked=!!f.fail2ban;
+        document.getElementById('sshTestRow').style.display='flex';
+        document.getElementById('sshTestResult').textContent='';
     }catch(e){toast('Error loading server','error')}
+}
+
+async function testSSHConn(){
+    const eid=document.getElementById('editId').value;
+    if(!eid){toast('Save the server first to test SSH','error');return;}
+    const el=document.getElementById('sshTestResult');
+    el.textContent='Testing…';el.style.color='var(--text2)';
+    try{
+        const r=await fetch('/api/servers/'+eid+'/test-ssh',{method:'POST'});
+        const d=await r.json();
+        if(d.ok){el.textContent='✅ '+esc(d.output);el.style.color='#34C759';}
+        else{el.textContent='❌ '+esc(d.error);el.style.color='#FF3B30';}
+    }catch(e){el.textContent='❌ '+esc(e.message);el.style.color='#FF3B30';}
 }
 
 async function editWebsite(id){
