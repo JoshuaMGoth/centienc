@@ -1,0 +1,218 @@
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "2.4"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PSVersion: "(3010.000) 0"
+*LanguageLevel: "3"
+*FileSystem: False
+*PCFileName: "ippeve.ppd"
+*Manufacturer: "EPSON"
+*ModelName: "ET-3840 Series"
+*Product: "(ET-3840 Series)"
+*NickName: "ET-3840 Series - IPP Everywhere"
+*ShortNickName: "ET-3840 Series - IPP Everywhere"
+*ColorDevice: True
+*cupsVersion: 2.4
+*cupsSNMPSupplies: False
+*cupsLanguages: "en_US en es-mx pt fr"
+*APSupplies: "http://10.10.10.170:80/PRESENTATION/BONJOUR"
+*cupsStringsURI: "http://10.10.10.170:80/LANGUAGES/IPP?LANG=en"
+*cupsStringsURI en: "http://10.10.10.170:80/LANGUAGES/IPP?LANG=en"
+*cupsStringsURI es-mx: "http://10.10.10.170:80/LANGUAGES/IPP?LANG=es-mx"
+*cupsStringsURI pt: "http://10.10.10.170:80/LANGUAGES/IPP?LANG=pt"
+*cupsStringsURI fr: "http://10.10.10.170:80/LANGUAGES/IPP?LANG=fr"
+*cupsFilter2: "image/jpeg image/jpeg 0 -"
+*cupsManualCopies: True
+*cupsFilter2: "image/urf image/urf 100 -"
+*cupsUrfSupported: "CP1,PQ4-5,OB9,OFU0,RS300,SRGB24,W8,DM3,IS1,V1.4,MT1-3-6-8-10-11-12"
+*OpenUI *PageSize: PickOne
+*OrderDependency: 10 AnySetup *PageSize
+*DefaultPageSize: Letter
+*PageSize 3.5x5: "<</PageSize[252 360]>>setpagedevice"
+*PageSize 3.5x5.Borderless: "<</PageSize[252 360]>>setpagedevice"
+*PageSize 4x6: "<</PageSize[288 432]>>setpagedevice"
+*PageSize 4x6.Borderless: "<</PageSize[288 432]>>setpagedevice"
+*PageSize 5x7: "<</PageSize[360 504]>>setpagedevice"
+*PageSize 5x7.Borderless: "<</PageSize[360 504]>>setpagedevice"
+*PageSize 8x10: "<</PageSize[576 720]>>setpagedevice"
+*PageSize 8x10.Borderless: "<</PageSize[576 720]>>setpagedevice"
+*PageSize A4: "<</PageSize[595.275590551181 841.889763779528]>>setpagedevice"
+*PageSize A4.Borderless: "<</PageSize[595.275590551181 841.889763779528]>>setpagedevice"
+*PageSize A6: "<</PageSize[297.637795275591 419.527559055118]>>setpagedevice"
+*PageSize Env10: "<</PageSize[296.985826771654 684]>>setpagedevice"
+*PageSize Executive: "<</PageSize[522 756]>>setpagedevice"
+*PageSize FanFoldGermanLegal: "<</PageSize[612 936]>>setpagedevice"
+*PageSize FolioSP: "<</PageSize[609.448818897638 892.913385826772]>>setpagedevice"
+*PageSize Legal: "<</PageSize[612 1008]>>setpagedevice"
+*PageSize Letter: "<</PageSize[612 792]>>setpagedevice"
+*PageSize Letter.Borderless: "<</PageSize[612 792]>>setpagedevice"
+*PageSize Oficio: "<</PageSize[612 964.8]>>setpagedevice"
+*PageSize Statement: "<</PageSize[396 612]>>setpagedevice"
+*CloseUI: *PageSize
+*OpenUI *PageRegion: PickOne
+*OrderDependency: 10 AnySetup *PageRegion
+*DefaultPageRegion: Letter
+*PageRegion 3.5x5: "<</PageSize[252 360]>>setpagedevice"
+*PageRegion 3.5x5.Borderless: "<</PageSize[252 360]>>setpagedevice"
+*PageRegion 4x6: "<</PageSize[288 432]>>setpagedevice"
+*PageRegion 4x6.Borderless: "<</PageSize[288 432]>>setpagedevice"
+*PageRegion 5x7: "<</PageSize[360 504]>>setpagedevice"
+*PageRegion 5x7.Borderless: "<</PageSize[360 504]>>setpagedevice"
+*PageRegion 8x10: "<</PageSize[576 720]>>setpagedevice"
+*PageRegion 8x10.Borderless: "<</PageSize[576 720]>>setpagedevice"
+*PageRegion A4: "<</PageSize[595.275590551181 841.889763779528]>>setpagedevice"
+*PageRegion A4.Borderless: "<</PageSize[595.275590551181 841.889763779528]>>setpagedevice"
+*PageRegion A6: "<</PageSize[297.637795275591 419.527559055118]>>setpagedevice"
+*PageRegion Env10: "<</PageSize[296.985826771654 684]>>setpagedevice"
+*PageRegion Executive: "<</PageSize[522 756]>>setpagedevice"
+*PageRegion FanFoldGermanLegal: "<</PageSize[612 936]>>setpagedevice"
+*PageRegion FolioSP: "<</PageSize[609.448818897638 892.913385826772]>>setpagedevice"
+*PageRegion Legal: "<</PageSize[612 1008]>>setpagedevice"
+*PageRegion Letter: "<</PageSize[612 792]>>setpagedevice"
+*PageRegion Letter.Borderless: "<</PageSize[612 792]>>setpagedevice"
+*PageRegion Oficio: "<</PageSize[612 964.8]>>setpagedevice"
+*PageRegion Statement: "<</PageSize[396 612]>>setpagedevice"
+*CloseUI: *PageRegion
+*DefaultImageableArea: Letter
+*DefaultPaperDimension: Letter
+*ImageableArea 3.5x5: "8.503937007874 8.503937007874 243.496062992126 351.496062992126"
+*PaperDimension 3.5x5: "252 360"
+*ImageableArea 3.5x5.Borderless: "0 0 252 360"
+*PaperDimension 3.5x5.Borderless: "252 360"
+*ImageableArea 4x6: "8.503937007874 8.503937007874 279.496062992126 423.496062992126"
+*PaperDimension 4x6: "288 432"
+*ImageableArea 4x6.Borderless: "0 0 288 432"
+*PaperDimension 4x6.Borderless: "288 432"
+*ImageableArea 5x7: "8.503937007874 8.503937007874 351.496062992126 495.496062992126"
+*PaperDimension 5x7: "360 504"
+*ImageableArea 5x7.Borderless: "0 0 360 504"
+*PaperDimension 5x7.Borderless: "360 504"
+*ImageableArea 8x10: "8.503937007874 8.503937007874 567.496062992126 711.496062992126"
+*PaperDimension 8x10: "576 720"
+*ImageableArea 8x10.Borderless: "0 0 576 720"
+*PaperDimension 8x10.Borderless: "576 720"
+*ImageableArea A4: "8.503937007874 8.503937007874 586.771653543307 833.385826771654"
+*PaperDimension A4: "595.275590551181 841.889763779528"
+*ImageableArea A4.Borderless: "0 0 595.275590551181 841.889763779528"
+*PaperDimension A4.Borderless: "595.275590551181 841.889763779528"
+*ImageableArea A6: "8.503937007874 8.503937007874 289.133858267717 411.023622047244"
+*PaperDimension A6: "297.637795275591 419.527559055118"
+*ImageableArea Env10: "8.503937007874 8.503937007874 288.48188976378 675.496062992126"
+*PaperDimension Env10: "296.985826771654 684"
+*ImageableArea Executive: "8.503937007874 8.503937007874 513.496062992126 747.496062992126"
+*PaperDimension Executive: "522 756"
+*ImageableArea FanFoldGermanLegal: "8.503937007874 8.503937007874 603.496062992126 927.496062992126"
+*PaperDimension FanFoldGermanLegal: "612 936"
+*ImageableArea FolioSP: "8.503937007874 8.503937007874 600.944881889764 884.409448818898"
+*PaperDimension FolioSP: "609.448818897638 892.913385826772"
+*ImageableArea Legal: "8.503937007874 8.503937007874 603.496062992126 999.496062992126"
+*PaperDimension Legal: "612 1008"
+*ImageableArea Letter: "8.503937007874 8.503937007874 603.496062992126 783.496062992126"
+*PaperDimension Letter: "612 792"
+*ImageableArea Letter.Borderless: "0 0 612 792"
+*PaperDimension Letter.Borderless: "612 792"
+*ImageableArea Oficio: "8.503937007874 8.503937007874 603.496062992126 956.296062992126"
+*PaperDimension Oficio: "612 964.8"
+*ImageableArea Statement: "8.503937007874 8.503937007874 387.496062992126 603.496062992126"
+*PaperDimension Statement: "396 612"
+*HWMargins: "8.503937007874 8.503937007874 8.503937007874 8.503937007874"
+*ParamCustomPageSize Width: 1 points 252.283464566929 612
+*ParamCustomPageSize Height: 2 points 360 3401.574803149606
+*ParamCustomPageSize WidthOffset: 3 points 0 0
+*ParamCustomPageSize HeightOffset: 4 points 0 0
+*ParamCustomPageSize Orientation: 5 int 0 3
+*CustomPageSize True: "pop pop pop <</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
+*OpenUI *MediaType: PickOne
+*OrderDependency: 10 AnySetup *MediaType
+*DefaultMediaType: Stationery
+*MediaType Stationery: "<</MediaType(Stationery)>>setpagedevice"
+*en_US.MediaType Stationery/Stationery: ""
+*MediaType PhotographicHighGloss: "<</MediaType(PhotographicHighGloss)>>setpagedevice"
+*en_US.MediaType PhotographicHighGloss/High Gloss Photo Paper: ""
+*MediaType Photographic: "<</MediaType(Photographic)>>setpagedevice"
+*en_US.MediaType Photographic/Photo Paper: ""
+*MediaType PhotographicSemiGloss: "<</MediaType(PhotographicSemiGloss)>>setpagedevice"
+*en_US.MediaType PhotographicSemiGloss/Semi-Gloss Photo Paper: ""
+*MediaType PhotographicGlossy: "<</MediaType(PhotographicGlossy)>>setpagedevice"
+*en_US.MediaType PhotographicGlossy/Glossy Photo Paper: ""
+*MediaType PhotographicMatte: "<</MediaType(PhotographicMatte)>>setpagedevice"
+*en_US.MediaType PhotographicMatte/Matte Photo Paper: ""
+*MediaType StationeryLetterhead: "<</MediaType(StationeryLetterhead)>>setpagedevice"
+*en_US.MediaType StationeryLetterhead/Letterhead: ""
+*MediaType Envelope: "<</MediaType(Envelope)>>setpagedevice"
+*en_US.MediaType Envelope/Envelope: ""
+*MediaType StationeryCoated: "<</MediaType(StationeryCoated)>>setpagedevice"
+*en_US.MediaType StationeryCoated/Coated Paper: ""
+*CloseUI: *MediaType
+*DefaultResolution: 300dpi
+*OpenUI *cupsPrintQuality: PickOne
+*OrderDependency: 10 AnySetup *cupsPrintQuality
+*en_US.Translation cupsPrintQuality/Print Quality: ""
+*DefaultcupsPrintQuality: Normal
+*cupsPrintQuality Draft: "<</HWResolution[300 150]>>setpagedevice"
+*en_US.cupsPrintQuality Draft/Draft: ""
+*cupsPrintQuality Normal: "<</HWResolution[300 300]>>setpagedevice"
+*en_US.cupsPrintQuality Normal/Normal: ""
+*cupsPrintQuality High: "<</HWResolution[300 300]>>setpagedevice"
+*en_US.cupsPrintQuality High/High: ""
+*CloseUI: *cupsPrintQuality
+*% ColorModel from urf-supported
+*OpenUI *ColorModel: PickOne
+*OrderDependency: 10 AnySetup *ColorModel
+*en_US.Translation ColorModel/Color Mode: ""
+*ColorModel RGB: "<</cupsColorSpace 19/cupsBitsPerColor 8/cupsColorOrder 0/cupsCompression 0>>setpagedevice"
+*en_US.ColorModel RGB/Color: ""
+*ColorModel Gray: "<</cupsColorSpace 18/cupsBitsPerColor 8/cupsColorOrder 0/cupsCompression 0>>setpagedevice"
+*en_US.ColorModel Gray/Grayscale: ""
+*DefaultColorModel: RGB
+*CloseUI: *ColorModel
+*APPrinterPreset Gray_with_Paper_Auto-Detect_-_Draft/Draft B&W: "
+  *cupsPrintQuality Draft *ColorModel Gray
+  com.apple.print.preset.graphicsType General
+  com.apple.print.preset.quality low
+  com.apple.print.preset.media-front-coating autodetect
+  com.apple.print.preset.output-mode monochrome"
+*End
+*APPrinterPreset Gray_with_Paper_Auto-Detect/Black and White: "
+  *cupsPrintQuality Normal *ColorModel Gray
+  com.apple.print.preset.graphicsType General
+  com.apple.print.preset.quality mid
+  com.apple.print.preset.media-front-coating autodetect
+  com.apple.print.preset.output-mode monochrome"
+*End
+*APPrinterPreset Color_with_Paper_Auto-Detect/Color: "
+  *cupsPrintQuality Normal *ColorModel RGB
+  com.apple.print.preset.graphicsType General
+  com.apple.print.preset.quality mid
+  com.apple.print.preset.media-front-coating autodetect
+  com.apple.print.preset.output-mode color"
+*End
+*APPrinterPreset Photo_with_Paper_Auto-Detect/Photo: "
+  *cupsPrintQuality High *ColorModel RGB
+  com.apple.print.preset.graphicsType Photo
+  com.apple.print.preset.quality high
+  com.apple.print.preset.media-front-coating autodetect
+  com.apple.print.preset.output-mode color"
+*End
+*OpenUI *Duplex: PickOne
+*OrderDependency: 10 AnySetup *Duplex
+*en_US.Translation Duplex/2-Sided Printing: ""
+*DefaultDuplex: DuplexNoTumble
+*Duplex None: "<</Duplex false>>setpagedevice"
+*en_US.Duplex None/Off (1-Sided): ""
+*Duplex DuplexNoTumble: "<</Duplex true/Tumble false>>setpagedevice"
+*en_US.Duplex DuplexNoTumble/Long-Edge (Portrait): ""
+*Duplex DuplexTumble: "<</Duplex true/Tumble true>>setpagedevice"
+*en_US.Duplex DuplexTumble/Short-Edge (Landscape): ""
+*CloseUI: *Duplex
+*cupsBackSide: Rotated
+*OpenUI *OutputBin: PickOne
+*OrderDependency: 10 AnySetup *OutputBin
+*DefaultOutputBin: FaceUp
+*DefaultOutputOrder: Reverse
+*OutputBin FaceUp: ""
+*en_US.OutputBin FaceUp/Face Up: ""
+*PageStackOrder FaceUp: Reverse
+*CloseUI: *OutputBin
+*cupsSingleFile: true

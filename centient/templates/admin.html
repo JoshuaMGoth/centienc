@@ -359,16 +359,16 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       Linking a website to a server with SSH access enables <strong>live traffic feed</strong>, <strong>visitor counts</strong>, <strong>device types</strong>, and <strong>connection types</strong> (ftp/ssh/http/https/sql) by parsing your web server's access logs (nginx/Apache).<br>
       Without a linked server, only uptime and response time monitoring is available.
     </div>
-    <div id="fwLogPathWrap" style="display:none">
-      <label>Access Log Path</label>
+    <!-- Inline vhost auto-detect panel -->
+    <div id="fwVhostWrap" style="display:none;margin-top:8px;padding:10px 12px;background:rgba(0,0,0,.3);border-radius:8px;border:1px solid rgba(255,255,255,.06)">
+      <div id="fwVhostStatus" style="font-size:.78em;color:var(--text2)"></div>
+      <div id="fwVhostPicker" style="margin-top:4px"></div>
+    </div>
+    <div id="fwLogPathWrap" style="display:none;margin-top:8px">
+      <label style="font-size:.82em;color:var(--text2);font-weight:400">Access log path <span style="opacity:.6;font-weight:400">(auto-filled · edit to override)</span></label>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="fwLogPath" placeholder="/var/log/nginx/access.log" style="flex:1">
-        <button type="button" class="btn btn-sm" id="fwDetectBtn" onclick="detectWebServerLogs()" title="Auto-detect web server and log files">🔍 Auto-Detect</button>
-      </div>
-      <div id="fwDetectedLogs" style="display:none;margin-top:6px"></div>
-      <div class="hint" style="margin-top:6px">
-        Path to your nginx or Apache access log on the linked server. Use <code>/var/log/nginx/*access*.log</code> for wildcard matching across virtual hosts.
-        <br>Common paths: <code>/var/log/nginx/access.log</code> · <code>/var/log/apache2/access.log</code> · <code>/var/log/httpd/access_log</code>
+        <button type="button" class="btn btn-sm" onclick="detectWebServerLogs()" title="Re-scan server">↻</button>
       </div>
     </div>
     <div class="modal-actions">
@@ -580,38 +580,82 @@ async function populateAdminWebsiteServers(selected=''){
   }catch(e){}
 }
 function onAdminWebsiteServerSelect(){
-  const hasServer=!!document.getElementById('fwServerId').value;
-  document.getElementById('fwLogPathWrap').style.display=hasServer?'block':'none';
-  document.getElementById('fwServerHint').style.display=hasServer?'none':'block';
-  document.getElementById('fwDetectedLogs').style.display='none';
-  document.getElementById('fwDetectedLogs').innerHTML='';
+  const v=document.getElementById('fwServerId').value;
+  document.getElementById('fwLogPathWrap').style.display=v?'block':'none';
+  document.getElementById('fwServerHint').style.display=v?'none':'block';
+  const vwrap=document.getElementById('fwVhostWrap');
+  if(!v){vwrap.style.display='none';document.getElementById('fwVhostPicker').innerHTML='';return;}
+  vwrap.style.display='block';
+  document.getElementById('fwVhostStatus').innerHTML='<span style="opacity:.6">🔍 Scanning server for web services…</span>';
+  document.getElementById('fwVhostPicker').innerHTML='';
+  _autoDetectLog(v,'fw');
 }
-async function detectWebServerLogs(){
-  const serverId=document.getElementById('fwServerId').value;
-  if(!serverId){toast('Select a server first','error');return}
-  const btn=document.getElementById('fwDetectBtn');
-  btn.disabled=true;btn.textContent='⏳ Detecting...';
+function detectWebServerLogs(){_autoDetectLog(document.getElementById('fwServerId').value,'fw');}
+/* ── Shared vhost auto-detect helpers (also in dashboard.html) ── */
+async function _autoDetectLog(serverId,prefix){
+  const urlEl=document.getElementById(prefix==='fw'?'fwUrl':'wUrl');
+  const url=urlEl?urlEl.value:'';
   try{
-    const d=await api('/api/servers/'+serverId+'/detect-web-server',{method:'POST'});
-    if(!d||!d.ok){toast(d?.error||'Detection failed','error');return}
-    const container=document.getElementById('fwDetectedLogs');
-    if(d.log_files&&d.log_files.length>0){
-      let html='<div style="font-size:.82em;color:var(--text2);margin-bottom:4px"><strong>Detected '+d.web_servers.join(', ')+' — found '+d.log_files.length+' log file(s):</strong></div>';
-      d.log_files.forEach(f=>{
-        html+='<button type="button" class="btn btn-sm" style="margin:2px 4px 2px 0;font-size:.78em" onclick="document.getElementById(\'fwLogPath\').value=\''+f.path+'\'">'+f.web_server+': '+f.path+'</button>';
-      });
-      if(d.suggested_path&&!document.getElementById('fwLogPath').value){
-        document.getElementById('fwLogPath').value=d.suggested_path;
-      }
-      container.innerHTML=html;container.style.display='block';
-      toast('Found '+d.log_files.length+' log file(s)','success');
-    }else{
-      container.innerHTML='<div style="font-size:.82em;color:var(--yellow)">No web server logs detected. You may need to specify the path manually or ensure the SSH user has read access to log files.</div>';
-      container.style.display='block';
-      toast('No logs found — check SSH user permissions','warning');
+    const r=await fetch('/api/servers/'+serverId+'/detect-web-server?url='+encodeURIComponent(url),{method:'POST'});
+    const d=await r.json();
+    if(!d.ok){document.getElementById(prefix+'VhostStatus').innerHTML='<span style="font-size:.78em;color:#FF9500">⚠ '+(d.error||'Detection failed')+'</span>';return;}
+    _renderVhostPicker(d,url,prefix);
+  }catch(e){document.getElementById(prefix+'VhostStatus').innerHTML='<span style="font-size:.78em;color:#FF9500">⚠ '+e.message+'</span>';}
+}
+function _renderVhostPicker(d,url,prefix){
+  const vmap=d.vhost_map||{},logFiles=d.log_files||[];
+  const urlHost=url.replace(/^https?:\/\//,'').split(/[/?#]/)[0].toLowerCase();
+  const bare=urlHost.startsWith('www.')?urlHost.slice(4):urlHost;
+  const el=document.getElementById(prefix+'VhostPicker');
+  const statusEl=document.getElementById(prefix+'VhostStatus');
+  const logInput=document.getElementById(prefix+'LogPath');
+  let html='';
+  if(d.web_servers&&d.web_servers.length)
+    html+='<span style="background:rgba(45,127,249,.15);color:#2D7FF9;padding:2px 10px;border-radius:10px;font-size:.72em;font-weight:700;display:inline-block;margin-bottom:7px">'+d.web_servers.map(x=>x.toUpperCase()).join('+')+'</span>';
+  const entries=Object.entries(vmap);
+  if(entries.length){
+    entries.sort(([a],[b])=>{const am=(a===urlHost||a===bare||a==='www.'+bare)?0:1;const bm=(b===urlHost||b===bare||b==='www.'+bare)?0:1;return am-bm;});
+    html+='<div style="font-size:.75em;color:var(--text2);margin:5px 0 4px">Select the access log for this website:</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:3px" id="'+prefix+'VhostRows">';
+    let autoSelected=false;
+    const curPath=logInput?logInput.value:'';
+    for(const [host,path] of entries){
+      const urlMatch=(host===urlHost||host===bare||host==='www.'+bare||'www.'+host===urlHost);
+      const curMatch=!!curPath&&curPath===path;
+      const hi=curMatch||(urlMatch&&!autoSelected&&!curPath);
+      if(urlMatch&&!autoSelected&&!curPath){if(logInput)logInput.value=path;autoSelected=true;}
+      html+='<div class="vhr" onclick="_selectVhostLog(this,\''+prefix+'\','+JSON.stringify(path)+')" style="cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid '+(hi?'rgba(45,127,249,.7)':'rgba(255,255,255,.07)')+';background:'+(hi?'rgba(45,127,249,.1)':'rgba(255,255,255,.02)')+';transition:border-color .15s,background .15s">';
+      html+='<div style="font-weight:600;font-size:.8em;color:'+(hi?'#2D7FF9':'var(--text)')+'">'+host+(urlMatch?'<span style="font-weight:400;font-size:.85em;color:#34C759;margin-left:5px">✓ this site</span>':'')+'</div>';
+      html+='<div style="font-family:monospace;font-size:.7em;color:var(--text2);margin-top:1px">'+path+'</div>';
+      html+='</div>';
     }
-  }catch(e){toast(e.message,'error')}
-  finally{btn.disabled=false;btn.textContent='🔍 Auto-Detect'}
+    html+='</div>';
+    if(!autoSelected&&d.suggested_path&&logInput&&!logInput.value)logInput.value=d.suggested_path;
+    statusEl.textContent='';
+  }else if(logFiles.length){
+    html+='<div style="font-size:.75em;color:var(--text2);margin:5px 0 4px">No per-site config found — select a log:</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:3px" id="'+prefix+'VhostRows">';
+    for(const f of logFiles.slice(0,6)){
+      const hi=!!(logInput&&logInput.value===f.path);
+      html+='<div class="vhr" onclick="_selectVhostLog(this,\''+prefix+'\','+JSON.stringify(f.path)+')" style="cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid '+(hi?'rgba(45,127,249,.7)':'rgba(255,255,255,.07)')+';background:'+(hi?'rgba(45,127,249,.1)':'rgba(255,255,255,.02)')+';transition:border-color .15s,background .15s">';
+      html+='<div style="font-family:monospace;font-size:.75em;color:var(--text)">'+f.path+'</div>';
+      html+='</div>';
+    }
+    html+='</div>';
+    if(logInput&&!logInput.value&&d.suggested_path)logInput.value=d.suggested_path;
+    statusEl.textContent='';
+  }else{
+    statusEl.innerHTML='<span style="font-size:.78em;color:#FF9500">No web server logs found. Enter the path manually below.</span>';
+  }
+  el.innerHTML=html;
+}
+function _selectVhostLog(el,prefix,path){
+  const rows=document.getElementById(prefix+'VhostRows');
+  if(rows)rows.querySelectorAll('.vhr').forEach(r=>{r.style.borderColor='rgba(255,255,255,.07)';r.style.background='rgba(255,255,255,.02)';const d=r.querySelector('div');if(d)d.style.color='var(--text)';});
+  el.style.borderColor='rgba(45,127,249,.7)';el.style.background='rgba(45,127,249,.1)';
+  const fd=el.querySelector('div');if(fd)fd.style.color='#2D7FF9';
+  const inp=document.getElementById(prefix+'LogPath');
+  if(inp)inp.value=path;
 }
 async function loadWebsiteEdit(id){
   try{
@@ -621,8 +665,9 @@ async function loadWebsiteEdit(id){
     document.getElementById('fwUrl').value=w.url||'';
     document.getElementById('fwExpectedStatus').value=w.expected_status||200;
     document.getElementById('fwTimeout').value=w.timeout||15;
-    await populateAdminWebsiteServers(String(w.server_id||''));
+    // Set log path BEFORE populate so async detect won't overwrite it
     document.getElementById('fwLogPath').value=w.log_path||'';
+    await populateAdminWebsiteServers(String(w.server_id||''));
   }catch(e){}
 }
 function closeWebsiteModal(){document.getElementById('websiteModalOverlay').classList.remove('active');editWebsiteId=null}

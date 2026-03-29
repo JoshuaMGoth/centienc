@@ -7,10 +7,10 @@
 ;  Build: Run build-exe.ps1 or ISCC.exe centienc-installer.iss
 ; ══════════════════════════════════════════════════════════════════
 
-#define MyAppName "centient"
+#define MyAppName "CentienC"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "Joshua Goth"
-#define MyAppURL "https://github.com/joshuagoth/centient"
+#define MyAppURL "https://github.com/JoshuaMGoth/centienc"
 
 [Setup]
 AppId={{7A8C3D2E-4F5B-6A1D-8E9F-0C1B2A3D4E5F}
@@ -21,11 +21,11 @@ AppPublisherURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
-OutputBaseFilename=centient-setup-{#MyAppVersion}
+OutputBaseFilename=CentienC-Setup-{#MyAppVersion}
 Compression=lzma2/ultra
 SolidCompression=yes
 WizardStyle=modern
-SetupIconFile=compiler:SetupClassicIcon.ico
+SetupIconFile=centienc-installer.ico
 UninstallDisplayName={#MyAppName}
 CreateUninstallRegKey=no
 
@@ -44,5 +44,5 @@ Filename: "powershell.exe"; \
     Flags: runhidden waituntilterminated
 
 [Messages]
-WelcomeLabel1=centient Server Monitor
-WelcomeLabel2=This will install centient v{#MyAppVersion} on your computer.%n%ncentient is a professional server, service, and website monitoring dashboard that runs as a background service.%n%nAfter installation, open the dashboard URL shown in the terminal to complete setup.
+WelcomeLabel1=CentienC Server Monitor
+WelcomeLabel2=This will install CentienC v{#MyAppVersion} on your computer.%n%nCentienC is a professional server, service, and website monitoring dashboard that runs as a background service.%n%nAfter installation, open the dashboard URL shown in the terminal to complete setup.

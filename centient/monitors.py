@@ -930,12 +930,18 @@ class MonitorEngine:
         ],
     }
 
-    async def detect_web_server(self, server: dict[str, Any]) -> dict[str, Any]:
-        """Auto-detect web server type and available log files on a server."""
+    async def detect_web_server(self, server: dict[str, Any], url_host: str = "") -> dict[str, Any]:
+        """Auto-detect web server type, per-vhost log paths, and available log files.
+
+        Args:
+            server:   Server dict with SSH credentials.
+            url_host: Optional bare hostname (e.g. ``joshuagoth.com``) used to
+                      score the best log-path suggestion for a specific site.
+        """
         conn = await self._get_ssh_conn(server)
         sudo_pass = server.get("sudo_password")
 
-        # Detect installed web servers
+        # ── 1. Detect installed web servers ───────────────────────
         detect_cmd = (
             "which nginx 2>/dev/null && echo '---NGINX---'; "
             "which apache2 2>/dev/null && echo '---APACHE2---'; "
@@ -950,7 +956,66 @@ class MonitorEngine:
         if "---APACHE2---" in raw or "---HTTPD---" in raw:
             web_servers.append("apache")
 
-        # Find available log files
+        # ── 2. Parse per-vhost log paths from site configs ────────
+        # vhost_map: { hostname → access_log_path }
+        vhost_map: dict[str, str] = {}
+
+        if "nginx" in web_servers:
+            cfg_cmd = (
+                "grep -rn 'server_name\\|access_log' /etc/nginx/sites-enabled/ 2>/dev/null; "
+                "grep -rn 'server_name\\|access_log' /etc/nginx/conf.d/ 2>/dev/null"
+            )
+            cfg_raw = await self._ssh_cmd(conn, cfg_cmd)
+            _fd: dict[str, dict] = {}
+            for cfg_line in cfg_raw.splitlines():
+                parts = cfg_line.split(":", 2)
+                if len(parts) < 3:
+                    continue
+                fname, content = parts[0], parts[2].strip()
+                if fname not in _fd:
+                    _fd[fname] = {"names": [], "log": None}
+                if content.startswith("server_name "):
+                    names = content[len("server_name "):].rstrip(";").split()
+                    _fd[fname]["names"].extend(
+                        n.lstrip("*.").lower() for n in names if n not in ("_", "")
+                    )
+                elif content.startswith("access_log ") and _fd[fname]["log"] is None:
+                    path = content[len("access_log "):].split()[0].rstrip(";")
+                    if path != "off" and ".log" in path:
+                        _fd[fname]["log"] = path
+            for data in _fd.values():
+                if data["log"]:
+                    for name in data["names"]:
+                        vhost_map[name] = data["log"]
+
+        if "apache" in web_servers:
+            cfg_cmd = (
+                "grep -rn 'ServerName\\|CustomLog' /etc/apache2/sites-enabled/ 2>/dev/null; "
+                "grep -rn 'ServerName\\|CustomLog' /etc/httpd/conf.d/ 2>/dev/null"
+            )
+            cfg_raw = await self._ssh_cmd(conn, cfg_cmd)
+            _fd2: dict[str, dict] = {}
+            for cfg_line in cfg_raw.splitlines():
+                parts = cfg_line.split(":", 2)
+                if len(parts) < 3:
+                    continue
+                fname, content = parts[0], parts[2].strip()
+                if fname not in _fd2:
+                    _fd2[fname] = {"names": [], "log": None}
+                if content.startswith("ServerName ") and not _fd2[fname]["names"]:
+                    name = content[len("ServerName "):].strip().lower()
+                    if name:
+                        _fd2[fname]["names"].append(name)
+                elif content.startswith("CustomLog ") and _fd2[fname]["log"] is None:
+                    path = content[len("CustomLog "):].split()[0].rstrip(";")
+                    if "/log" in path:
+                        _fd2[fname]["log"] = path
+            for data in _fd2.values():
+                if data["log"]:
+                    for name in data["names"]:
+                        vhost_map[name] = data["log"]
+
+        # ── 3. Scan glob paths to find all available log files ────
         log_files = []
         for ws_type in web_servers:
             for glob_path in self._LOG_PATHS[ws_type]:
@@ -962,15 +1027,31 @@ class MonitorEngine:
                 for line in result.strip().split("\n"):
                     line = line.strip()
                     if line and not line.startswith("ls:") and line.endswith(".log"):
-                        log_files.append({
-                            "path": line,
-                            "web_server": ws_type,
-                        })
+                        log_files.append({"path": line, "web_server": ws_type})
+
+        # ── 4. Score the best log path for the requested URL ──────
+        suggested_path: str | None = None
+        if url_host:
+            bare = url_host[4:] if url_host.startswith("www.") else url_host
+            for candidate in (url_host, bare, "www." + bare):
+                if candidate in vhost_map:
+                    suggested_path = vhost_map[candidate]
+                    break
+            if not suggested_path:
+                # Prefix / substring fallback
+                prefix = bare.split(".")[0]
+                for host, path in vhost_map.items():
+                    if host.startswith(prefix) or prefix in host:
+                        suggested_path = path
+                        break
+        if not suggested_path:
+            suggested_path = log_files[0]["path"] if log_files else None
 
         return {
             "web_servers": web_servers,
             "log_files": log_files,
-            "suggested_path": log_files[0]["path"] if log_files else None,
+            "vhost_map": vhost_map,
+            "suggested_path": suggested_path,
         }
 
     async def get_site_detail(
@@ -992,6 +1073,12 @@ class MonitorEngine:
         if not log_path:
             # Auto-detect: try nginx first, then apache
             log_path = "/var/log/nginx/*access*.log"
+        else:
+            # If the configured path is a directory, look for access logs inside it
+            # or fall back to the nginx default glob
+            is_dir = await self._ssh_cmd(conn, f"test -d {log_path} && echo dir || echo file")
+            if is_dir.strip() == "dir":
+                log_path = "/var/log/nginx/*access*.log"
 
         cmd = f"tail -n 15000 {log_path} 2>/dev/null || echo ''"
         if sudo_pass:
@@ -1052,10 +1139,18 @@ class MonitorEngine:
             vhost = m.group("vhost") or current_file_site
             if vhost:
                 vhost_lower = vhost.lower()
-                # Match by exact hostname, or by prefix (e.g. "25cent" matches "25cent.cloud")
+                # Match by exact hostname, www. prefix, bare label, or
+                # vhost-is-parent checks (e.g. "joshuagoth" matches "joshuagoth.com",
+                # "www.joshuagoth.com" matches "joshuagoth.com")
                 if url_host and vhost_lower != url_host:
-                    prefix = url_host.split(".")[0]
-                    if vhost_lower != prefix and not url_host.startswith(vhost_lower + "."):
+                    # Strip leading www. from both sides for comparison
+                    bare_vhost = vhost_lower[4:] if vhost_lower.startswith("www.") else vhost_lower
+                    bare_url = url_host[4:] if url_host.startswith("www.") else url_host
+                    prefix = bare_url.split(".")[0]
+                    if (bare_vhost != bare_url
+                            and vhost_lower != prefix
+                            and bare_vhost != prefix
+                            and not bare_url.startswith(bare_vhost + ".")):
                         continue
             # else: no vhost in log line and no file-header hint — standard
             # combined format; assume traffic belongs to this website (the

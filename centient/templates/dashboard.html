@@ -423,13 +423,17 @@ body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);co
             <select id="wServerId" style="width:100%;padding:8px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px" onchange="onServerSelect()">
                 <option value="">None (basic monitor only)</option>
             </select>
-            <div id="wLogPathGroup" style="display:none;margin-top:10px">
-                <label>Log File Path</label>
+            <!-- Inline auto-detect panel: shown when server selected -->
+            <div id="wVhostPanel" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(0,0,0,.3);border-radius:8px;border:1px solid rgba(255,255,255,.06)">
+                <div id="wVhostStatus" style="font-size:.78em;color:var(--text2)"></div>
+                <div id="wVhostPicker" style="margin-top:4px"></div>
+            </div>
+            <div id="wLogPathGroup" style="display:none;margin-top:8px">
+                <label style="font-size:.78em;color:var(--text2);font-weight:400">Access log path <span style="opacity:.6">(auto-filled · edit to override)</span></label>
                 <div style="display:flex;gap:6px">
-                    <input id="wLogPath" placeholder="/var/log/nginx/*access*.log" style="flex:1">
-                    <button class="btn btn-sm" onclick="detectWebServer()" id="detectBtn" style="white-space:nowrap">🔍 Auto-detect</button>
+                    <input id="wLogPath" placeholder="/var/log/nginx/access.log" style="flex:1">
+                    <button class="btn btn-sm" onclick="detectWebServer()" title="Re-scan server" style="white-space:nowrap">↻</button>
                 </div>
-                <div id="detectResult" style="margin-top:6px;font-size:.72em;color:var(--text2)"></div>
             </div>
         </div>
     </div>
@@ -841,7 +845,9 @@ function clearForms(){
     ['fPm2','fServices','fNginx','fFail2ban'].forEach(id=>document.getElementById(id).checked=false);
     document.getElementById('wServerId').value='';document.getElementById('wLogPath').value='';
     document.getElementById('wLogPathGroup').style.display='none';
-    document.getElementById('detectResult').textContent='';
+    document.getElementById('wVhostPanel').style.display='none';
+    document.getElementById('wVhostPicker').innerHTML='';
+    document.getElementById('wVhostStatus').textContent='';
     document.getElementById('sshTestRow').style.display='none';
     document.getElementById('sshTestResult').textContent='';
     document.getElementById('sshKeyGenResult').style.display='none';
@@ -849,7 +855,13 @@ function clearForms(){
 }
 function onServerSelect(){
     const v=document.getElementById('wServerId').value;
+    const panel=document.getElementById('wVhostPanel');
     document.getElementById('wLogPathGroup').style.display=v?'block':'none';
+    if(!v){panel.style.display='none';document.getElementById('wVhostPicker').innerHTML='';return;}
+    panel.style.display='block';
+    document.getElementById('wVhostStatus').innerHTML='<span style="opacity:.6">🔍 Scanning server for web services…</span>';
+    document.getElementById('wVhostPicker').innerHTML='';
+    _autoDetectLog(v,'w');
 }
 async function populateServerDropdown(){
     try{
@@ -864,28 +876,73 @@ async function populateServerDropdown(){
         if(cur)sel.value=cur;
     }catch(e){}
 }
-async function detectWebServer(){
-    const sid=document.getElementById('wServerId').value;
-    if(!sid){toast('Select a server first','error');return}
-    const el=document.getElementById('detectResult');
-    el.textContent='Detecting...';
+/* ── Auto-detect web server + inline vhost picker ── */
+async function _autoDetectLog(serverId,prefix){
+    const urlEl=document.getElementById(prefix==='fw'?'fwUrl':'wUrl');
+    const url=urlEl?urlEl.value:'';
     try{
-        const r=await fetch('/api/servers/'+sid+'/detect-web-server',{method:'POST'});
+        const r=await fetch('/api/servers/'+serverId+'/detect-web-server?url='+encodeURIComponent(url),{method:'POST'});
         const d=await r.json();
-        if(!d.ok){el.textContent='Error: '+(d.error||'Failed');return}
-        const ws=d.web_servers||[];
-        const files=d.log_files||[];
-        let html=ws.length?'Found: '+ws.join(', ')+'<br>':'No web server detected<br>';
-        if(files.length){
-            html+='Log files:<br>';
-            for(const f of files){
-                html+='<a href="#" style="color:#2D7FF9;text-decoration:none" onclick="document.getElementById(\'wLogPath\').value=\''+f.path+'\';return false">'+esc(f.path)+'</a> ('+f.web_server+')<br>';
-            }
-        }
-        if(d.suggested_path)document.getElementById('wLogPath').value=d.suggested_path;
-        el.innerHTML=html;
-    }catch(e){el.textContent='Error: '+e.message}
+        if(!d.ok){document.getElementById(prefix+'VhostStatus').innerHTML='<span style="font-size:.78em;color:#FF9500">⚠ '+(d.error||'Detection failed')+'</span>';return;}
+        _renderVhostPicker(d,url,prefix);
+    }catch(e){document.getElementById(prefix+'VhostStatus').innerHTML='<span style="font-size:.78em;color:#FF9500">⚠ '+esc(e.message)+'</span>';}
 }
+function _renderVhostPicker(d,url,prefix){
+    const vmap=d.vhost_map||{},logFiles=d.log_files||[];
+    const urlHost=url.replace(/^https?:\/\//,'').split(/[/?#]/)[0].toLowerCase();
+    const bare=urlHost.startsWith('www.')?urlHost.slice(4):urlHost;
+    const el=document.getElementById(prefix+'VhostPicker');
+    const statusEl=document.getElementById(prefix+'VhostStatus');
+    const logInput=document.getElementById(prefix+'LogPath');
+    let html='';
+    if(d.web_servers&&d.web_servers.length)
+        html+='<span style="background:rgba(45,127,249,.15);color:#2D7FF9;padding:2px 10px;border-radius:10px;font-size:.72em;font-weight:700;display:inline-block;margin-bottom:7px">'+d.web_servers.map(x=>x.toUpperCase()).join('+')+'</span>';
+    const entries=Object.entries(vmap);
+    if(entries.length){
+        entries.sort(([a],[b])=>{const am=(a===urlHost||a===bare||a==='www.'+bare)?0:1;const bm=(b===urlHost||b===bare||b==='www.'+bare)?0:1;return am-bm;});
+        html+='<div style="font-size:.75em;color:var(--text2);margin:5px 0 4px">Select the access log for this website:</div>';
+        html+='<div style="display:flex;flex-direction:column;gap:3px" id="'+prefix+'VhostRows">';
+        let autoSelected=false;
+        const curPath=logInput?logInput.value:'';
+        for(const [host,path] of entries){
+            const urlMatch=(host===urlHost||host===bare||host==='www.'+bare||'www.'+host===urlHost);
+            const curMatch=!!curPath&&curPath===path;
+            const hi=curMatch||(urlMatch&&!autoSelected&&!curPath);
+            if(urlMatch&&!autoSelected&&!curPath){if(logInput)logInput.value=path;autoSelected=true;}
+            html+='<div class="vhr" onclick="_selectVhostLog(this,\''+prefix+'\','+JSON.stringify(path)+')" style="cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid '+(hi?'rgba(45,127,249,.7)':'rgba(255,255,255,.07)')+';background:'+(hi?'rgba(45,127,249,.1)':'rgba(255,255,255,.02)')+';transition:border-color .15s,background .15s">';
+            html+='<div style="font-weight:600;font-size:.8em;color:'+(hi?'#2D7FF9':'var(--text)')+'">'+esc(host)+(urlMatch?'<span style="font-weight:400;font-size:.85em;color:#34C759;margin-left:5px">✓ this site</span>':'')+'</div>';
+            html+='<div style="font-family:monospace;font-size:.7em;color:var(--text2);margin-top:1px">'+esc(path)+'</div>';
+            html+='</div>';
+        }
+        html+='</div>';
+        if(!autoSelected&&d.suggested_path&&logInput&&!logInput.value)logInput.value=d.suggested_path;
+        statusEl.textContent='';
+    }else if(logFiles.length){
+        html+='<div style="font-size:.75em;color:var(--text2);margin:5px 0 4px">No per-site config found — select a log:</div>';
+        html+='<div style="display:flex;flex-direction:column;gap:3px" id="'+prefix+'VhostRows">';
+        for(const f of logFiles.slice(0,6)){
+            const hi=!!(logInput&&logInput.value===f.path);
+            html+='<div class="vhr" onclick="_selectVhostLog(this,\''+prefix+'\','+JSON.stringify(f.path)+')" style="cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid '+(hi?'rgba(45,127,249,.7)':'rgba(255,255,255,.07)')+';background:'+(hi?'rgba(45,127,249,.1)':'rgba(255,255,255,.02)')+';transition:border-color .15s,background .15s">';
+            html+='<div style="font-family:monospace;font-size:.75em;color:var(--text)">'+esc(f.path)+'</div>';
+            html+='</div>';
+        }
+        html+='</div>';
+        if(logInput&&!logInput.value&&d.suggested_path)logInput.value=d.suggested_path;
+        statusEl.textContent='';
+    }else{
+        statusEl.innerHTML='<span style="font-size:.78em;color:#FF9500">No web server logs found on this server. Enter the path manually below.</span>';
+    }
+    el.innerHTML=html;
+}
+function _selectVhostLog(el,prefix,path){
+    const rows=document.getElementById(prefix+'VhostRows');
+    if(rows)rows.querySelectorAll('.vhr').forEach(r=>{r.style.borderColor='rgba(255,255,255,.07)';r.style.background='rgba(255,255,255,.02)';const d=r.querySelector('div');if(d)d.style.color='var(--text)';});
+    el.style.borderColor='rgba(45,127,249,.7)';el.style.background='rgba(45,127,249,.1)';
+    const fd=el.querySelector('div');if(fd)fd.style.color='#2D7FF9';
+    const inp=document.getElementById(prefix+'LogPath');
+    if(inp)inp.value=path;
+}
+function detectWebServer(){_autoDetectLog(document.getElementById('wServerId').value,'w');}
 
 async function editServer(id){
     try{const r=await fetch('/api/servers'),d=await r.json(),srv=(d.servers||[]).find(s=>s.id===id);if(!srv)return;
@@ -1091,7 +1148,7 @@ function _ddUpdateCharts(){
 
 async function loadSiteDetail(id,init){
     try{
-        const r=await fetch('/api/websites/'+id+'/detail?minutes=5');
+        const r=await fetch('/api/websites/'+id+'/detail?minutes=30');
         const d=await r.json();
         if(!d.ok){document.getElementById('siteDetailContent').innerHTML='<div style="color:#FF3B30;padding:20px">Error: '+esc(d.error||'Failed')+'</div>';return;}
         const w=d.website||{};
@@ -1284,6 +1341,21 @@ async function loadSiteDetail(id,init){
         h+='</div>';
 
         h+='</div>';
+
+        /* ── No-traffic warning when SSH log access works but 0 requests found ── */
+        if(!reqs.length && !t.requests){
+            h+='<div class="dd-card" style="margin-bottom:16px;border-color:rgba(255,149,0,.3);background:rgba(255,149,0,.06)">';
+            h+='<h4 style="color:#FF9500">⚠ No traffic found in the last 30 minutes</h4>';
+            h+='<div style="font-size:.84em;color:var(--text2);line-height:1.6">';
+            h+='The server was reached via SSH but no matching log entries were found. This usually means:<br>';
+            h+='<ul style="margin:8px 0 8px 18px;padding:0">';
+            h+='<li>The <strong>Access Log Path</strong> configured for this website is incorrect (e.g. pointing to a directory instead of a log file)</li>';
+            h+='<li>Nginx uses a per-vhost log format — try setting the path to <code style="color:#58a6ff">/var/log/nginx/access.log</code> or a site-specific log like <code style="color:#58a6ff">/var/log/nginx/'+esc((w.name||'').replace(/https?:\/\//,'').split('/')[0])+'.access.log</code></li>';
+            h+='<li>No one has visited the site in the last 30 minutes — try browsing it and refreshing this page</li>';
+            h+='</ul>';
+            h+='<button class="btn btn-sm" style="margin-top:4px" onclick="closeSiteDetail();editWebsite('+id+')">⚙ Edit Log Path</button>';
+            h+='</div></div>';
+        }
 
         /* ── Row 2: Live Request Feed (prominent, full width) ── */
         if(reqs.length){

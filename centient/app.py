@@ -1107,8 +1107,14 @@ async def website_detail(website_id: int, request: Request):
 
 @app.post("/api/servers/{server_id}/detect-web-server")
 async def detect_web_server(server_id: int, request: Request):
-    """Auto-detect web server type and log paths on a server."""
+    """Auto-detect web server type and log paths on a server.
+
+    Optional query param ``url`` — used to score the best log-path suggestion
+    for a specific website URL (e.g. ``?url=https://joshuagoth.com``).
+    """
     await _require_auth_or_401(request)
+    url = request.query_params.get("url", "")
+    url_host = url.replace("https://", "").replace("http://", "").split("/")[0].lower() if url else ""
     servers = await db.list_servers()
     server = next((s for s in servers if s["id"] == server_id), None)
     if not server:
@@ -1117,7 +1123,7 @@ async def detect_web_server(server_id: int, request: Request):
         raise HTTPException(400, "Server has no SSH credentials")
 
     try:
-        result = await engine.detect_web_server(server)
+        result = await engine.detect_web_server(server, url_host=url_host)
         return {"ok": True, **result}
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
