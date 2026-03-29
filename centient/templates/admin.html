@@ -98,6 +98,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <a href="#" onclick="showPage('data')" data-page="data">🗄 Data</a>
       <a href="#" onclick="showPage('proxmox')" data-page="proxmox">🖧 Proxmox</a>
       <a href="#" onclick="showPage('about')" data-page="about">ℹ️ About</a>
+      <a href="#" onclick="openWizard()" style="margin-top:8px;border-left-color:transparent;background:linear-gradient(90deg,rgba(88,166,255,.12),transparent)">🧭 Setup Wizard</a>
     </nav>
     <div class="bottom"><a href="/">← Back to Dashboard</a></div>
   </div>
@@ -126,7 +127,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <h3 style="margin:0">🖥 Servers</h3>
-          <button class="btn btn-primary" onclick="openServerModal()">+ Add Server</button>
+          <button class="btn btn-primary" onclick="openWizard('server')">+ Add Server</button>
         </div>
         <table class="tbl">
           <thead><tr><th>Name</th><th>Hostname</th><th>Port</th><th>SSH User</th><th>SSH Port</th><th>Monitoring</th><th>Status</th><th>Actions</th></tr></thead>
@@ -153,7 +154,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <div class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <h3 style="margin:0">🌐 Websites</h3>
-          <button class="btn btn-primary" onclick="openWebsiteModal()">+ Add Website</button>
+          <button class="btn btn-primary" onclick="openWizard('website')">+ Add Website</button>
         </div>
         <table class="tbl">
           <thead><tr><th>Name</th><th>URL</th><th>Linked Server</th><th>Log Path</th><th>Status</th><th>Response</th><th>Actions</th></tr></thead>
@@ -383,6 +384,622 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 </div>
 
 <div class="toast-container" id="toasts"></div>
+
+<!-- ═══════════════════════════ SETUP WIZARD ═══════════════════════════ -->
+<style>
+.wiz-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;align-items:center;justify-content:center}
+.wiz-overlay.active{display:flex}
+.wiz-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:0;width:96%;max-width:560px;box-shadow:0 16px 60px rgba(0,0,0,.5);overflow:hidden;display:flex;flex-direction:column;max-height:92vh}
+.wiz-head{padding:20px 24px 0;flex-shrink:0}
+.wiz-head h2{font-size:17px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:9px}
+.wiz-progress{display:flex;gap:5px;margin:14px 0 0}
+.wiz-step-dot{height:4px;border-radius:2px;flex:1;background:var(--border);transition:.3s}
+.wiz-step-dot.done{background:var(--green)}
+.wiz-step-dot.active{background:var(--accent)}
+.wiz-body{flex:1;overflow-y:auto;padding:20px 24px}
+.wiz-body h3{font-size:14px;font-weight:600;margin-bottom:4px;color:var(--text)}
+.wiz-body p{font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.55}
+.wiz-body label{display:block;font-size:12px;color:var(--text2);margin:12px 0 3px}
+.wiz-body input,.wiz-body select{width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box}
+.wiz-body input:focus,.wiz-body select:focus{border-color:var(--accent)}
+.wiz-body .hint{font-size:11px;color:var(--text2);margin-top:3px;line-height:1.4}
+.wiz-body .card-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.wiz-body .wcard{border:2px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;text-align:center;transition:.2s;background:var(--surface2)}
+.wiz-body .wcard:hover,.wiz-body .wcard.sel{border-color:var(--accent);background:rgba(88,166,255,.08)}
+.wiz-body .wcard .wcard-icon{font-size:26px;margin-bottom:6px}
+.wiz-body .wcard .wcard-title{font-size:13px;font-weight:600;color:var(--text)}
+.wiz-body .wcard .wcard-desc{font-size:11px;color:var(--text2);margin-top:3px;line-height:1.4}
+.wiz-body .info-box{padding:11px 14px;border-radius:8px;background:rgba(88,166,255,.07);border:1px solid rgba(88,166,255,.2);font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.55}
+.wiz-body .info-box strong{color:var(--accent)}
+.wiz-body .feat-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.wiz-body .feat-grid label{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:var(--text);min-width:auto;margin:0}
+.wiz-body .feat-grid input[type=checkbox]{width:auto;flex:none;min-width:0}
+.wiz-body .test-row{display:flex;gap:8px;align-items:center;margin-top:10px}
+.wiz-body .test-out{font-size:12px;padding:8px 12px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);margin-top:8px;word-break:break-all;white-space:pre-wrap;min-height:36px;color:var(--text2)}
+.wiz-body .test-out.ok{border-color:var(--green);color:var(--green)}
+.wiz-body .test-out.err{border-color:var(--red);color:var(--red)}
+.wiz-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0}
+@media(max-width:480px){.wiz-body .card-row{grid-template-columns:1fr}}
+</style>
+
+<div class="wiz-overlay" id="wizOverlay" onclick="if(event.target===this)closeWizard()">
+  <div class="wiz-box">
+    <div class="wiz-head">
+      <h2 id="wizTitle">🧭 Setup Wizard</h2>
+      <div class="wiz-progress" id="wizProgress"></div>
+    </div>
+    <div class="wiz-body" id="wizBody"></div>
+    <div class="wiz-foot">
+      <button class="btn" onclick="closeWizard()">✕ Cancel</button>
+      <button class="btn" id="wizBackBtn" onclick="wizBack()" style="display:none">← Back</button>
+      <button class="btn btn-primary" id="wizNextBtn" onclick="wizNext()">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════ SETUP WIZARD ══════════════════════ */
+let _wiz = {type:null, siteType:null, step:0, steps:[], data:{}};
+
+function openWizard(preType){
+  _wiz = {type:preType||null, siteType:null, step:0, steps:[], data:{}};
+  _wizBuild();
+  document.getElementById('wizOverlay').classList.add('active');
+}
+function closeWizard(){
+  document.getElementById('wizOverlay').classList.remove('active');
+}
+
+function _wizBuild(){
+  if(!_wiz.type){
+    _wiz.steps = ['choose'];
+  } else if(_wiz.type === 'server'){
+    _wiz.steps = ['srv_basics','srv_ssh','srv_features','srv_test','srv_done'];
+  } else if(_wiz.type === 'website'){
+    _wiz.steps = ['web_type','web_basics','web_server','web_done'];
+  }
+  _wizRender();
+}
+
+function _wizRender(){
+  const s = _wiz.steps[_wiz.step];
+  const total = _wiz.steps.length;
+  const idx = _wiz.step;
+
+  // Progress dots
+  const dots = _wiz.steps.map((_,i)=>`<div class="wiz-step-dot ${i<idx?'done':i===idx?'active':''}"></div>`).join('');
+  document.getElementById('wizProgress').innerHTML = dots;
+
+  // Back btn
+  document.getElementById('wizBackBtn').style.display = idx > 0 ? 'inline-block' : 'none';
+
+  // Next/Finish label
+  const nextBtn = document.getElementById('wizNextBtn');
+  nextBtn.textContent = (idx === total-1) ? '✓ Finish' : 'Next →';
+  nextBtn.style.display = s === 'srv_test' ? 'none' : 'inline-block'; // hide during test step (show save btn instead)
+  if(s === 'srv_test') nextBtn.style.display = 'inline-block'; // still show skip
+
+  const renders = {
+    'choose': _wizStepChoose,
+    'srv_basics': _wizStepSrvBasics,
+    'srv_ssh': _wizStepSrvSSH,
+    'srv_features': _wizStepSrvFeatures,
+    'srv_test': _wizStepSrvTest,
+    'srv_done': _wizStepSrvDone,
+    'web_type': _wizStepWebType,
+    'web_basics': _wizStepWebBasics,
+    'web_server': _wizStepWebServer,
+    'web_log': _wizStepWebLog,
+    'web_done': _wizStepWebDone,
+  };
+  if(renders[s]) renders[s]();
+}
+
+/* ── collect helpers ── */
+function _wizCollectSrvBasics(){
+  _wiz.data.name = document.getElementById('wz_sname').value.trim();
+  _wiz.data.hostname = document.getElementById('wz_shost').value.trim();
+  _wiz.data.port = parseInt(document.getElementById('wz_sport').value)||22;
+}
+function _wizCollectSrvSSH(){
+  _wiz.data.ssh_user = document.getElementById('wz_suser').value.trim();
+  _wiz.data.ssh_port = parseInt(document.getElementById('wz_ssport').value)||22;
+  _wiz.data.ssh_key_path = document.getElementById('wz_skeypath').value.trim();
+  _wiz.data.ssh_password = document.getElementById('wz_spass').value;
+  _wiz.data.sudo_password = document.getElementById('wz_sudopass').value;
+}
+function _wizCollectSrvFeatures(){
+  _wiz.data.monitor_flags = {
+    system: document.getElementById('wz_fm_sys').checked,
+    pm2: document.getElementById('wz_fm_pm2').checked,
+    services: document.getElementById('wz_fm_svc').checked,
+    nginx: document.getElementById('wz_fm_ngx').checked,
+    apache: document.getElementById('wz_fm_aph').checked,
+    fail2ban: document.getElementById('wz_fm_f2b').checked,
+  };
+}
+function _wizCollectWebBasics(){
+  _wiz.data.wname = document.getElementById('wz_wname').value.trim();
+  _wiz.data.wurl = document.getElementById('wz_wurl').value.trim();
+  _wiz.data.wstatus = parseInt(document.getElementById('wz_wstatus').value)||200;
+  _wiz.data.wtimeout = parseInt(document.getElementById('wz_wtimeout').value)||15;
+}
+
+/* ── step validators (return error string or null) ── */
+function _wizValidate(){
+  const s = _wiz.steps[_wiz.step];
+  if(s==='choose') return _wiz.type ? null : 'Please choose what to add.';
+  if(s==='srv_basics'){
+    _wizCollectSrvBasics();
+    if(!_wiz.data.name) return 'Server name is required.';
+    if(!_wiz.data.hostname) return 'Hostname or IP is required.';
+  }
+  if(s==='srv_ssh'){
+    _wizCollectSrvSSH();
+    if(!_wiz.data.ssh_user) return 'SSH username is required.';
+    if(!_wiz.data.ssh_key_path && !_wiz.data.ssh_password) return 'Provide either an SSH key path or SSH password.';
+  }
+  if(s==='srv_features'){ _wizCollectSrvFeatures(); }
+  if(s==='web_type') return _wiz.siteType ? null : 'Please select the website type.';
+  if(s==='web_basics'){
+    _wizCollectWebBasics();
+    if(!_wiz.data.wurl) return 'URL is required.';
+  }
+  return null;
+}
+
+async function wizNext(){
+  const err = _wizValidate();
+  if(err){ toast(err,'error'); return; }
+
+  const s = _wiz.steps[_wiz.step];
+
+  // From the opening choose screen, rebuild steps for the selected type
+  if(s === 'choose'){
+    if(_wiz.type === 'server') _wiz.steps = ['srv_basics','srv_ssh','srv_features','srv_test','srv_done'];
+    else if(_wiz.type === 'website') _wiz.steps = ['web_type','web_basics','web_server','web_done'];
+    _wiz.step = -1; // will be incremented to 0 below
+  }
+
+  // srv_test: "Skip & Save" or success → go to srv_done
+  if(s === 'srv_test'){
+    _wiz.step = _wiz.steps.indexOf('srv_done') - 1;
+  }
+
+  // Terminal steps → save & close
+  if(s === 'srv_done'){ _wizSaveServer(); return; }
+  if(s === 'web_done'){ closeWizard(); return; }
+  if(s === 'web_done'){ _wizSaveWebsite(); return; }
+
+  // web_server: collect log path before advancing to save step
+  if(s === 'web_server'){
+    const sEl=document.getElementById('wz_wserver');
+    if(sEl) _wiz.data.wserver_id = sEl.value ? parseInt(sEl.value,10) : null;
+    const lpEl=document.getElementById('wz_wlogpath');
+    if(lpEl) _wiz.data.wlog_path = lpEl.value||null;
+    // Skip web_log if present, jump to save
+    _wiz.data._web_server_step_done = true;
+    await _wizSaveWebsite(); return;
+  }
+
+  // If web_type and remote → skip server/log steps
+  if(s === 'web_type' && _wiz.siteType === 'remote'){
+    _wiz.steps = ['web_type','web_basics','web_done'];
+  }
+  if(s === 'web_type' && (_wiz.siteType === 'hosted' || _wiz.siteType === 'managed')){
+    _wiz.steps = ['web_type','web_basics','web_server','web_done'];
+  }
+
+  _wiz.step++;
+  _wizRender();
+}
+
+function wizBack(){
+  if(_wiz.step > 0){ _wiz.step--; _wizRender(); }
+}
+
+/* ═══ STEP RENDERERS ═══ */
+
+function _wizStepChoose(){
+  document.getElementById('wizTitle').innerHTML = '🧭 Setup Wizard';
+  document.getElementById('wizBody').innerHTML = `
+    <h3>What would you like to add?</h3>
+    <p>The wizard will guide you step by step. You can always add or edit items later in Settings.</p>
+    <div class="card-row">
+      <div class="wcard ${_wiz.type==='server'?'sel':''}" onclick="_wizPickType('server',this)">
+        <div class="wcard-icon">🖥️</div>
+        <div class="wcard-title">A Server</div>
+        <div class="wcard-desc">SSH-monitored linux server (metrics, services, logs, PM2)</div>
+      </div>
+      <div class="wcard ${_wiz.type==='website'?'sel':''}" onclick="_wizPickType('website',this)">
+        <div class="wcard-icon">🌐</div>
+        <div class="wcard-title">A Website</div>
+        <div class="wcard-desc">Uptime, response time, and optionally live traffic feed</div>
+      </div>
+    </div>`;
+}
+function _wizPickType(t, el){
+  _wiz.type = t;
+  document.querySelectorAll('#wizBody .wcard').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  _wiz.steps = [];
+  // rebuild steps immediately so next click is correct
+}
+
+function _wizStepWebType(){
+  document.getElementById('wizTitle').innerHTML = '🌐 Website Type';
+  document.getElementById('wizBody').innerHTML = `
+    <h3>What kind of website is this?</h3>
+    <p>Helps CentienC know how to monitor it best.</p>
+    <div class="card-row" style="grid-template-columns:1fr">
+      <div class="wcard ${_wiz.siteType==='remote'?'sel':''}" onclick="_wizPickSiteType('remote',this)">
+        <div class="wcard-icon">☁️</div>
+        <div class="wcard-title">Remote / Third-party site</div>
+        <div class="wcard-desc">A site you don't host (e.g. a client's site, a service you depend on). CentienC will monitor uptime and response time only.</div>
+      </div>
+      <div class="wcard ${_wiz.siteType==='hosted'?'sel':''}" onclick="_wizPickSiteType('hosted',this)">
+        <div class="wcard-icon">🏠</div>
+        <div class="wcard-title">Hosted by me (I have SSH access)</div>
+        <div class="wcard-desc">A site running on your own server. Enables live traffic feed, visitor counts, device types, and log-based analytics.</div>
+      </div>
+      <div class="wcard ${_wiz.siteType==='managed'?'sel':''}" onclick="_wizPickSiteType('managed',this)">
+        <div class="wcard-icon">🔑</div>
+        <div class="wcard-title">Managed by me (I have root access)</div>
+        <div class="wcard-desc">Full access — same as above plus SSH-based log detection and auto-configuration.</div>
+      </div>
+    </div>
+    <div class="info-box" id="wizSiteTypeHint" style="display:${_wiz.siteType?'block':'none'}"></div>`;
+  if(_wiz.siteType) _wizUpdateSiteTypeHint(_wiz.siteType);
+}
+function _wizPickSiteType(t, el){
+  _wiz.siteType = t;
+  document.querySelectorAll('#wizBody .wcard').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  _wizUpdateSiteTypeHint(t);
+}
+function _wizUpdateSiteTypeHint(t){
+  const box = document.getElementById('wizSiteTypeHint');
+  if(!box) return;
+  const msgs = {
+    remote: '<strong>Remote / Third-party:</strong> CentienC will ping your URL every minute and record uptime, HTTP status codes, and response time. No SSH needed.',
+    hosted: '<strong>Hosted by me:</strong> CentienC will link the site to one of your SSH-monitored servers and parse nginx/Apache access logs for live traffic data.',
+    managed: '<strong>Managed by me (root):</strong> Same as hosted, but CentienC can also auto-detect your web server configuration and suggest the correct access log path.',
+  };
+  box.innerHTML = msgs[t]||'';
+  box.style.display = 'block';
+}
+
+function _wizStepWebBasics(){
+  document.getElementById('wizTitle').innerHTML = '🌐 Website Details';
+  const d = _wiz.data;
+  document.getElementById('wizBody').innerHTML = `
+    <h3>Tell us about the website</h3>
+    <p>These are the core monitoring settings. You can change them later in Settings → Websites.</p>
+    <label>Website URL <span style="color:var(--red)">*</span></label>
+    <input id="wz_wurl" placeholder="https://example.com" value="${d.wurl||''}">
+    <div class="hint">Include the full URL with https://</div>
+    <label>Display Name</label>
+    <input id="wz_wname" placeholder="My Website" value="${d.wname||''}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <label>Expected Status Code</label>
+        <input id="wz_wstatus" type="number" value="${d.wstatus||200}">
+      </div>
+      <div>
+        <label>Timeout (seconds)</label>
+        <input id="wz_wtimeout" type="number" value="${d.wtimeout||15}">
+      </div>
+    </div>`;
+}
+
+function _wizStepWebServer(){
+  document.getElementById('wizTitle').innerHTML = '🔗 Link a Server';
+  const d = _wiz.data;
+  let serverOpts = '<option value="">— Select server —</option>';
+  // Populate async
+  document.getElementById('wizBody').innerHTML = `
+    <h3>Link to a monitored server</h3>
+    <p>Linking to a server with SSH access enables live traffic analytics from your nginx/Apache access logs.</p>
+    <label>Server <span style="color:var(--red)">*</span></label>
+    <select id="wz_wserver" onchange="_wizWebServerChange(this.value)"><option value="">Loading…</option></select>
+    <div class="hint">Only servers with SSH access are shown. Add a server first if needed.</div>
+    <div id="wz_wvhost_wrap" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(0,0,0,.3);border-radius:8px;border:1px solid rgba(255,255,255,.06)">
+      <div id="wz_wvhost_status" style="font-size:.78em;color:var(--text2)"></div>
+      <div id="wz_wvhost_picker"></div>
+    </div>
+    <div id="wz_wlog_wrap" style="margin-top:10px;display:none">
+      <label>Access Log Path <span style="font-weight:400;opacity:.6">(auto-filled · edit to override)</span></label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="wz_wlogpath" placeholder="/var/log/nginx/access.log" style="flex:1">
+        <button type="button" class="btn" onclick="_wizWebServerChange(document.getElementById('wz_wserver').value)" title="Re-scan">↻</button>
+      </div>
+    </div>`;
+  // Load servers
+  api('/api/servers').then(d=>{
+    if(!d)return;
+    const sel=document.getElementById('wz_wserver');if(!sel)return;
+    sel.innerHTML='<option value="">— Select server —</option>';
+    (d.servers||[]).filter(s=>s.ssh_user).forEach(s=>{
+      sel.innerHTML+=`<option value="${s.id}">${s.name} (${s.hostname})</option>`;
+    });
+    if(!d.servers||!d.servers.filter(s=>s.ssh_user).length){
+      sel.innerHTML='<option value="">No SSH servers configured yet</option>';
+    }
+    if(_wiz.data.wserver_id) sel.value=String(_wiz.data.wserver_id);
+  }).catch(()=>{});
+}
+function _wizWebServerChange(id){
+  _wiz.data.wserver_id = id ? parseInt(id,10) : null;
+  const lw = document.getElementById('wz_wlog_wrap');
+  const vw = document.getElementById('wz_wvhost_wrap');
+  if(!id){ if(lw)lw.style.display='none'; if(vw)vw.style.display='none'; return; }
+  if(lw)lw.style.display='block';
+  if(vw){vw.style.display='block'; document.getElementById('wz_wvhost_status').innerHTML='<span style="opacity:.6">🔍 Scanning…</span>'; document.getElementById('wz_wvhost_picker').innerHTML='';}
+  // Reuse shared detect helper with wz prefix
+  const url = _wiz.data.wurl||'';
+  api('/api/servers/'+id+'/detect-web-server?url='+encodeURIComponent(url),{method:'POST'}).then(d=>{
+    if(!d||!d.ok){const s=document.getElementById('wz_wvhost_status');if(s)s.innerHTML='<span style="font-size:.78em;color:#FF9500">⚠ '+(d&&d.error||'Detection failed')+'</span>';return;}
+    _wizRenderVhostPicker(d, url);
+  }).catch(e=>{const s=document.getElementById('wz_wvhost_status');if(s)s.innerHTML='<span style="font-size:.78em;color:#FF9500">⚠ '+e.message+'</span>';});
+}
+function _wizRenderVhostPicker(d, url){
+  const vmap=d.vhost_map||{},logFiles=d.log_files||[];
+  const urlHost=url.replace(/^https?:\/\//,'').split(/[/?#]/)[0].toLowerCase();
+  const bare=urlHost.startsWith('www.')?urlHost.slice(4):urlHost;
+  const el=document.getElementById('wz_wvhost_picker');
+  const statusEl=document.getElementById('wz_wvhost_status');
+  const logInput=document.getElementById('wz_wlogpath');
+  if(!el)return;
+  let html='';
+  if(d.web_servers&&d.web_servers.length)
+    html+='<span style="background:rgba(45,127,249,.15);color:#2D7FF9;padding:2px 10px;border-radius:10px;font-size:.72em;font-weight:700;display:inline-block;margin-bottom:7px">'+d.web_servers.map(x=>x.toUpperCase()).join('+')+'</span>';
+  const entries=Object.entries(vmap);
+  if(entries.length){
+    entries.sort(([a],[b])=>{const am=(a===urlHost||a===bare||a==='www.'+bare)?0:1;const bm=(b===urlHost||b===bare||b==='www.'+bare)?0:1;return am-bm;});
+    html+='<div style="font-size:.75em;color:var(--text2);margin:5px 0 4px">Select the access log for this website:</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:3px" id="wz_vhost_rows">';
+    let autoSelected=false;
+    for(const [host,path] of entries){
+      const urlMatch=(host===urlHost||host===bare||host==='www.'+bare||'www.'+host===urlHost);
+      const curPath=logInput?logInput.value:'';
+      const hi=!!(logInput&&curPath===path)||(urlMatch&&!autoSelected&&!curPath);
+      if(urlMatch&&!autoSelected&&!curPath){if(logInput)logInput.value=path;autoSelected=true;}
+      html+='<div class="vhr" onclick="_wizSelectLog(this,'+JSON.stringify(path)+')" style="cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid '+(hi?'rgba(45,127,249,.7)':'rgba(255,255,255,.07)')+';background:'+(hi?'rgba(45,127,249,.1)':'rgba(255,255,255,.02)')+';transition:border-color .15s,background .15s">';
+      html+='<div style="font-weight:600;font-size:.8em;color:'+(hi?'#2D7FF9':'var(--text)')+'">'+host+(urlMatch?'<span style="font-weight:400;font-size:.85em;color:#34C759;margin-left:5px">✓ this site</span>':'')+'</div>';
+      html+='<div style="font-family:monospace;font-size:.7em;color:var(--text2);margin-top:1px">'+path+'</div>';
+      html+='</div>';
+    }
+    html+='</div>';
+    if(!autoSelected&&d.suggested_path&&logInput&&!logInput.value)logInput.value=d.suggested_path;
+    statusEl.textContent='';
+  }else if(logFiles.length){
+    html+='<div style="font-size:.75em;color:var(--text2);margin:5px 0 4px">No per-site config found — select a log:</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:3px" id="wz_vhost_rows">';
+    for(const f of logFiles.slice(0,6)){
+      const hi=!!(logInput&&logInput.value===f.path);
+      html+='<div class="vhr" onclick="_wizSelectLog(this,'+JSON.stringify(f.path)+')" style="cursor:pointer;padding:7px 10px;border-radius:6px;border:1px solid '+(hi?'rgba(45,127,249,.7)':'rgba(255,255,255,.07)')+';background:'+(hi?'rgba(45,127,249,.1)':'rgba(255,255,255,.02)')+';transition:border-color .15s,background .15s">';
+      html+='<div style="font-family:monospace;font-size:.75em;color:var(--text)">'+f.path+'</div>';
+      html+='</div>';
+    }
+    html+='</div>';
+    if(logInput&&!logInput.value&&d.suggested_path)logInput.value=d.suggested_path;
+    statusEl.textContent='';
+  }else{
+    statusEl.innerHTML='<span style="font-size:.78em;color:#FF9500">No web server logs found. Enter the path manually above.</span>';
+  }
+  el.innerHTML=html;
+}
+function _wizSelectLog(el,path){
+  const rows=document.getElementById('wz_vhost_rows');
+  if(rows)rows.querySelectorAll('.vhr').forEach(r=>{r.style.borderColor='rgba(255,255,255,.07)';r.style.background='rgba(255,255,255,.02)';const d=r.querySelector('div');if(d)d.style.color='var(--text)';});
+  el.style.borderColor='rgba(45,127,249,.7)';el.style.background='rgba(45,127,249,.1)';
+  const fd=el.querySelector('div');if(fd)fd.style.color='#2D7FF9';
+  const inp=document.getElementById('wz_wlogpath');
+  if(inp)inp.value=path;
+  _wiz.data.wlog_path = path;
+}
+
+function _wizStepWebLog(){
+  // Inline in server step — skip to advance
+  _wiz.step++;
+  _wizRender();
+}
+
+function _wizStepSrvBasics(){
+  document.getElementById('wizTitle').innerHTML = '🖥️ Server Details';
+  const d = _wiz.data;
+  document.getElementById('wizBody').innerHTML = `
+    <h3>Server basics</h3>
+    <p>Give the server a friendly name and tell CentienC where to reach it.</p>
+    <label>Server Name <span style="color:var(--red)">*</span></label>
+    <input id="wz_sname" placeholder="Production Server" value="${d.name||''}">
+    <label>Hostname or IP Address <span style="color:var(--red)">*</span></label>
+    <input id="wz_shost" placeholder="192.168.1.100 or server.example.com" value="${d.hostname||''}">
+    <label>Port</label>
+    <input id="wz_sport" type="number" value="${d.port||22}">
+    <div class="hint">Usually 22 for SSH. Only change this if your server uses a non-standard SSH port.</div>`;
+}
+
+function _wizStepSrvSSH(){
+  document.getElementById('wizTitle').innerHTML = '🔑 SSH Credentials';
+  const d = _wiz.data;
+  document.getElementById('wizBody').innerHTML = `
+    <h3>How should CentienC connect?</h3>
+    <p>CentienC uses SSH — no agents are installed on your server. Key-based auth is recommended.</p>
+    <div class="info-box"><strong>Tip:</strong> The CentienC SSH public key is at <code>/var/lib/centienc/.ssh/id_ed25519.pub</code>. Add it to <code>~/.ssh/authorized_keys</code> on your server for passwordless access.</div>
+    <label>SSH Username <span style="color:var(--red)">*</span></label>
+    <input id="wz_suser" placeholder="root" value="${d.ssh_user||''}">
+    <label>SSH Port</label>
+    <input id="wz_ssport" type="number" value="${d.ssh_port||22}">
+    <label>SSH Key Path (recommended)</label>
+    <input id="wz_skeypath" placeholder="/var/lib/centienc/.ssh/id_ed25519" value="${d.ssh_key_path||'/var/lib/centienc/.ssh/id_ed25519'}">
+    <div class="hint">Path to the private key on the CentienC server. Leave blank to use password auth.</div>
+    <label>SSH Password (if no key)</label>
+    <input id="wz_spass" type="password" placeholder="Leave blank for key auth">
+    <label>Sudo Password (optional)</label>
+    <input id="wz_sudopass" type="password" placeholder="Only needed if user requires sudo password">`;
+}
+
+function _wizStepSrvFeatures(){
+  document.getElementById('wizTitle').innerHTML = '⚙️ Monitoring Features';
+  const f = _wiz.data.monitor_flags||{};
+  document.getElementById('wizBody').innerHTML = `
+    <h3>What should CentienC monitor?</h3>
+    <p>Enable the metrics you want. You can change these at any time from Settings → Servers.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px">
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <label style="display:flex;align-items:flex-start;gap:9px;margin:0;cursor:pointer">
+          <input type="checkbox" id="wz_fm_sys" style="width:auto;min-width:0;margin-top:2px" ${f.system!==false?'checked':''}>
+          <div><div style="font-weight:600;font-size:13px;color:var(--text)">📊 System Metrics</div><div style="font-size:11px;color:var(--text2);margin-top:2px">CPU, memory, disk, load, uptime, network I/O</div></div>
+        </label>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <label style="display:flex;align-items:flex-start;gap:9px;margin:0;cursor:pointer">
+          <input type="checkbox" id="wz_fm_pm2" style="width:auto;min-width:0;margin-top:2px" ${f.pm2?'checked':''}>
+          <div><div style="font-weight:600;font-size:13px;color:var(--text)">⬢ PM2 Processes</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Node.js app status, memory, CPU, restarts</div></div>
+        </label>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <label style="display:flex;align-items:flex-start;gap:9px;margin:0;cursor:pointer">
+          <input type="checkbox" id="wz_fm_svc" style="width:auto;min-width:0;margin-top:2px" ${f.services?'checked':''}>
+          <div><div style="font-weight:600;font-size:13px;color:var(--text)">🔧 Systemd Services</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Active/failed state of system daemons</div></div>
+        </label>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <label style="display:flex;align-items:flex-start;gap:9px;margin:0;cursor:pointer">
+          <input type="checkbox" id="wz_fm_ngx" style="width:auto;min-width:0;margin-top:2px" ${f.nginx?'checked':''}>
+          <div><div style="font-weight:600;font-size:13px;color:var(--text)">📋 Nginx Logs</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Live request feed, RPM, status codes via SSH</div></div>
+        </label>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <label style="display:flex;align-items:flex-start;gap:9px;margin:0;cursor:pointer">
+          <input type="checkbox" id="wz_fm_aph" style="width:auto;min-width:0;margin-top:2px" ${f.apache?'checked':''}>
+          <div><div style="font-weight:600;font-size:13px;color:var(--text)">🪶 Apache Logs</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Same as nginx, for Apache httpd servers</div></div>
+        </label>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+        <label style="display:flex;align-items:flex-start;gap:9px;margin:0;cursor:pointer">
+          <input type="checkbox" id="wz_fm_f2b" style="width:auto;min-width:0;margin-top:2px" ${f.fail2ban?'checked':''}>
+          <div><div style="font-weight:600;font-size:13px;color:var(--text)">🛡 Fail2Ban</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Active jails, banned IPs, attack detection</div></div>
+        </label>
+      </div>
+    </div>`;
+}
+
+function _wizStepSrvTest(){
+  document.getElementById('wizTitle').innerHTML = '🔍 Test Connection';
+  document.getElementById('wizBody').innerHTML = `
+    <h3>Test SSH connection</h3>
+    <p>CentienC will attempt to connect to <strong>${_wiz.data.hostname}</strong> using the credentials you provided.</p>
+    <div class="test-row">
+      <button class="btn btn-primary" onclick="_wizRunTest()" id="wz_testbtn">▶ Test Connection</button>
+      <span style="font-size:12px;color:var(--text2)">or</span>
+      <button class="btn" onclick="wizNext()">Skip & Save →</button>
+    </div>
+    <div class="test-out" id="wz_testout">Click "Test Connection" to verify SSH access before saving.</div>`;
+  document.getElementById('wizNextBtn').style.display = 'none';
+}
+async function _wizRunTest(){
+  const out = document.getElementById('wz_testout');
+  const btn = document.getElementById('wz_testbtn');
+  if(!out)return;
+  out.className='test-out'; out.textContent='Testing…'; btn.disabled=true;
+  try{
+    _wizCollectSrvBasics(); _wizCollectSrvSSH();
+    // Save temporarily to get a server id, then check
+    const body={
+      name:_wiz.data.name,hostname:_wiz.data.hostname,port:_wiz.data.port,
+      ssh_user:_wiz.data.ssh_user,ssh_port:_wiz.data.ssh_port,
+      ssh_key_path:_wiz.data.ssh_key_path||null,
+      ssh_password:_wiz.data.ssh_password||null,
+      sudo_password:_wiz.data.sudo_password||null,
+      monitor_flags:_wiz.data.monitor_flags||{system:true}
+    };
+    const created=await api('/api/servers',{method:'POST',body:JSON.stringify(body)});
+    if(!created){out.className='test-out err';out.textContent='Failed to create server record.';btn.disabled=false;return;}
+    _wiz.data._saved_server_id = created.id;
+    const check=await api('/api/servers/'+created.id+'/check',{method:'POST'});
+    if(check&&check.status==='up'){
+      out.className='test-out ok';
+      out.textContent='✓ Connected successfully! Server is reachable and responding.\nCPU: '+(check.metrics&&check.metrics.cpu_pct!=null?check.metrics.cpu_pct.toFixed(1)+'%':'—');
+      // Show skip button as finish
+      const nb=document.getElementById('wizNextBtn');nb.style.display='inline-block';nb.textContent='✓ Done';
+    }else{
+      out.className='test-out err';
+      out.textContent='Connection failed: '+(check&&check.error||'No response. Check hostname, SSH credentials, and firewall rules.');
+      const nb=document.getElementById('wizNextBtn');nb.style.display='inline-block';nb.textContent='Save Anyway →';
+    }
+  }catch(e){out.className='test-out err';out.textContent='Error: '+e.message; const nb=document.getElementById('wizNextBtn');nb.style.display='inline-block';nb.textContent='Save Anyway →';}
+  btn.disabled=false;
+}
+
+function _wizStepSrvDone(){
+  document.getElementById('wizTitle').innerHTML = '✅ Server Added';
+  document.getElementById('wizNextBtn').textContent = '✓ Finish';
+  document.getElementById('wizBody').innerHTML = `
+    <div style="text-align:center;padding:16px 0">
+      <div style="font-size:52px;margin-bottom:12px">🎉</div>
+      <h3 style="font-size:16px;margin-bottom:8px">Server saved!</h3>
+      <p><strong>${_wiz.data.name}</strong> has been added. CentienC will start polling it shortly.</p>
+      <p style="margin-top:10px">Want to also add a website hosted on this server? You can do that next, or close and view your server in the dashboard.</p>
+    </div>`;
+}
+async function _wizSaveServer(){
+  if(_wiz.data._saved_server_id){ closeWizard(); loadServers(); return; }
+  _wizCollectSrvBasics(); _wizCollectSrvSSH(); _wizCollectSrvFeatures();
+  const body={
+    name:_wiz.data.name,hostname:_wiz.data.hostname,port:_wiz.data.port,
+    ssh_user:_wiz.data.ssh_user,ssh_port:_wiz.data.ssh_port,
+    ssh_key_path:_wiz.data.ssh_key_path||null,
+    ssh_password:_wiz.data.ssh_password||null,
+    sudo_password:_wiz.data.sudo_password||null,
+    monitor_flags:_wiz.data.monitor_flags||{system:true}
+  };
+  try{
+    await api('/api/servers',{method:'POST',body:JSON.stringify(body)});
+    toast('Server added','success');
+    closeWizard(); loadServers();
+  }catch(e){toast(e.message,'error')}
+}
+
+function _wizStepWebDone(){
+  document.getElementById('wizTitle').innerHTML = '✅ Website Added';
+  document.getElementById('wizNextBtn').textContent = '✓ Finish';
+  document.getElementById('wizBody').innerHTML = `
+    <div style="text-align:center;padding:16px 0">
+      <div style="font-size:52px;margin-bottom:12px">🎉</div>
+      <h3 style="font-size:16px;margin-bottom:8px">Website saved!</h3>
+      <p><strong>${_wiz.data.wurl}</strong> has been added and is now being monitored.</p>
+      ${_wiz.data.wserver_id?'<p style="margin-top:10px">Live traffic feed is enabled — click the site card in the dashboard to see visitor analytics.</p>':'<p style="margin-top:10px">Uptime and response time tracking is active. Link a server later to enable live traffic analytics.</p>'}
+    </div>`;
+}
+async function _wizSaveWebsite(){
+  _wizCollectWebBasics();
+  const lpEl=document.getElementById('wz_wlogpath');
+  if(lpEl&&lpEl.value) _wiz.data.wlog_path=lpEl.value;
+  const sEl=document.getElementById('wz_wserver');
+  if(sEl&&sEl.value) _wiz.data.wserver_id=parseInt(sEl.value,10)||null;
+  const body={
+    name:_wiz.data.wname||_wiz.data.wurl,
+    url:_wiz.data.wurl,
+    expected_status:_wiz.data.wstatus||200,
+    timeout:_wiz.data.wtimeout||15,
+    server_id:_wiz.data.wserver_id||null,
+    log_path:_wiz.data.wserver_id?(_wiz.data.wlog_path||null):null
+  };
+  try{
+    await api('/api/websites',{method:'POST',body:JSON.stringify(body)});
+    toast('Website added','success');
+    loadWebsites();
+    // Show done screen
+    const doneIdx = _wiz.steps.indexOf('web_done');
+    if(doneIdx >= 0){ _wiz.step = doneIdx; _wizRender(); }
+    else closeWizard();
+  }catch(e){toast(e.message,'error')}
+}
+/* ══════════════════════ END WIZARD ══════════════════════ */
+
+</script>
 
 <script>
 let settings={},editUserId=null,editChannelId=null,editServerId=null,editWebsiteId=null;
