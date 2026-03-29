@@ -206,8 +206,11 @@ if [[ -f "${KEY_FILE}.pub" ]]; then
     echo -e "  ${BOLD}${YELLOW}SSH Public Key${NC} (add to servers you want to monitor):"
     echo -e "  ${CYAN}$(cat "${KEY_FILE}.pub")${NC}"
     echo ""
-    echo -e "  To add to a remote server:"
-    echo -e "    ssh-copy-id -i ${KEY_FILE} user@remote-server"
+    echo -e "  ${BOLD}Prepare each server you want to monitor:${NC}"
+    echo -e "    On each target server, run as root:"
+    echo -e "    ${CYAN}curl -sL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/universal/prepare-target.sh | sudo bash -s -- \"$(cat "${KEY_FILE}.pub")\"${NC}"
+    echo ""
+    echo -e "    Or manually: ssh-copy-id -i ${KEY_FILE} user@remote-server"
     echo ""
 fi
 

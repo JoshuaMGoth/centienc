@@ -1522,8 +1522,18 @@ class MonitorEngine:
         cache_key = f"proxmox:{nid}"
         previous = self.status_cache.get(cache_key, {})
 
+        # Smart auth: if user already contains "!tokenid", don't double it.
+        # e.g. user="root@pam!centienc" token_id="centienc" → avoid "root@pam!centienc!centienc"
+        if "!" in user and token_id and user.endswith(f"!{token_id}"):
+            auth_value = f"{user}={token_secret}"
+        elif "!" in user and not token_id:
+            # User entered full "user!tokenid" in user field with empty token_id
+            auth_value = f"{user}={token_secret}"
+        else:
+            auth_value = f"{user}!{token_id}={token_secret}"
+
         base = f"https://{host}:{port}/api2/json"
-        auth_header = f"PVEAPIToken={user}!{token_id}={token_secret}"
+        auth_header = f"PVEAPIToken={auth_value}"
         headers = {"Authorization": auth_header}
 
         results: dict[str, Any] = {

@@ -285,8 +285,11 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <label>Port</label><input id="fpPort" type="number" value="8006">
     <label>PVE Node name</label><input id="fpNode" placeholder="pve">
     <label>API User</label><input id="fpUser" placeholder="root@pam">
-    <label>API Token ID</label><input id="fpTokenId" placeholder="monitoring">
+    <div class="hint">Proxmox user realm, e.g. root@pam (without the token name)</div>
+    <label>API Token ID</label><input id="fpTokenId" placeholder="centienc">
+    <div class="hint">Token name only, e.g. centienc — or leave empty if you entered user!token above</div>
     <label>API Token Secret</label><input id="fpTokenSecret" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <div class="hint">UUID shown once when the API token was created in Proxmox</div>
     <label>Verify SSL</label><select id="fpVerifySSL"><option value="0">No (self-signed OK)</option><option value="1">Yes</option></select>
     <label>Check Interval (s)</label><input id="fpInterval" type="number" value="60">
     <div class="modal-actions">

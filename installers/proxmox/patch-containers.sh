@@ -44,7 +44,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 [[ -f "${PROJECT_ROOT}/centient/monitors.py" ]] || err "Source not found at ${PROJECT_ROOT}/centient"
 
 # ── Push updated Python source files ─────────────────────────────
-for f in monitors.py app.py auth.py database.py notifications.py; do
+for f in monitors.py app.py auth.py database.py notifications.py reports.py; do
     SRC="${PROJECT_ROOT}/centient/${f}"
     [[ -f "$SRC" ]] || { warn "Skipping missing file: $f"; continue; }
     info "Pushing $f..."
@@ -75,6 +75,14 @@ ok "Ping group range configured"
 info "Fixing ownership..."
 pct exec "$CTID" -- chown -R centienc:centienc "$PKG_DIR"
 
+# ── Push prepare-target.sh helper ─────────────────────────────────
+PREP_SCRIPT="${PROJECT_ROOT}/installers/universal/prepare-target.sh"
+if [[ -f "$PREP_SCRIPT" ]]; then
+    info "Pushing prepare-target.sh helper..."
+    pct push "$CTID" "$PREP_SCRIPT" "/usr/local/bin/centienc-prepare-target" --perms 755
+    ok "  ✓ prepare-target script available as: centienc-prepare-target"
+fi
+
 # ── Restart service ───────────────────────────────────────────────
 info "Restarting centienc service..."
 pct exec "$CTID" -- systemctl restart centienc
@@ -100,6 +108,7 @@ echo "    • TCP fallback ping — servers detected via port 22/80/443 if ICMP 
 echo "    • Proxmox error messages now visible immediately after adding a node"
 echo "    • Proxmox form validation prevents saving with empty required fields"
 echo "    • Proxmox form hints clarify API token format and correct Host IP"
+echo "    • Reports detail endpoint returns correct data for iOS/mobile drill-down"
 echo ""
 echo "  For the Proxmox node issue:"
 echo "    1. The 'Host' field must be the Proxmox HOST IP (not this container's IP)"
@@ -108,4 +117,13 @@ echo "    3. Token ID: just the name, e.g.  monitoring"
 echo "    4. Token Secret: the UUID shown when you created the token in Proxmox"
 echo "    5. Proxmox: Datacenter → Permissions → API Tokens → Add"
 echo "       Assign PVEAuditor role to the token"
+echo ""
+echo -e "  ${BOLD}Prepare monitored servers:${NC}"
+SSH_PUBKEY=$(pct exec "$CTID" -- cat /var/lib/centienc/.ssh/centienc_ed25519.pub 2>/dev/null || echo "")
+if [[ -n "$SSH_PUBKEY" ]]; then
+    echo -e "    On each target server you want to monitor, run:"
+    echo -e "    ${CYAN}curl -sL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/universal/prepare-target.sh | sudo bash -s -- \"${SSH_PUBKEY}\"${NC}"
+else
+    echo "    Run 'centienc-prepare-target' inside the container with a public key"
+fi
 echo ""

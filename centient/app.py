@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -663,6 +664,16 @@ async def add_proxmox_node(request: Request):
                "verify_ssl", "check_interval", "enabled",
                "ssh_port", "ssh_user", "ssh_password", "ssh_key_path"}
     data = {k: v for k, v in body.items() if k in allowed}
+
+    # Smart-parse: if user field contains "!" and token_id is empty,
+    # split "user!tokenname" into separate user and token_id fields.
+    user_val = str(data.get("user", "")).strip()
+    token_id_val = str(data.get("token_id", "")).strip()
+    if "!" in user_val and not token_id_val:
+        parts = user_val.split("!", 1)
+        data["user"] = parts[0]
+        data["token_id"] = parts[1]
+
     required = {"name", "host", "user", "token_id", "token_secret"}
     missing = required - set(data.keys())
     if missing:
@@ -1292,8 +1303,88 @@ async def api_reports_detail(request: Request, target_type: str, target_id: int)
     if target_type not in ("server", "website", "service"):
         raise HTTPException(400, "target_type must be server, website, or service")
     days = max(1, min(int(request.query_params.get("days", "7")), 365))
-    data = await build_report_data(db, engine, target_type, days, target_type, target_id)
-    return {"ok": True, **data}
+
+    # Resolve target name
+    if target_type == "server":
+        targets = {s["id"]: s["name"] for s in await db.list_servers()}
+    elif target_type == "website":
+        targets = {w["id"]: w["name"] for w in await db.list_websites()}
+    else:
+        targets = {s["id"]: s["name"] for s in await db.list_services()}
+    target_name = targets.get(target_id, f"#{target_id}")
+
+    # Fetch raw data
+    daily_raw = await db.get_daily_summary(target_type, target_id, days)
+    hourly_raw = await db.get_hourly_summary(target_type, target_id, min(days, 3))
+    timeline_raw = await db.get_status_timeline(target_type, target_id, days)
+    incidents_raw = await db.get_incidents_for_period(days, target_type, target_id)
+    incidents = [
+        {
+            **inc,
+            "target_name": target_name,
+        }
+        for inc in incidents_raw
+    ]
+
+    # Map to iOS-expected field names
+    daily_data = [
+        {
+            "date": d["day"],
+            "uptime_pct": d["uptime_pct"],
+            "avg_response": d["avg_response"],
+            "min_response": d["min_response"],
+            "max_response": d["max_response"],
+            "checks": d["checks"],
+            "up_checks": d["up_count"],
+            "down_checks": d["checks"] - d["up_count"],
+        }
+        for d in daily_raw
+    ]
+    # Extract hour number (0-23) from "YYYY-MM-DD HH:00" strings
+    hourly_data = [
+        {
+            "hour": int(h["hour"].split(" ")[1].split(":")[0]),
+            "avg_response": h["avg_response"],
+            "checks": h["checks"],
+        }
+        for h in hourly_raw
+    ]
+    # Map timeline status-change events to recent_checks
+    recent_checks = [
+        {
+            "timestamp": t["checked_at"],
+            "status": t["status"],
+            "response_time": t["response_time"],
+        }
+        for t in timeline_raw[:50]
+    ]
+
+    # Compute aggregate totals from daily_data
+    total_checks = sum(d["checks"] for d in daily_data)
+    up_checks = sum(d["up_checks"] for d in daily_data)
+    all_avg = [d["avg_response"] for d in daily_data if d["avg_response"] is not None]
+    all_max = [d["max_response"] for d in daily_data if d["max_response"] is not None]
+    totals = {
+        "uptime_pct": round(up_checks / total_checks * 100, 2) if total_checks else 100.0,
+        "total_checks": total_checks,
+        "avg_response": round(sum(all_avg) / len(all_avg), 2) if all_avg else None,
+        "max_response": max(all_max) if all_max else None,
+        "total_incidents": len(incidents),
+    }
+
+    return {
+        "ok": True,
+        "target_type": target_type,
+        "target_id": target_id,
+        "target_name": target_name,
+        "days": days,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "totals": totals,
+        "daily_data": daily_data,
+        "hourly_data": hourly_data,
+        "recent_checks": recent_checks,
+        "incidents": incidents,
+    }
 
 
 @app.get("/api/reports/incidents")

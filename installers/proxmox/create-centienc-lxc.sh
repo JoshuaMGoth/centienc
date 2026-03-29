@@ -413,6 +413,14 @@ pct exec "$CTID" -- /opt/centienc/venv/bin/python -m centient --help > /dev/null
 
 ok "CentienC is runnable — using /opt/centienc/venv/bin/python -m centient"
 
+# ── Push prepare-target.sh helper into container ─────────────
+PREP_SCRIPT="$(cd "$(dirname "$0")/../universal" && pwd)/prepare-target.sh"
+if [[ -f "$PREP_SCRIPT" ]]; then
+    info "Installing target preparation helper..."
+    pct push "$CTID" "$PREP_SCRIPT" "/usr/local/bin/centienc-prepare-target" --perms 755
+    ok "prepare-target script available inside container as: centienc-prepare-target"
+fi
+
 # ── Create systemd service inside container ──────────────────
 header "Configuring Service"
 
@@ -491,7 +499,11 @@ echo ""
 echo -e "  ${BOLD}SSH Public Key (copy to monitored servers):${NC}"
 echo -e "    ${CYAN}${SSH_PUBKEY}${NC}"
 echo ""
-echo -e "  To authorize on each server you want to monitor:"
+echo -e "  ${BOLD}Prepare each server you want to monitor:${NC}"
+echo -e "    On each target server, run as root:"
+echo -e "    ${CYAN}curl -sL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/universal/prepare-target.sh | sudo bash -s -- \"${SSH_PUBKEY}\"${NC}"
+echo ""
+echo -e "  Or manually authorize on each server:"
 echo -e "    ${BOLD}ssh USER@SERVER 'mkdir -p ~/.ssh && echo \"${SSH_PUBKEY}\" >> ~/.ssh/authorized_keys'${NC}"
 echo ""
 echo -e "  ${BOLD}Management:${NC}"
