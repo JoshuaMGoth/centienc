@@ -9,173 +9,310 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;color:#fff;min-height:100vh;overflow-x:hidden}
+:root{
+  --bg:#0d1117;--surface:#0f1923;--surface2:#162032;--surface3:#1c2a3f;
+  --border:rgba(255,255,255,.07);--text:#e6edf3;--text2:#8b949e;--text3:#58748a;
+  --blue:#58a6ff;--green:#3fb950;--orange:#ffa726;--red:#f85149;
+  --purple:#ab47bc;--teal:#26c6da;--yellow:#d29922;
+}
+html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 
 /* ── Header ── */
-.header{background:rgba(0,0,0,.4);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.07)}
-.header h1{font-size:1.5em;font-weight:600;text-shadow:none;display:flex;align-items:center;gap:10px}
-.header .logo{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
-.header-right{display:flex;align-items:center;gap:16px;font-size:.82em;color:rgba(255,255,255,.65)}
-.header-right a{color:rgba(255,255,255,.65);text-decoration:none;transition:.2s}
-.header-right a:hover{color:#58a6ff}
-.header-links{display:flex;gap:10px}
-.header-links a{background:rgba(255,255,255,.05);padding:4px 12px;border-radius:8px;font-size:.82em;border:1px solid rgba(255,255,255,.07);text-decoration:none;color:rgba(255,255,255,.75);transition:.2s}
-.header-links a:hover,.header-links a.active{background:rgba(255,255,255,.07);border-color:rgba(88,166,255,.4);color:#fff}
+.header{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:50}
+.header h1{font-size:1.05em;font-weight:700;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.header .logo{width:28px;height:28px;border-radius:6px;object-fit:cover}
+.header-sub{color:rgba(255,255,255,.4);font-weight:300;font-size:.9em}
+.header-links{display:flex;gap:6px;flex-wrap:wrap}
+.header-links a{color:var(--text2);text-decoration:none;font-size:.82em;padding:4px 11px;
+  border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.03);transition:.15s;white-space:nowrap}
+.header-links a:hover,.header-links a.active{color:var(--blue);border-color:rgba(88,166,255,.35);background:rgba(88,166,255,.08)}
 
-/* ── Controls bar ── */
-.controls{background:rgba(0,0,0,.3);padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.04)}
-.controls label{font-size:.82em;color:rgba(255,255,255,.55);margin-right:4px}
-.controls select,.controls button{border:1px solid rgba(255,255,255,.2);border-radius:8px;background:rgba(255,255,255,.05);color:#fff;padding:6px 14px;font-size:.85em;cursor:pointer;outline:none;transition:.2s}
-.controls select:hover,.controls button:hover{background:rgba(255,255,255,.07);border-color:rgba(88,166,255,.4)}
-.controls select option{background:#0d1117;color:#e6edf3}
-.controls .refresh-btn{background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4)}
-.controls .refresh-btn:hover{background:rgba(88,166,255,.3)}
-.days-pills{display:flex;gap:6px}
-.days-pill{border:1px solid rgba(255,255,255,.07);border-radius:20px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);padding:4px 14px;font-size:.82em;cursor:pointer;transition:.2s}
-.days-pill:hover{background:rgba(255,255,255,.08)}
-.days-pill.active{background:rgba(88,166,255,.22);border-color:rgba(88,166,255,.5);color:#fff;font-weight:600}
-
-/* ── Loading / Error ── */
-.state-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;opacity:.7}
-.spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.07);border-top-color:#58a6ff;border-radius:50%;animation:spin .85s linear infinite}
+/* ── Controls ── */
+.controls{background:rgba(0,0,0,.25);border-bottom:1px solid var(--border);
+  padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.controls label{font-size:.8em;color:var(--text2);margin-right:3px;white-space:nowrap}
+.ctl-group{display:flex;align-items:center;gap:6px}
+.controls select{border:1px solid rgba(255,255,255,.14);border-radius:8px;
+  background:var(--surface2);color:var(--text);padding:6px 12px;font-size:.84em;
+  cursor:pointer;outline:none;transition:.15s;max-width:280px}
+.controls select:hover{border-color:rgba(88,166,255,.4)}
+.controls select option{background:#0d1117;color:var(--text)}
+.pill-row{display:flex;gap:5px}
+.pill{border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.04);
+  color:var(--text2);padding:4px 14px;font-size:.8em;cursor:pointer;transition:.15s;white-space:nowrap}
+.pill:hover{background:rgba(255,255,255,.07)}
+.pill.active{background:rgba(88,166,255,.2);border-color:rgba(88,166,255,.5);color:#fff;font-weight:600}
+.refresh-btn{border:1px solid rgba(88,166,255,.35);border-radius:8px;
+  background:rgba(88,166,255,.12);color:var(--blue);padding:6px 14px;font-size:.83em;
+  cursor:pointer;transition:.15s;white-space:nowrap}
+.refresh-btn:hover{background:rgba(88,166,255,.25)}
+#lastUpdated{font-size:.76em;color:var(--text3);margin-left:auto;white-space:nowrap}
+/* ── Spinner / error ── */
+.state-overlay{display:flex;flex-direction:column;align-items:center;
+  justify-content:center;min-height:340px;gap:14px}
+.spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.08);
+  border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.error-box{background:rgba(244,67,54,.12);border:1px solid rgba(244,67,54,.3);border-radius:12px;padding:20px 28px;max-width:480px;text-align:center;color:#ef9a9a;line-height:1.6}
-
-/* ── Section title ── */
-.section-title{padding:4px 24px 8px;max-width:1500px;margin:10px auto 0;color:rgba(255,255,255,.45);font-size:.78em;text-transform:uppercase;letter-spacing:.06em}
-
-/* ── Summary strip ── */
-.metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:14px 24px;max-width:1500px;margin:0 auto}
-.mc{background:rgba(255,255,255,.05);border-radius:10px;padding:14px 16px;text-align:center;border:1px solid rgba(255,255,255,.07);transition:transform .2s}
-.mc:hover{transform:translateY(-2px)}
-.mc-label{font-size:.7em;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
-.mc-val{font-size:1.9em;font-weight:700}
-.mc-sub{font-size:.68em;color:rgba(255,255,255,.4);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.c-blue{color:#58a6ff}.c-green{color:#66bb6a}.c-orange{color:#ffa726}.c-purple{color:#ab47bc}.c-teal{color:#26c6da}
-
-/* ── Charts grid ── */
-.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
-.chart-card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
-.chart-card h3{margin-bottom:14px;color:#58a6ff;font-size:1em;font-weight:600;display:flex;align-items:center;gap:7px}
-.chart-card h3 .icon{font-size:1.1em}
-.chart-card.full{grid-column:1/-1}
-.chart-wrap{position:relative;max-height:280px}
-.chart-wrap-tall{position:relative;max-height:340px}
-
-/* ── Tables ── */
-.tables-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
-.table-card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
-.table-card h3{margin-bottom:12px;color:#58a6ff;font-size:1em;font-weight:600;display:flex;align-items:center;gap:7px}
-.tbl{width:100%;border-collapse:collapse;font-size:.82em}
-.tbl th{color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase;font-size:.72em;letter-spacing:.04em;padding:4px 6px;text-align:left}
-.tbl td{padding:5px 6px;border-top:1px solid rgba(255,255,255,.04);vertical-align:middle}
-.tbl tr:hover td{background:rgba(255,255,255,.04)}
-.tbl .rank{color:rgba(255,255,255,.3);font-size:.8em;width:24px}
-.tbl .name{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:.9em}
-.tbl .name-plain{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tbl .count{text-align:right;font-variant-numeric:tabular-nums;color:#58a6ff;font-weight:600}
-.bar-mini{height:4px;border-radius:2px;background:rgba(88,166,255,.25);margin-top:3px;overflow:hidden}
-.bar-fill{height:100%;background:#58a6ff;border-radius:2px;transition:width .6s ease}
-
+.state-msg{color:var(--text3);font-size:.9em}
+.error-box{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.25);
+  border-radius:12px;padding:20px 24px;max-width:500px;text-align:center;color:#ff8a80;line-height:1.6;font-size:.88em}
+/* ── Page wrapper ── */
+.page{max-width:1500px;margin:0 auto;padding:20px 22px 80px}
+/* ── Privacy badge ── */
+.privacy-badge{display:inline-flex;align-items:center;gap:7px;font-size:.75em;
+  color:var(--text3);border:1px solid rgba(255,255,255,.06);border-radius:20px;
+  padding:4px 12px;margin-bottom:18px;background:rgba(255,255,255,.02)}
+.privacy-badge .pb-green{color:var(--green)}
+/* ── Section label ── */
+.slabel{font-size:.7em;text-transform:uppercase;letter-spacing:.08em;font-weight:700;
+  color:var(--text3);margin-bottom:10px;margin-top:28px;padding-bottom:6px;
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+/* ── KPI strip ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:4px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:15px 16px;transition:.15s}
+.kpi:hover{border-color:rgba(88,166,255,.25);transform:translateY(-2px)}
+.kpi-label{font-size:.68em;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.kpi-val{font-size:2em;font-weight:700;line-height:1}
+.kpi-sub{font-size:.7em;color:var(--text3);margin-top:4px}
+.kpi-hint{font-size:.68em;color:var(--text3);margin-top:6px;border-top:1px solid var(--border);padding-top:5px}
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
+.card h3{font-size:.9em;font-weight:600;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.card h3 .icon{font-size:1.1em}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.chart-wrap{position:relative;height:260px}
+.chart-wrap-sm{position:relative;height:180px}
+.chart-wrap-xs{position:relative;height:140px}
+/* ── Content table ── */
+.ctbl-wrap{overflow-x:auto}
+.ctbl{width:100%;border-collapse:collapse;font-size:.83em}
+.ctbl thead th{color:var(--text3);font-weight:600;text-transform:uppercase;
+  font-size:.72em;letter-spacing:.05em;padding:6px 10px;text-align:left;
+  white-space:nowrap;cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
+.ctbl thead th:hover{color:var(--text)}
+.ctbl thead th.sorted{color:var(--blue)}
+.ctbl tbody tr{cursor:pointer;transition:.12s}
+.ctbl tbody tr:hover td{background:rgba(255,255,255,.04)}
+.ctbl tbody tr.expanded td{background:var(--surface2)}
+.ctbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.ctbl td.rank{color:var(--text3);font-size:.78em;width:28px;text-align:center}
+.ctbl td.page-cell{max-width:0;width:40%}
+.page-path{font-family:'SF Mono',monospace;font-size:.88em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:500px}
+.ctbl td.count-cell{text-align:right;font-variant-numeric:tabular-nums;color:var(--blue);font-weight:600;white-space:nowrap}
+.ctbl td.trend-cell{text-align:center;white-space:nowrap;width:80px}
+.trendup{color:var(--green);font-weight:600;font-size:.82em}
+.trenddn{color:var(--red);font-weight:600;font-size:.82em}
+.trendfl{color:var(--text3);font-size:.82em}
+.ctbl td.chev{color:var(--text3);font-size:.75em;width:24px;text-align:center;transition:transform .2s}
+.ctbl tr.expanded td.chev{transform:rotate(90deg)}
+.drill-tr td{padding:0}
+.drill-content{padding:12px 16px 16px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.drill-mini{display:flex;gap:16px;align-items:flex-start}
+.drill-chart-wrap{flex:1;height:120px}
+.drill-stats{display:flex;flex-direction:column;gap:10px;min-width:120px}
+.drill-stat-val{font-weight:700;color:var(--blue);font-size:1.1em}
+.drill-stat-lbl{color:var(--text3);font-size:.72em}
+/* ── Heatmap ── */
+.heatmap-wrap{overflow-x:auto}
+.heatmap-grid{display:grid;grid-template-columns:44px repeat(24,1fr);gap:2px;min-width:520px}
+.hm-hour-lbl{font-size:.65em;color:var(--text3);text-align:center;padding-bottom:4px;white-space:nowrap}
+.hm-day-lbl{font-size:.72em;color:var(--text2);display:flex;align-items:center;justify-content:flex-end;padding-right:6px;white-space:nowrap}
+.hm-label{font-size:.65em;color:var(--text3)}
+.hm-cell{height:22px;border-radius:3px;cursor:default;transition:.1s}
+.hm-cell:hover{outline:1px solid rgba(255,255,255,.4);z-index:2}
+.hm-peak-note{font-size:.72em;color:var(--text3);margin-top:10px;text-align:center}
+/* ── Source list ── */
+.src-list{display:flex;flex-direction:column;gap:8px;margin-top:4px;flex:1}
+.src-item{display:flex;align-items:center;gap:8px;font-size:.82em}
+.src-icon{width:22px;text-align:center}
+.src-label{flex:1;color:var(--text2)}
+.src-bar-wrap{width:70px;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.src-bar-fill{height:100%;border-radius:3px;transition:width .6s ease}
+.src-count{color:var(--blue);font-weight:600;min-width:32px;text-align:right}
+.src-pct{color:var(--text3);font-size:.78em;min-width:30px;text-align:right}
+/* ── Simple tables ── */
+.stbl{width:100%;border-collapse:collapse;font-size:.82em}
+.stbl th{color:var(--text3);font-weight:600;text-transform:uppercase;font-size:.68em;letter-spacing:.04em;padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)}
+.stbl td{padding:5px 8px;border-top:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.stbl tr:hover td{background:rgba(255,255,255,.03)}
+.stbl .srank{color:var(--text3);font-size:.78em;width:22px}
+.stbl .sname{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'SF Mono',monospace;font-size:.88em}
+.stbl .scount{text-align:right;color:var(--blue);font-weight:600;white-space:nowrap}
+.bar-mini{height:3px;border-radius:2px;background:rgba(88,166,255,.15);margin-top:3px}
+.bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .5s ease}
 /* ── Device pills ── */
-.device-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 24px 24px;max-width:1500px;margin:0 auto}
-.dev-pill{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:20px;padding:6px 16px;font-size:.82em;display:flex;align-items:center;gap:6px}
-.dev-num{font-weight:700;color:#58a6ff}
+.dev-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.dev-pill{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex:1;min-width:80px;text-align:center}
+.dev-pill-icon{font-size:1.3em;display:block;margin-bottom:4px}
+.dev-pill-val{font-size:1.1em;font-weight:700;color:var(--blue)}
+.dev-pill-lbl{font-size:.67em;color:var(--text3);margin-top:2px}
+.nodata{color:var(--text3);font-size:.82em;padding:16px 0;text-align:center}
+/* ── Color helpers ── */
+.c-blue{color:var(--blue)}.c-green{color:var(--green)}.c-orange{color:var(--orange)}
+.c-purple{color:var(--purple)}.c-teal{color:var(--teal)}.c-yellow{color:var(--yellow)}
 
-@media(max-width:1100px){.charts-grid{grid-template-columns:1fr}.tables-grid{grid-template-columns:1fr 1fr}.chart-card.full{grid-column:1}}
-@media(max-width:700px){.header{flex-direction:column;gap:8px;text-align:center}.header-links{display:none}.tables-grid{grid-template-columns:1fr}.controls{flex-direction:column;align-items:flex-start}.mc-val{font-size:1.5em}}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.grid-3{grid-template-columns:1fr 1fr}.grid-2{grid-template-columns:1fr}}
+@media(max-width:700px){
+  .header-links{display:none}.mob-nav{display:block}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}.page{padding:16px 14px 80px}
+  .kpi-val{font-size:1.5em}.grid-2,.grid-3{grid-template-columns:1fr}
+  .controls{flex-direction:column;align-items:flex-start}#lastUpdated{margin-left:0}
+}
 </style>
 </head>
 <body>
 
 <div class="header">
   <h1>
-    <img src="/static/centienc-logo.png" alt="logo" class="logo" onerror="this.style.display='none'">
+    <img src="/static/centienc-logo.png" alt="CentienC" class="logo" onerror="this.style.display='none'">
     <span>CentienC</span>
-    <span style="font-weight:300;color:rgba(255,255,255,.55)">/ Web Analytics</span>
+    <span class="header-sub">/ Web Analytics</span>
   </h1>
-  <div class="header-right">
-    <div class="header-links">
-      <a href="/">🏠 Dashboard</a>
-      <a href="/map">🗺️ Map</a>
-      <a href="/tv">📺 TV</a>
-      <a href="/analytics" class="active">📊 Analytics</a>
-      <a href="/reports">📋 Reports</a>
-      <a href="/troubleshoot">🛠️ Troubleshoot</a>
-      <a href="/updates">📣 Updates</a>
-      <a href="/admin">⚙️ Admin</a>
-    </div>
+  <div class="header-links">
+    <a href="/">🏠 Dashboard</a>
+    <a href="/map">🗺️ Map</a>
+    <a href="/tv">📺 TV</a>
+    <a href="/analytics" class="active">📊 Analytics</a>
+    <a href="/reports">📋 Reports</a>
+    <a href="/troubleshoot">🛠️ Troubleshoot</a>
+    <a href="/updates">📣 Updates</a>
+    <a href="/admin">⚙️ Admin</a>
   </div>
 </div>
 
 <div class="controls">
-  <div>
-    <label for="serverSel">Server:</label>
-    <select id="serverSel"><option value="">— loading —</option></select>
+  <div class="ctl-group">
+    <label for="websiteSel">📌 Website:</label>
+    <select id="websiteSel"><option value="">— loading —</option></select>
   </div>
-  <div>
+  <div class="ctl-group" id="srvGroup" style="display:none">
+    <label for="serverSel">🖥 Server:</label>
+    <select id="serverSel"><option value="">— none —</option></select>
+  </div>
+  <div class="ctl-group">
     <label>Period:</label>
-    <div class="days-pills" id="daysPills">
-      <span class="days-pill" data-days="7">7d</span>
-      <span class="days-pill active" data-days="30">30d</span>
-      <span class="days-pill" data-days="90">90d</span>
-      <span class="days-pill" data-days="180">180d</span>
+    <div class="pill-row" id="daysPills">
+      <span class="pill" data-days="7">7d</span>
+      <span class="pill active" data-days="30">30d</span>
+      <span class="pill" data-days="90">90d</span>
+      <span class="pill" data-days="180">180d</span>
     </div>
   </div>
   <button class="refresh-btn" onclick="loadAnalytics()">↻ Refresh</button>
-  <span id="lastUpdated" style="font-size:.78em;color:rgba(255,255,255,.35);margin-left:auto"></span>
+  <span id="lastUpdated"></span>
 </div>
 
 <div id="mainContent">
   <div class="state-overlay">
     <div class="spinner"></div>
-    <span style="color:rgba(255,255,255,.5)">Select a server to load analytics…</span>
+    <div class="state-msg">Select a website to load analytics…</div>
   </div>
 </div>
 
+<!-- Mobile bottom nav -->
+<nav class="mob-nav">
+  <div class="mob-nav-items">
+    <a class="mob-nav-item" href="/"><span>🏠</span><span>Home</span></a>
+    <a class="mob-nav-item active" href="/analytics"><span>📊</span><span>Analytics</span></a>
+    <a class="mob-nav-item" href="/reports"><span>📋</span><span>Reports</span></a>
+    <a class="mob-nav-item" href="/troubleshoot"><span>🛠️</span><span>Help</span></a>
+    <a class="mob-nav-item" href="/admin"><span>⚙️</span><span>Admin</span></a>
+  </div>
+</nav>
+
 <script>
+// ── State ──────────────────────────────────────────────────────
 let charts = {};
+let drillCharts = {};
 let activeDays = 30;
+let websites = [];
+let servers = [];
+let currentData = null;
+let sortCol = 'count';
+let sortDir = -1;
+let expandedIdx = -1;
 
 // ── Utilities ──────────────────────────────────────────────────
-function fmt(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n)}
-function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
+function fmt(n){
+  n=Math.round(n||0);
+  return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n);
+}
+function fmtPct(n){return (n||0).toFixed(1)+'%'}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function hourLabel(h){const s=h%12||12,ap=h<12?'am':'pm';return s+ap}
+function weekdayLabel(i){return['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]}
+function destroyCharts(){
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};
+  Object.values(drillCharts).forEach(c=>{try{c.destroy()}catch(e){}});drillCharts={};
+}
 
-// ── Load server list ───────────────────────────────────────────
-async function loadServers(){
+// ── Boot: load websites + servers ─────────────────────────────
+async function boot(){
   try{
-    const r=await fetch('/api/servers');
-    const d=await r.json();
-    const sel=document.getElementById('serverSel');
-    const servers=(d.servers||[]).filter(s=>s.ssh_user);
-    if(!servers.length){
-      sel.innerHTML='<option value="">No SSH servers configured</option>';
-      showError('No SSH-monitored servers found. Add a server with SSH credentials in Admin → Servers.');
-      return;
+    const [wRes, sRes] = await Promise.all([fetch('/api/websites'), fetch('/api/servers')]);
+    const [wData, sData] = await Promise.all([wRes.json(), sRes.json()]);
+    websites = (wData.websites||[]);
+    servers  = (sData.servers||[]).filter(s=>s.ssh_user);
+
+    const wSel = document.getElementById('websiteSel');
+    const grp  = document.getElementById('srvGroup');
+    const sSel = document.getElementById('serverSel');
+
+    // Populate website selector
+    if(websites.length){
+      wSel.innerHTML = '<option value="">— all servers (legacy) —</option>' +
+        websites.map(w=>`<option value="${w.id}">${esc(w.name||w.domain||w.id)}</option>`).join('');
+    } else {
+      wSel.innerHTML = '<option value="">No websites configured</option>';
     }
-    sel.innerHTML=servers.map(s=>`<option value="${s.id}">${s.name} (${s.hostname||s.ip_address||''})</option>`).join('');
-    sel.addEventListener('change',loadAnalytics);
+
+    // Populate server selector (fallback)
+    if(servers.length){
+      sSel.innerHTML = servers.map(s=>`<option value="${s.id}">${esc(s.name)} (${esc(s.hostname||s.ip_address||'')})</option>`).join('');
+    }
+
+    // Show server group only when no website selected
+    wSel.addEventListener('change', ()=>{
+      grp.style.display = wSel.value ? 'none' : (servers.length ? 'flex' : 'none');
+      loadAnalytics();
+    });
+    sSel.addEventListener('change', loadAnalytics);
+
+    // Auto-select first website that has a matching server
+    const autoW = websites.find(w=>w.server_id && servers.find(s=>s.id==w.server_id));
+    if(autoW){
+      wSel.value = autoW.id;
+      grp.style.display = 'none';
+    } else if(servers.length){
+      wSel.value = '';
+      grp.style.display = 'flex';
+    }
     loadAnalytics();
   }catch(e){
-    showError('Could not load servers: '+e.message);
+    showError('Could not load configuration: '+e.message);
   }
 }
 
 // ── Load analytics ─────────────────────────────────────────────
 async function loadAnalytics(){
-  const sel=document.getElementById('serverSel');
-  const srvId=sel.value;
-  if(!srvId)return;
+  const wId = document.getElementById('websiteSel').value;
+  const sId = document.getElementById('serverSel').value;
+  if(!wId && !sId) return showError('Select a website or server to view analytics.');
 
-  document.getElementById('mainContent').innerHTML=
-    `<div class="state-overlay"><div class="spinner"></div><span style="color:rgba(255,255,255,.5)">Reading nginx logs via SSH… this may take a moment for large log files.</span></div>`;
-  destroyCharts();
+  showLoading();
 
   try{
-    const r=await fetch(`/api/analytics?server_id=${srvId}&days=${activeDays}`);
-    const d=await r.json();
-    if(!d.ok) throw new Error(d.detail||'API error');
-    if(d.error) throw new Error(d.error);
+    const qs = wId ? `website_id=${encodeURIComponent(wId)}&days=${activeDays}`
+                   : `server_id=${encodeURIComponent(sId)}&days=${activeDays}`;
+    const r = await fetch(`/api/analytics?${qs}`);
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.detail||d.error||'API error');
+    currentData = d;
+    sortCol = 'count'; sortDir = -1; expandedIdx = -1;
     render(d);
     document.getElementById('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString();
   }catch(e){
@@ -183,159 +320,471 @@ async function loadAnalytics(){
   }
 }
 
-// ── Error state ────────────────────────────────────────────────
+// ── Loading / Error states ─────────────────────────────────────
+function showLoading(){
+  destroyCharts();
+  document.getElementById('mainContent').innerHTML=
+    `<div class="state-overlay"><div class="spinner"></div><div class="state-msg">Reading logs via SSH — large files may take a moment…</div></div>`;
+}
 function showError(msg){
   destroyCharts();
   document.getElementById('mainContent').innerHTML=
-    `<div class="state-overlay"><div class="error-box">⚠️ ${msg}</div></div>`;
+    `<div class="state-overlay"><div class="error-box">⚠️ ${esc(msg)}</div></div>`;
 }
 
-// ── Render all data ────────────────────────────────────────────
+// ── Main render ────────────────────────────────────────────────
 function render(d){
-  const t=d.totals||{};
-  const topPage=(d.pages&&d.pages[0])?d.pages[0].name:'—';
-  const topTopic=(d.topics&&d.topics[0])?d.topics[0].name:'—';
-  const devTotal=(d.devices.mobile||0)+(d.devices.desktop||0)+(d.devices.bot||0)||1;
-  const humanTotal=(d.devices.mobile||0)+(d.devices.desktop||0)||1;
+  const t      = d.totals||{};
+  const nvr    = d.new_vs_returning||{};
+  const total  = t.views||0;
+  const humanT = (d.devices?.desktop||0)+(d.devices?.mobile||0)+(d.devices?.tablet||0)||1;
+  const mobileP= Math.round((d.devices?.mobile||0)/humanT*100);
+  const newP   = total>0 ? Math.round((nvr.new||0)/(nvr.new+nvr.returning||1)*100) : 0;
+  const peakH  = t.peak_hour!=null ? hourLabel(t.peak_hour) : '—';
+  const topPage= (d.pages&&d.pages[0]) ? d.pages[0].name : '—';
+  const topBrowser=(d.browsers&&d.browsers[0]) ? d.browsers[0].name : '—';
+
+  // Days in range
+  const days = d.traffic_by_day||[];
 
   document.getElementById('mainContent').innerHTML=`
-  <div class="section-title">Summary</div>
-  <div class="metrics-strip">
-    <div class="mc"><div class="mc-label">Total Pageviews</div><div class="mc-val c-blue">${fmt(t.views||0)}</div><div class="mc-sub">${activeDays}-day window</div></div>
-    <div class="mc"><div class="mc-label">Unique Visitors</div><div class="mc-val c-green">${fmt(t.unique_visitors||0)}</div><div class="mc-sub">unique IPs</div></div>
-    <div class="mc"><div class="mc-label">Avg / Day</div><div class="mc-val c-orange">${fmt(t.avg_daily||0)}</div><div class="mc-sub">pageviews per day</div></div>
-    <div class="mc"><div class="mc-label">Top Page</div><div class="mc-val" style="font-size:.95em;word-break:break-all;color:#58a6ff">${topPage}</div><div class="mc-sub">${(d.pages&&d.pages[0])?fmt(d.pages[0].count)+' views':''}</div></div>
-    <div class="mc"><div class="mc-label">Top Topic</div><div class="mc-val" style="font-size:.95em;word-break:break-all;color:#ab47bc">${topTopic}</div><div class="mc-sub">${(d.topics&&d.topics[0])?fmt(d.topics[0].count)+' views':''}</div></div>
-    <div class="mc"><div class="mc-label">Mobile Share</div><div class="mc-val c-teal">${Math.round((d.devices.mobile||0)/humanTotal*100)}%</div><div class="mc-sub">${fmt(d.devices.mobile||0)} mobile visitors</div></div>
+<div class="page">
+
+  <div class="privacy-badge"><span class="pb-green">●</span> No cookies · No third-party tracking · Privacy-first analytics</div>
+
+  <!-- ── KPI Strip ── -->
+  <div class="slabel">📊 Overview — last ${activeDays} days</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Pageviews</div><div class="kpi-val c-blue">${fmt(total)}</div><div class="kpi-sub">${fmt(t.unique_visitors||0)} unique IPs</div></div>
+    <div class="kpi"><div class="kpi-label">Daily Avg</div><div class="kpi-val c-orange">${fmt(t.avg_daily||0)}</div><div class="kpi-sub">views / day</div></div>
+    <div class="kpi"><div class="kpi-label">Peak Hour</div><div class="kpi-val c-purple">${peakH}</div><div class="kpi-sub">most traffic</div></div>
+    <div class="kpi"><div class="kpi-label">New Visitors</div><div class="kpi-val c-green">${newP}%</div><div class="kpi-sub">${fmt(nvr.new||0)} first-time IPs</div></div>
+    <div class="kpi"><div class="kpi-label">Mobile</div><div class="kpi-val c-teal">${mobileP}%</div><div class="kpi-sub">${fmt(d.devices?.mobile||0)} sessions</div></div>
+    <div class="kpi"><div class="kpi-label">Top Browser</div><div class="kpi-val" style="font-size:1.1em;color:var(--blue)">${esc(topBrowser)}</div><div class="kpi-sub">most common</div></div>
   </div>
 
-  <div class="section-title">Traffic Over Time</div>
-  <div class="charts-grid">
-    <div class="chart-card full"><h3><span class="icon">📈</span> Daily Pageviews (last ${activeDays} days)</h3><div class="chart-wrap-tall"><canvas id="chartTraffic"></canvas></div></div>
+  <!-- ── Traffic Over Time ── -->
+  <div class="slabel">📈 Traffic over time</div>
+  <div class="card">
+    <h3><span class="icon">📈</span> Daily Pageviews &amp; Unique Visitors</h3>
+    <div class="chart-wrap"><canvas id="chartTraffic"></canvas></div>
   </div>
 
-  <div class="section-title">Pages & Content</div>
-  <div class="charts-grid">
-    <div class="chart-card"><h3><span class="icon">📄</span> Top Pages</h3><div class="chart-wrap-tall"><canvas id="chartPages"></canvas></div></div>
-    <div class="chart-card"><h3><span class="icon">🗂️</span> Site Sections</h3><div class="chart-wrap"><canvas id="chartSections"></canvas></div></div>
-  </div>
-
-  <div class="section-title">Health & Sources</div>
-  <div class="charts-grid">
-    <div class="chart-card"><h3><span class="icon">🔢</span> HTTP Status Codes</h3><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div>
-    <div class="chart-card"><h3><span class="icon">🕐</span> Traffic by Hour of Day</h3><div class="chart-wrap"><canvas id="chartHour"></canvas></div></div>
-  </div>
-
-  <div class="section-title">Top Content Topics</div>
-  <div class="tables-grid">
-    <div class="table-card">
-      <h3><span>🏆</span> Focus Topics</h3>
-      ${topicsTable(d.topics||[])}
+  <!-- ── Content Table ── -->
+  <div class="slabel">📄 Top content — click any row to drill down</div>
+  <div class="card" id="contentCard">
+    <h3><span class="icon">📄</span> Pages &amp; Articles
+      <span style="font-size:.75em;color:var(--text3);font-weight:400;margin-left:auto">Click a column header to sort · Click a row for daily breakdown</span>
+    </h3>
+    <div class="ctbl-wrap" id="contentTableWrap">
+      ${renderContentTableHTML(buildContentRows(d))}
     </div>
-    <div class="table-card">
-      <h3><span>🔗</span> Top Referrers</h3>
+  </div>
+
+  <!-- ── Heatmap ── -->
+  <div class="slabel">🔥 Best time to publish — activity heatmap</div>
+  <div class="card">
+    <h3><span class="icon">🔥</span> Hour-of-Day × Day-of-Week Heatmap
+      <span style="color:var(--text3);font-size:.75em;font-weight:400;margin-left:8px">(blue = quiet · orange = peak)</span>
+    </h3>
+    <div class="heatmap-wrap">${buildHeatmap(d.heatmap)}</div>
+  </div>
+
+  <!-- ── Row: Sources + Devices + Browsers ── -->
+  <div class="slabel">🌐 Audience &amp; sources</div>
+  <div class="grid-3">
+    <div class="card">
+      <h3><span class="icon">🌐</span> Traffic Sources</h3>
+      ${renderSourceList(d.traffic_sources)}
+    </div>
+    <div class="card">
+      <h3><span class="icon">📱</span> Devices</h3>
+      ${renderDevPills(d.devices, humanT)}
+      <div class="chart-wrap-sm" style="margin-top:14px"><canvas id="chartDevices"></canvas></div>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🌍</span> Browsers</h3>
+      <div class="chart-wrap" style="margin-top:6px"><canvas id="chartBrowsers"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Row: Weekday + Hourly ── -->
+  <div class="slabel">📅 When your audience shows up</div>
+  <div class="grid-2">
+    <div class="card">
+      <h3><span class="icon">📅</span> Traffic by Day of Week</h3>
+      <div class="chart-wrap"><canvas id="chartWeekday"></canvas></div>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🕐</span> Traffic by Hour of Day</h3>
+      <div class="chart-wrap"><canvas id="chartHour"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Referrers + Keywords + Sections + Status ── -->
+  <div class="slabel">🔍 Discovery &amp; health</div>
+  <div class="grid-2">
+    <div class="card">
+      <h3><span class="icon">🔗</span> Top Referrers</h3>
       ${simpleTable(d.referrers||[],'Referrer Domain')}
     </div>
-    <div class="table-card">
-      <h3><span>🌐</span> Top IP Addresses</h3>
-      ${simpleTable(d.top_ips||[],'IP Address')}
+    <div class="card">
+      <h3><span class="icon">🔍</span> Search Keywords</h3>
+      ${simpleTable(d.search_queries||[],'Search Term')}
+    </div>
+  </div>
+  <div class="grid-2" style="margin-top:12px">
+    <div class="card">
+      <h3><span class="icon">🗂️</span> Site Sections</h3>
+      <div class="chart-wrap"><canvas id="chartSections"></canvas></div>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🔢</span> HTTP Status Codes</h3>
+      <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
     </div>
   </div>
 
-  <div class="section-title">Device Breakdown</div>
-  <div class="device-row">
-    <div class="dev-pill">💻 Desktop <span class="dev-num">${fmt(d.devices.desktop||0)}</span> <span style="color:rgba(255,255,255,.4);font-size:.85em">${Math.round((d.devices.desktop||0)/humanTotal*100)}%</span></div>
-    <div class="dev-pill">📱 Mobile <span class="dev-num">${fmt(d.devices.mobile||0)}</span> <span style="color:rgba(255,255,255,.4);font-size:.85em">${Math.round((d.devices.mobile||0)/humanTotal*100)}%</span></div>
-    <div class="dev-pill">🤖 Bots (excluded) <span class="dev-num">${fmt(d.devices.bot||0)}</span></div>
-    <div class="dev-pill" style="margin-left:auto;opacity:.5;font-size:.78em">Bots are excluded from all metrics above</div>
-  </div>
-  `;
+</div>`;
 
   buildCharts(d);
+  attachContentTableEvents();
 }
 
-// ── Table helpers ──────────────────────────────────────────────
-function topicsTable(rows){
-  if(!rows.length) return '<p style="color:rgba(255,255,255,.35);font-size:.82em;padding:8px">No data yet</p>';
-  const max=rows[0].count||1;
-  return `<table class="tbl">
-    <tr><th>#</th><th>Topic / Page Slug</th><th style="text-align:right">Views</th></tr>
-    ${rows.slice(0,15).map((r,i)=>`
-      <tr>
-        <td class="rank">${i+1}</td>
-        <td><div class="name-plain">${esc(r.name)}</div><div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.count/max*100)}%"></div></div></td>
-        <td class="count">${fmt(r.count)}</td>
-      </tr>`).join('')}
-  </table>`;
+// ── Content Table ──────────────────────────────────────────────
+function buildContentRows(d){
+  const rows = (d.pages||[]).map((p,i)=>{
+    const tp = (d.trending_pages||[]).find(t=>t.name===p.name);
+    return {idx:i, name:p.name, count:p.count, trend: tp?tp.trend_pct:0};
+  });
+  rows.sort((a,b)=>( (b[sortCol]||0)-(a[sortCol]||0) )*sortDir);
+  return rows;
 }
 
-function simpleTable(rows, colLabel){
-  if(!rows.length) return '<p style="color:rgba(255,255,255,.35);font-size:.82em;padding:8px">No data yet</p>';
-  const max=rows[0].count||1;
-  return `<table class="tbl">
-    <tr><th>#</th><th>${esc(colLabel)}</th><th style="text-align:right">Hits</th></tr>
-    ${rows.slice(0,12).map((r,i)=>`
-      <tr>
-        <td class="rank">${i+1}</td>
-        <td><div class="name">${esc(r.name)}</div><div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.count/max*100)}%"></div></div></td>
-        <td class="count">${fmt(r.count)}</td>
-      </tr>`).join('')}
-  </table>`;
+function renderContentTableHTML(rows){
+  if(!rows.length) return '<div class="nodata">No page data yet.</div>';
+  const arw = (col)=> sortCol===col ? (sortDir>0?'↑':'↓') : '';
+  let html = `<table class="ctbl">
+    <thead><tr>
+      <th class="sorted" data-col="rank">#</th>
+      <th data-col="name">Page ${arw('name')}</th>
+      <th data-col="count" class="${sortCol==='count'?'sorted':''}">Views ${arw('count')}</th>
+      <th data-col="trend" class="${sortCol==='trend'?'sorted':''}">Trend ${arw('trend')}</th>
+      <th></th>
+    </tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const trendHTML = r.trend>5
+      ? `<span class="trendup">▲ ${r.trend.toFixed(0)}%</span>`
+      : r.trend < -5
+        ? `<span class="trenddn">▼ ${Math.abs(r.trend).toFixed(0)}%</span>`
+        : `<span class="trendfl">→ flat</span>`;
+    const isExp = expandedIdx===r.idx;
+    html += `<tr class="ctbl-row${isExp?' expanded':''}" data-idx="${r.idx}" data-page="${esc(r.name)}">
+      <td class="rank">${i+1}</td>
+      <td class="page-cell"><span class="page-path">${esc(r.name)}</span></td>
+      <td class="count-cell">${fmt(r.count)}</td>
+      <td class="trend-cell">${trendHTML}</td>
+      <td class="chev">▶</td>
+    </tr>`;
+    if(isExp){
+      html += `<tr class="drill-tr"><td colspan="5">
+        <div class="drill-content">
+          <div class="drill-mini">
+            <div class="drill-chart-wrap"><canvas id="drillChart${r.idx}"></canvas></div>
+            <div class="drill-stats">
+              <div><div class="drill-stat-val c-blue">${fmt(r.count)}</div><div class="drill-stat-lbl">Total views</div></div>
+              <div><div class="drill-stat-val c-${r.trend>0?'green':'orange'}">${r.trend>0?'+':''}${r.trend.toFixed(1)}%</div><div class="drill-stat-lbl">Trend vs earlier</div></div>
+            </div>
+          </div>
+        </div>
+      </td></tr>`;
+    }
+  });
+  html += '</tbody></table>';
+  return html;
 }
 
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function attachContentTableEvents(){
+  // Column sort
+  document.querySelectorAll('.ctbl thead th[data-col]').forEach(th=>{
+    if(th.dataset.col==='rank') return;
+    th.style.cursor='pointer';
+    th.addEventListener('click',()=>{
+      const col = th.dataset.col;
+      if(sortCol===col) sortDir*=-1; else {sortCol=col;sortDir=-1;}
+      expandedIdx=-1;
+      Object.values(drillCharts).forEach(c=>{try{c.destroy()}catch(e){}});drillCharts={};
+      document.getElementById('contentTableWrap').innerHTML=
+        renderContentTableHTML(buildContentRows(currentData));
+      attachContentTableEvents();
+    });
+  });
+  // Row expand/collapse
+  document.querySelectorAll('.ctbl-row').forEach(tr=>{
+    tr.addEventListener('click',()=>{
+      const idx  = parseInt(tr.dataset.idx,10);
+      const page = tr.dataset.page;
+      toggleDrill(idx, page);
+    });
+  });
+  // Build any open drill charts
+  if(expandedIdx>=0 && currentData){
+    const tl = (currentData.page_timelines||{})[
+      Object.keys(currentData.page_timelines||{}).find(k=>k===decodeURIComponent(document.querySelector(`.ctbl-row[data-idx="${expandedIdx}"]`)?.dataset.page||''))
+    ];
+    if(tl){
+      const cvs = document.getElementById('drillChart'+expandedIdx);
+      if(cvs) buildDrillChart(expandedIdx, cvs, tl, currentData);
+    }
+  }
+}
 
-// ── Build Charts ───────────────────────────────────────────────
-function buildCharts(d){
-  const gridColor='rgba(255,255,255,.04)';
-  const textColor='rgba(255,255,255,.55)';
-  Chart.defaults.color=textColor;
-  Chart.defaults.borderColor=gridColor;
+function toggleDrill(idx, page){
+  Object.values(drillCharts).forEach(c=>{try{c.destroy()}catch(e){}});drillCharts={};
+  expandedIdx = (expandedIdx===idx) ? -1 : idx;
+  document.getElementById('contentTableWrap').innerHTML=
+    renderContentTableHTML(buildContentRows(currentData));
+  attachContentTableEvents();
 
-  // Traffic over time
-  const days=d.traffic_by_day||[];
-  charts.traffic=new Chart(document.getElementById('chartTraffic'),{
-    type:'line',
+  if(expandedIdx>=0 && currentData){
+    const tl = (currentData.page_timelines||{})[page];
+    const cvs = document.getElementById('drillChart'+idx);
+    if(cvs && tl && tl.length) buildDrillChart(idx, cvs, tl, currentData);
+  }
+}
+
+function buildDrillChart(idx, cvs, tl, d){
+  const days = d.traffic_by_day||[];
+  const labels = days.map(x=>x.date).slice(-tl.length);
+  drillCharts[idx] = new Chart(cvs,{
+    type:'bar',
     data:{
-      labels:days.map(x=>x.date),
+      labels,
       datasets:[{
-        label:'Pageviews',
-        data:days.map(x=>x.count),
-        fill:true,
-        backgroundColor:'rgba(88,166,255,.12)',
-        borderColor:'#58a6ff',
-        borderWidth:2,
-        pointRadius:days.length>60?0:3,
-        pointHoverRadius:5,
-        tension:.35,
+        label:'Daily views',
+        data:tl,
+        backgroundColor:'rgba(88,166,255,.45)',
+        borderColor:'rgba(88,166,255,.8)',
+        borderWidth:1,
+        borderRadius:3,
       }]
     },
     options:{
       responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>'Date: '+items[0].label}}},
+      plugins:{legend:{display:false}},
       scales:{
-        x:{grid:{color:gridColor},ticks:{maxTicksLimit:12,color:textColor}},
+        x:{display:false},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'rgba(255,255,255,.5)',font:{size:10}},beginAtZero:true}
+      }
+    }
+  });
+}
+
+// ── Heatmap ────────────────────────────────────────────────────
+function buildHeatmap(heatmap){
+  if(!heatmap||!heatmap.length){
+    return '<div class="nodata">Not enough data for heatmap yet.</div>';
+  }
+  // Find max + peak cell
+  let maxVal=0, peakDay=0, peakHour=0;
+  heatmap.forEach((row,d)=>row.forEach((v,h)=>{if(v>maxVal){maxVal=v;peakDay=d;peakHour=h;}}));
+  if(!maxVal) return '<div class="nodata">Not enough data yet.</div>';
+
+  function heatColor(v){
+    const t = maxVal>0 ? v/maxVal : 0;
+    // blue (cold) → orange (hot)
+    const r = Math.round(88  + (255-88)*t);
+    const g = Math.round(166 + (167-166)*t*0.3);
+    const b = Math.round(255 + (38-255)*t);
+    return `rgb(${r},${g},${b})`;
+  }
+
+  let grid = '<div class="heatmap-grid">';
+  // corner
+  grid += '<div class="hm-label"></div>';
+  // hour headers  0..23
+  for(let h=0;h<24;h++) grid += `<div class="hm-hour-lbl">${hourLabel(h)}</div>`;
+  // rows
+  heatmap.forEach((row,day)=>{
+    grid += `<div class="hm-day-lbl">${weekdayLabel(day)}</div>`;
+    row.forEach((v,h)=>{
+      const alpha = maxVal>0 ? 0.15+0.85*(v/maxVal) : 0.1;
+      const bg = v>0 ? heatColor(v) : 'rgba(255,255,255,.04)';
+      const title = `${weekdayLabel(day)} ${hourLabel(h)}: ${v} hits`;
+      grid += `<div class="hm-cell" style="background:${bg};opacity:${v>0?1:0.3}" title="${esc(title)}"></div>`;
+    });
+  });
+  grid += '</div>';
+  grid += `<div class="hm-peak-note">🔥 Peak: <strong>${weekdayLabel(peakDay)} at ${hourLabel(peakHour)}</strong> — best time to publish for maximum reach</div>`;
+  return grid;
+}
+
+// ── Traffic Sources ────────────────────────────────────────────
+function renderSourceList(srcs){
+  if(!srcs) return '<div class="nodata">No source data.</div>';
+  const items=[
+    {key:'search', icon:'🔍', label:'Organic Search', color:'var(--blue)'},
+    {key:'social', icon:'📣', label:'Social Media',   color:'var(--purple)'},
+    {key:'referral',icon:'🔗',label:'Referral',       color:'var(--teal)'},
+    {key:'direct', icon:'🏠', label:'Direct / Dark',  color:'var(--text2)'},
+  ];
+  const total = items.reduce((s,x)=>s+(srcs[x.key]||0),0)||1;
+  let html='<div class="src-list">';
+  items.forEach(item=>{
+    const v=srcs[item.key]||0;
+    const pct=Math.round(v/total*100);
+    html+=`<div class="src-item">
+      <span class="src-icon">${item.icon}</span>
+      <span class="src-label">${item.label}</span>
+      <div class="src-bar-wrap"><div class="src-bar-fill" style="width:${pct}%;background:${item.color}"></div></div>
+      <span class="src-count">${fmt(v)}</span>
+      <span class="src-pct">${pct}%</span>
+    </div>`;
+  });
+  html+='</div>';
+  return html;
+}
+
+// ── Device Pills ───────────────────────────────────────────────
+function renderDevPills(devs, total){
+  if(!devs) return '';
+  const list=[
+    {key:'desktop',icon:'💻',label:'Desktop'},
+    {key:'mobile', icon:'📱',label:'Mobile'},
+    {key:'tablet', icon:'📟',label:'Tablet'},
+  ];
+  let html='<div class="dev-pills">';
+  list.forEach(d=>{
+    const v=devs[d.key]||0;
+    const pct=total>0?Math.round(v/total*100):0;
+    html+=`<div class="dev-pill">
+      <span class="dev-pill-icon">${d.icon}</span>
+      <div class="dev-pill-val">${pct}%</div>
+      <div class="dev-pill-lbl">${d.label}</div>
+    </div>`;
+  });
+  if(devs.bot>0) html+=`<div class="dev-pill" style="opacity:.4">
+    <span class="dev-pill-icon">🤖</span>
+    <div class="dev-pill-val">${fmt(devs.bot)}</div>
+    <div class="dev-pill-lbl">Bots (excluded)</div>
+  </div>`;
+  html+='</div>';
+  return html;
+}
+
+// ── Simple Table ───────────────────────────────────────────────
+function simpleTable(rows, colLabel){
+  if(!rows||!rows.length) return '<div class="nodata">No data yet.</div>';
+  const max=rows[0].count||1;
+  let html=`<table class="stbl"><thead><tr><th>#</th><th>${esc(colLabel)}</th><th style="text-align:right">Hits</th></tr></thead><tbody>`;
+  rows.slice(0,15).forEach((r,i)=>{
+    html+=`<tr><td class="srank">${i+1}</td>
+      <td class="sname">${esc(r.name)}<div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.count/max*100)}%"></div></div></td>
+      <td class="scount">${fmt(r.count)}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  return html;
+}
+
+// ── Build Charts ───────────────────────────────────────────────
+function buildCharts(d){
+  const gridColor='rgba(255,255,255,.05)';
+  const textColor='rgba(255,255,255,.5)';
+  Chart.defaults.color=textColor;
+  Chart.defaults.borderColor=gridColor;
+
+  // Traffic dual-line (views + unique)
+  const dayData=d.traffic_by_day||[];
+  const uniqueByDay=d.unique_by_day||[];
+  charts.traffic=new Chart(document.getElementById('chartTraffic'),{
+    type:'line',
+    data:{
+      labels:dayData.map(x=>x.date),
+      datasets:[
+        {label:'Pageviews',data:dayData.map(x=>x.count),fill:true,
+         backgroundColor:'rgba(88,166,255,.1)',borderColor:'#58a6ff',
+         borderWidth:2,pointRadius:dayData.length>60?0:2,tension:.35},
+        {label:'Unique Visitors',data:uniqueByDay,fill:false,
+         borderColor:'#66bb6a',borderWidth:1.5,
+         pointRadius:0,tension:.35,borderDash:[5,3]}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:12,padding:16,color:textColor}}},
+      scales:{
+        x:{grid:{color:gridColor},ticks:{maxTicksLimit:10,color:textColor}},
         y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true}
       }
     }
   });
 
-  // Top pages horizontal bar
-  const pages=(d.pages||[]).slice(0,12);
-  charts.pages=new Chart(document.getElementById('chartPages'),{
+  // Devices doughnut
+  const devs=d.devices||{};
+  charts.devices=new Chart(document.getElementById('chartDevices'),{
+    type:'doughnut',
+    data:{
+      labels:['Desktop','Mobile','Tablet'],
+      datasets:[{
+        data:[devs.desktop||0,devs.mobile||0,devs.tablet||0],
+        backgroundColor:['rgba(88,166,255,.75)','rgba(102,187,106,.75)','rgba(255,167,38,.75)'],
+        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:6
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10,color:textColor}}}}
+  });
+
+  // Browsers horizontal bar
+  const brows=(d.browsers||[]).slice(0,6);
+  charts.browsers=new Chart(document.getElementById('chartBrowsers'),{
     type:'bar',
     data:{
-      labels:pages.map(p=>p.name.length>35?p.name.slice(0,32)+'…':p.name),
-      datasets:[{label:'Views',data:pages.map(p=>p.count),backgroundColor:'rgba(88,166,255,.6)',borderColor:'rgba(88,166,255,.9)',borderWidth:1,borderRadius:4}]
+      labels:brows.map(b=>b.name),
+      datasets:[{label:'Sessions',data:brows.map(b=>b.count),
+        backgroundColor:'rgba(171,71,188,.6)',borderColor:'rgba(171,71,188,.9)',
+        borderWidth:1,borderRadius:4}]
     },
-    options:{
-      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false}},
-      scales:{
-        x:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true},
-        y:{grid:{color:'transparent'},ticks:{color:textColor,font:{size:11}}}
-      }
-    }
+      scales:{x:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true},
+              y:{grid:{color:'transparent'},ticks:{color:textColor,font:{size:12}}}}}
+  });
+
+  // Weekday bar (peak highlighted)
+  const wkd=d.traffic_by_weekday||Array(7).fill(0);
+  const wkdMax=Math.max(...wkd,1);
+  charts.weekday=new Chart(document.getElementById('chartWeekday'),{
+    type:'bar',
+    data:{
+      labels:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+      datasets:[{label:'Pageviews',data:wkd,
+        backgroundColor:wkd.map(v=>v===wkdMax?'rgba(255,167,38,.8)':'rgba(88,166,255,.5)'),
+        borderColor:wkd.map(v=>v===wkdMax?'rgba(255,167,38,1)':'rgba(88,166,255,.8)'),
+        borderWidth:1,borderRadius:4}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gridColor},ticks:{color:textColor}},
+              y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true}}}
+  });
+
+  // Hour of day bar (peak highlighted orange)
+  const hours=d.traffic_by_hour||Array(24).fill(0);
+  const hourMax=Math.max(...hours,1);
+  charts.hour=new Chart(document.getElementById('chartHour'),{
+    type:'bar',
+    data:{
+      labels:[...Array(24).keys()].map(h=>hourLabel(h)),
+      datasets:[{label:'Hits',data:hours,
+        backgroundColor:hours.map(v=>v===hourMax?'rgba(255,167,38,.8)':'rgba(38,198,218,.4)'),
+        borderColor:hours.map(v=>v===hourMax?'rgba(255,167,38,1)':'rgba(38,198,218,.7)'),
+        borderWidth:1,borderRadius:3}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:gridColor},ticks:{color:textColor,font:{size:10},maxRotation:0}},
+              y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true}}}
   });
 
   // Sections doughnut
@@ -343,76 +792,41 @@ function buildCharts(d){
   const secColors=['#58a6ff','#66bb6a','#ffa726','#ab47bc','#26c6da','#ef5350','#ffca28','#8d6e63'];
   charts.sections=new Chart(document.getElementById('chartSections'),{
     type:'doughnut',
-    data:{
-      labels:secs.map(s=>s.name),
-      datasets:[{data:secs.map(s=>s.count),backgroundColor:secColors.slice(0,secs.length),borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,color:textColor}}}
-    }
+    data:{labels:secs.map(s=>s.name),
+      datasets:[{data:secs.map(s=>s.count),
+        backgroundColor:secColors.slice(0,secs.length),
+        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,color:textColor}}}}
   });
 
-  // Status codes doughnut
+  // Status doughnut
   const sc=d.status_codes||{};
   const scLabels=Object.keys(sc);
-  const scColors={
-    '2xx':'rgba(102,187,106,.8)','3xx':'rgba(88,166,255,.8)',
-    '4xx':'rgba(255,167,38,.8)','5xx':'rgba(239,83,80,.8)'
-  };
+  const scPalette={'2xx':'rgba(102,187,106,.8)','3xx':'rgba(88,166,255,.8)','4xx':'rgba(255,167,38,.8)','5xx':'rgba(239,83,80,.8)'};
   charts.status=new Chart(document.getElementById('chartStatus'),{
     type:'doughnut',
-    data:{
-      labels:scLabels,
-      datasets:[{
-        data:scLabels.map(l=>sc[l]),
-        backgroundColor:scLabels.map(l=>scColors[l]||'rgba(158,158,158,.7)'),
-        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,color:textColor}}}
-    }
-  });
-
-  // Hour of day bar
-  const hours=d.traffic_by_hour||Array(24).fill(0);
-  charts.hour=new Chart(document.getElementById('chartHour'),{
-    type:'bar',
-    data:{
-      labels:[...Array(24).keys()].map(h=>h+':00'),
-      datasets:[{
-        label:'Avg Hits',
-        data:hours,
-        backgroundColor:'rgba(171,71,188,.55)',
-        borderColor:'rgba(171,71,188,.85)',
-        borderWidth:1,borderRadius:3,
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{grid:{color:gridColor},ticks:{color:textColor,maxRotation:0}},
-        y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true}
-      }
-    }
+    data:{labels:scLabels,
+      datasets:[{data:scLabels.map(l=>sc[l]),
+        backgroundColor:scLabels.map(l=>scPalette[l]||'rgba(158,158,158,.7)'),
+        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,color:textColor}}}}
   });
 }
 
 // ── Days pill interaction ──────────────────────────────────────
 document.getElementById('daysPills').addEventListener('click',e=>{
-  const pill=e.target.closest('[data-days]');
+  const pill = e.target.closest('[data-days]');
   if(!pill) return;
-  activeDays=parseInt(pill.dataset.days,10);
-  document.querySelectorAll('.days-pill').forEach(p=>p.classList.remove('active'));
+  activeDays = parseInt(pill.dataset.days, 10);
+  document.querySelectorAll('#daysPills .pill').forEach(p=>p.classList.remove('active'));
   pill.classList.add('active');
   loadAnalytics();
 });
 
 // ── Boot ──────────────────────────────────────────────────────
-loadServers();
+boot();
 </script>
 </body>
 </html>

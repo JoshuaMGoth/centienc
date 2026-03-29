@@ -1263,20 +1263,74 @@ class MonitorEngine:
         re.IGNORECASE,
     )
     _MOBILE_UA = re.compile(r'Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini', re.IGNORECASE)
+    _TABLET_UA = re.compile(r'iPad|Android(?!.*Mobile)|Tablet|kindle|silk|GT-P|GT-N|SM-T', re.IGNORECASE)
+    _SEARCH_REFS = re.compile(
+        r'(google|bing|yahoo|duckduckgo|baidu|yandex|ecosia|brave|kagi|startpage)\.',
+        re.IGNORECASE,
+    )
+    _SOCIAL_REFS = re.compile(
+        r'(facebook\.com|twitter\.com|instagram\.com|linkedin\.com|reddit\.com|'
+        r'pinterest\.com|tiktok\.com|youtube\.com|t\.co|snapchat\.com|tumblr\.com|'
+        r'discord\.com|telegram\.org|whatsapp\.com|news\.ycombinator\.com)',
+        re.IGNORECASE,
+    )
 
-    async def get_analytics(self, server: dict[str, Any], days: int = 30) -> dict[str, Any]:
+    def _detect_browser(self, ua: str) -> str:
+        if "Edg/" in ua or "Edge/" in ua:
+            return "Edge"
+        if "Firefox/" in ua:
+            return "Firefox"
+        if "Chrome/" in ua:
+            return "Chrome"
+        if "Safari/" in ua:
+            return "Safari"
+        if "MSIE" in ua or "Trident/" in ua:
+            return "IE"
+        return "Other"
+
+    def _classify_source(self, ref: str) -> str:
+        if not ref or ref == "-" or ref.startswith("/"):
+            return "direct"
+        if self._SEARCH_REFS.search(ref):
+            return "search"
+        if self._SOCIAL_REFS.search(ref):
+            return "social"
+        return "referral"
+
+    def _extract_search_query(self, ref: str) -> str | None:
+        try:
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(ref)
+            qs = parse_qs(parsed.query)
+            for key in ("q", "query", "search", "p", "text", "s"):
+                if key in qs and qs[key]:
+                    return qs[key][0].strip()
+        except Exception:
+            pass
+        return None
+
+    async def get_analytics(
+        self,
+        server: dict[str, Any],
+        days: int = 30,
+        log_path: str | None = None,
+    ) -> dict[str, Any]:
         """Public method: fetch analytics from a server via SSH."""
         empty: dict[str, Any] = {
             "pages": [], "topics": [], "sections": [], "traffic_by_day": [],
             "traffic_by_hour": [0] * 24, "status_codes": {},
-            "top_ips": [], "referrers": [], "devices": {"mobile": 0, "desktop": 0, "bot": 0},
+            "top_ips": [], "referrers": [], "devices": {"mobile": 0, "desktop": 0, "bot": 0, "tablet": 0},
             "totals": {"views": 0, "unique_visitors": 0, "avg_daily": 0},
+            "traffic_by_weekday": [0] * 7, "heatmap": [[0] * 24 for _ in range(7)],
+            "browsers": [], "traffic_sources": {"search": 0, "social": 0, "direct": 0, "referral": 0},
+            "search_queries": [], "new_vs_returning": {"new": 0, "returning": 0},
+            "trending_pages": [], "page_timelines": {}, "unique_by_day": [],
             "error": None,
         }
         try:
             conn = await self._get_ssh_conn(server)
             sudo_pass = server.get("sudo_password")
-            return await self._ssh_analytics(conn, sudo_pass, days=days)
+            return await self._ssh_analytics(conn, sudo_pass, days=days, log_path=log_path)
         except Exception as exc:
             logger.warning("Analytics SSH error for server %s: %s", server.get("id"), exc)
             empty["error"] = str(exc)
@@ -1287,16 +1341,25 @@ class MonitorEngine:
         conn: asyncssh.SSHClientConnection,
         sudo_pass: str | None,
         days: int = 30,
+        log_path: str | None = None,
     ) -> dict[str, Any]:
         """Deep-read nginx logs and return structured analytics data."""
         from datetime import datetime, timezone
+        import shlex
 
-        # Read current + rotated logs (including gzip-compressed)
-        cmd = (
-            "(zcat /var/log/nginx/*.gz 2>/dev/null; "
-            "cat /var/log/nginx/*access*.log 2>/dev/null) "
-            "| tail -n 2000000 || echo ''"
-        )
+        # Build SSH command — use specific log file if provided, else all nginx access logs
+        if log_path:
+            sp = shlex.quote(log_path)
+            cmd = (
+                f"(zcat {sp}-*.gz 2>/dev/null; zcat {sp}.gz 2>/dev/null; cat {sp} 2>/dev/null) "
+                "| tail -n 2000000 || echo ''"
+            )
+        else:
+            cmd = (
+                "(zcat /var/log/nginx/*.gz 2>/dev/null; "
+                "cat /var/log/nginx/*access*.log 2>/dev/null) "
+                "| tail -n 2000000 || echo ''"
+            )
         if sudo_pass:
             raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass, timeout=120)
         else:
@@ -1322,7 +1385,15 @@ class MonitorEngine:
         ip_counts: dict[str, int] = {}
         referrer_counts: dict[str, int] = {}
         unique_ips: set[str] = set()
-        devices = {"mobile": 0, "desktop": 0, "bot": 0}
+        devices: dict[str, int] = {"mobile": 0, "desktop": 0, "bot": 0, "tablet": 0}
+        weekday_counts: list[int] = [0] * 7  # Mon=0 .. Sun=6
+        heatmap: list[list[int]] = [[0] * 24 for _ in range(7)]
+        browser_counts: dict[str, int] = {}
+        source_counts: dict[str, int] = {"search": 0, "social": 0, "direct": 0, "referral": 0}
+        search_query_counts: dict[str, int] = {}
+        ip_visit_count: dict[str, int] = {}
+        day_unique_ips: dict[str, set] = {}
+        page_day_counts: dict[str, dict[str, int]] = {}
 
         for line in raw.split("\n"):
             m = log_re.search(line)
@@ -1369,12 +1440,42 @@ class MonitorEngine:
             unique_ips.add(ip)
 
             # Device type
-            if self._MOBILE_UA.search(ua):
+            if self._TABLET_UA.search(ua):
+                devices["tablet"] += 1
+            elif self._MOBILE_UA.search(ua):
                 devices["mobile"] += 1
             else:
                 devices["desktop"] += 1
 
-            # Referrer (skip empty, self, and common noise)
+            # Weekday / heatmap
+            weekday = dt.weekday()  # Mon=0, Sun=6
+            weekday_counts[weekday] += 1
+            heatmap[weekday][dt.hour] += 1
+
+            # Daily unique IPs
+            if day_key not in day_unique_ips:
+                day_unique_ips[day_key] = set()
+            day_unique_ips[day_key].add(ip)
+
+            # New vs returning (count visits per IP)
+            ip_visit_count[ip] = ip_visit_count.get(ip, 0) + 1
+
+            # Browser
+            browser = self._detect_browser(ua)
+            browser_counts[browser] = browser_counts.get(browser, 0) + 1
+
+            # Traffic source
+            source = self._classify_source(ref)
+            source_counts[source] += 1
+
+            # Search query extraction
+            if source == "search":
+                sq = self._extract_search_query(ref)
+                if sq:
+                    sq_key = sq.lower()[:80]
+                    search_query_counts[sq_key] = search_query_counts.get(sq_key, 0) + 1
+
+            # Referrer host (for referrers table)
             if ref and ref != "-" and not ref.startswith("/"):
                 try:
                     from urllib.parse import urlparse
@@ -1394,6 +1495,11 @@ class MonitorEngine:
                 clean_path = "/"
 
             page_counts[clean_path] = page_counts.get(clean_path, 0) + 1
+
+            # Per-page daily tracking (for timelines + trends)
+            if clean_path not in page_day_counts:
+                page_day_counts[clean_path] = {}
+            page_day_counts[clean_path][day_key] = page_day_counts[clean_path].get(day_key, 0) + 1
 
             # Section: first path segment
             parts = [p for p in clean_path.split("/") if p]
@@ -1426,6 +1532,49 @@ class MonitorEngine:
             dk = (end_dt - timedelta(days=i)).strftime("%Y-%m-%d")
             traffic_by_day.append({"date": dk, "count": day_counts.get(dk, 0)})
 
+        date_keys = [x["date"] for x in traffic_by_day]
+
+        # Daily unique visitors
+        unique_by_day = [len(day_unique_ips.get(dk, set())) for dk in date_keys]
+
+        # New vs returning (1 visit = new, 2+ visits = returning)
+        new_visitors = sum(1 for cnt in ip_visit_count.values() if cnt == 1)
+        returning_visitors = sum(1 for cnt in ip_visit_count.values() if cnt > 1)
+
+        # Trending pages: compare recent 1/3 vs early 1/3 of the period
+        top_pages_list = top_n(page_counts, 20)
+        third_n = max(1, days // 3)
+        early_keys = set(date_keys[:third_n])
+        recent_keys = set(date_keys[-third_n:])
+
+        def page_trend(page_name: str) -> int:
+            day_data = page_day_counts.get(page_name, {})
+            early = sum(day_data.get(d, 0) for d in early_keys)
+            recent = sum(day_data.get(d, 0) for d in recent_keys)
+            if early == 0:
+                return 100 if recent > 0 else 0
+            return round((recent - early) / early * 100)
+
+        trending_pages = [
+            {"name": p["name"], "count": p["count"], "trend_pct": page_trend(p["name"])}
+            for p in top_pages_list
+        ]
+
+        # Per-page daily timelines for drill-down (top 20 pages)
+        page_timelines = {
+            p["name"]: [page_day_counts.get(p["name"], {}).get(dk, 0) for dk in date_keys]
+            for p in top_pages_list
+        }
+
+        # Browser list sorted
+        browser_list = [
+            {"name": k, "count": v}
+            for k, v in sorted(browser_counts.items(), key=lambda x: -x[1])
+        ]
+
+        # Find peak publishing hour (hour with most traffic)
+        peak_hour = hour_counts.index(max(hour_counts)) if hour_counts else 0
+
         return {
             "pages": top_n(page_counts, 25),
             "topics": top_n(topic_counts, 20),
@@ -1440,7 +1589,17 @@ class MonitorEngine:
                 "views": total_views,
                 "unique_visitors": len(unique_ips),
                 "avg_daily": avg_daily,
+                "peak_hour": peak_hour,
             },
+            "traffic_by_weekday": weekday_counts,
+            "heatmap": heatmap,
+            "browsers": browser_list,
+            "traffic_sources": source_counts,
+            "search_queries": top_n(search_query_counts, 15),
+            "new_vs_returning": {"new": new_visitors, "returning": returning_visitors},
+            "trending_pages": trending_pages,
+            "page_timelines": page_timelines,
+            "unique_by_day": unique_by_day,
             "error": None,
         }
 

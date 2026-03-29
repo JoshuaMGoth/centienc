@@ -1333,25 +1333,48 @@ async def api_analytics(request: Request):
     """Deep nginx log parse for web analytics.
 
     Query params:
-        server_id (int, required) – ID of the SSH-monitored server to read logs from
-        days      (int, default 30) – How many days of history to analyse
+        server_id  (int)          – SSH server to read from (required unless website_id given)
+        website_id (int, optional) – Website ID; auto-selects server and log_path
+        days       (int, default 30) – How many days of history to analyse
     """
     await _require_auth_or_401(request)
+    days = max(1, min(int(request.query_params.get("days", "30")), 365))
+
+    log_path: str | None = None
+
+    # Resolve server via website_id if provided
+    website_id_str = request.query_params.get("website_id", "").strip()
     server_id_str = request.query_params.get("server_id", "").strip()
+
+    if website_id_str:
+        try:
+            website_id_int = int(website_id_str)
+        except ValueError:
+            raise HTTPException(400, "website_id must be an integer")
+        websites = await db.list_websites()
+        website = next((w for w in websites if w["id"] == website_id_int), None)
+        if not website:
+            raise HTTPException(404, "Website not found")
+        lp = website.get("log_path") or ""
+        # Validate log_path to prevent path traversal
+        if lp and lp.startswith("/") and ".." not in lp and lp.endswith(".log"):
+            log_path = lp
+        if not server_id_str:
+            server_id_str = str(website.get("server_id") or "")
+
     if not server_id_str:
-        raise HTTPException(400, "server_id is required")
+        raise HTTPException(400, "server_id or website_id (with a linked server) is required")
     try:
         server_id_int = int(server_id_str)
     except ValueError:
         raise HTTPException(400, "server_id must be an integer")
-    days = max(1, min(int(request.query_params.get("days", "30")), 365))
 
     servers = await db.list_servers()
     server = next((s for s in servers if s["id"] == server_id_int), None)
     if not server:
         raise HTTPException(404, "Server not found")
 
-    result = await engine.get_analytics(server, days=days)
+    result = await engine.get_analytics(server, days=days, log_path=log_path)
     return {"ok": True, **result}
 
 
