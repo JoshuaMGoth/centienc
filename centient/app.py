@@ -433,15 +433,8 @@ async def tv_page(request: Request):
 
 @app.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request):
-    setup_done = await db.get_setting("setup_complete", "false")
-    if setup_done != "true":
-        return RedirectResponse("/setup")
-    auth_enabled = await db.get_setting("auth_enabled", "false")
-    if auth_enabled == "true":
-        user = await _require_auth(request)
-        if user is None:
-            return RedirectResponse("/login")
-    return _serve_template("analytics.html")
+    # Analytics page removed — all analytics are now consolidated in Reports
+    return RedirectResponse("/reports")
 
 
 @app.get("/reports", response_class=HTMLResponse)

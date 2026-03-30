@@ -1274,6 +1274,51 @@ class MonitorEngine:
         r'discord\.com|telegram\.org|whatsapp\.com|news\.ycombinator\.com)',
         re.IGNORECASE,
     )
+    _SCANNER_UA_RE = re.compile(
+        r'nikto|masscan|zgrab|nmap|sqlmap|dirbuster|gobuster|wfuzz|ffuf|'
+        r'burpsuite|acunetix|nessus|w3af|openvas|metasploit|nuclei|'
+        r'censys|shodan|havij|commix|appscan|webinspect|vega|skipfish|'
+        r'paros|zaproxy|owasp-zap|struts2?-vuln|jexboss|jndi:',
+        re.IGNORECASE,
+    )
+    _HACK_PATH_RE = re.compile(
+        r'\.\./|%2e%2e|%252e|/etc/passwd|/etc/shadow|/etc/hosts'
+        r'|\.env$|\.env\.|\.git/config|\.git/HEAD|\.htaccess|\.htpasswd'
+        r'|wp-login\.php|xmlrpc\.php'
+        r'|phpmyadmin|/pma/|adminer\.php'
+        r'|UNION.{0,25}SELECT|OR.{0,8}1=1|DROP.{0,8}TABLE'
+        r'|<script|javascript:|onerror=|onload=|document\.cookie'
+        r'|/bin/sh|/bin/bash|cmd\.exe|;cat\s|wget\shttp|curl\shttp'
+        r'|eval\(|base64_decode|system\(|exec\(|passthru\('
+        r'|shell\.php|c99\.php|r57\.php|webshell|backdoor\.php',
+        re.IGNORECASE,
+    )
+
+    def _classify_attack_type(self, path: str, ref: str, method: str, status: int) -> str | None:
+        """Classify a single request as a known attack type, or None if benign."""
+        combined = path + (ref or "")
+        pl = path.lower()
+        if re.search(r'\.\./|%2e%2e|%252e|/etc/passwd|/etc/shadow|\.htpasswd|\.git/config|\.htaccess', path, re.I):
+            return "Path Traversal"
+        if re.search(r'\.env$|\.env\.|\.git/|wp-config\.php|config\.php|settings\.py|\.aws/|\.ssh/', path, re.I):
+            return "Config File Probe"
+        if re.search(r'wp-admin|wp-login\.php|xmlrpc\.php|/admin\.php|/manager/', pl):
+            return "CMS/Admin Probe"
+        if re.search(r'phpmyadmin|/pma/|adminer\.php|phpinfo\.php', pl):
+            return "DB Admin Probe"
+        if re.search(r'UNION.{0,25}SELECT|OR.{0,8}1=1|DROP.{0,8}TABLE|sleep\(\d|1=1--', combined, re.I):
+            return "SQL Injection"
+        if re.search(r'<script|javascript:|onerror=|onload=|alert\(|document\.cookie', combined, re.I):
+            return "XSS Attempt"
+        if re.search(r'/bin/sh|/bin/bash|cmd\.exe|;cat\s|wget\shttp|curl\shttp|eval\(|system\(|exec\(|passthru\(', path, re.I):
+            return "Command Injection"
+        if re.search(r'shell\.php|c99\.php|r57\.php|webshell|backdoor\.php|upload\.php', pl):
+            return "Webshell Probe"
+        if re.search(r'jndi:|\$\{|log4j|log4shell', combined, re.I):
+            return "Log4Shell / JNDI"
+        if method in ("TRACE", "CONNECT", "PROPFIND", "TRACK"):
+            return "Suspicious Method"
+        return None
 
     def _detect_browser(self, ua: str) -> str:
         if "Edg/" in ua or "Edge/" in ua:
@@ -1325,7 +1370,9 @@ class MonitorEngine:
             "browsers": [], "traffic_sources": {"search": 0, "social": 0, "direct": 0, "referral": 0},
             "search_queries": [], "new_vs_returning": {"new": 0, "returning": 0},
             "trending_pages": [], "page_timelines": {}, "unique_by_day": [],
-            "error": None,
+            "error_breakdown": {}, "hack_attempts": [], "attacking_ips": [],
+            "scanner_uas": [], "bot_categories": {}, "method_distribution": {},
+            "http_versions": {}, "error": None,
         }
         try:
             conn = await self._get_ssh_conn(server)
@@ -1371,7 +1418,7 @@ class MonitorEngine:
             r'(?:(?P<vhost>[a-zA-Z0-9._-]+)\s+)?'
             r'(?P<ip>[\d.a-fA-F:]+)\s+\S+\s+\S+\s+'
             r'\[(?P<ts>[^\]]+)\]\s+'
-            r'"(?P<method>\S+)\s+(?P<path>\S+)\s+\S+"\s+'
+            r'"(?P<method>\S+)\s+(?P<path>\S+)\s+(?P<proto>\S+)"\s+'
             r'(?P<status>\d+)\s+\S+\s+'
             r'"(?P<ref>[^"]*)"\s+"(?P<ua>[^"]*)"'
         )
@@ -1394,6 +1441,14 @@ class MonitorEngine:
         ip_visit_count: dict[str, int] = {}
         day_unique_ips: dict[str, set] = {}
         page_day_counts: dict[str, dict[str, int]] = {}
+        # Security / marketing extensions
+        method_counts: dict[str, int] = {}
+        http_version_counts: dict[str, int] = {}
+        error_code_counts: dict[str, int] = {}
+        hack_attempt_counts: dict[str, int] = {}
+        attacking_ips: dict[str, int] = {}
+        scanner_ua_counts: dict[str, int] = {}
+        bot_categories: dict[str, int] = {}
 
         for line in raw.split("\n"):
             m = log_re.search(line)
@@ -1417,10 +1472,55 @@ class MonitorEngine:
             if ts < cutoff:
                 continue
 
-            # Classify device / bot
+            status_int = int(status)
+            proto_val = (m.group("proto") or "HTTP/1.1").upper()
+
+            # ── Security tracking (runs for ALL requests, before any skip) ──────
+            method_counts[method] = method_counts.get(method, 0) + 1
+            http_version_counts[proto_val] = http_version_counts.get(proto_val, 0) + 1
+            if status_int >= 400:
+                ec_key = str(status_int)
+                error_code_counts[ec_key] = error_code_counts.get(ec_key, 0) + 1
+                attacking_ips[ip] = attacking_ips.get(ip, 0) + 1
+            atk = self._classify_attack_type(path, ref, method, status_int)
+            if atk:
+                hack_attempt_counts[atk] = hack_attempt_counts.get(atk, 0) + 1
+                attacking_ips[ip] = attacking_ips.get(ip, 0) + 2  # weight attacks higher
+            if self._SCANNER_UA_RE.search(ua):
+                tool = "Other Scanner"
+                for t_name, t_pat in (
+                    ("Nikto", "nikto"), ("SQLmap", "sqlmap"), ("Nmap", "nmap"),
+                    ("Masscan", "masscan"), ("Nuclei", "nuclei"), ("ZGrab", "zgrab"),
+                    ("Censys", "censys"), ("Shodan", "shodan"),
+                    ("DirBuster", "dirbuster"), ("GoBuster", "gobuster"),
+                    ("Wfuzz", "wfuzz"), ("FFUF", "ffuf"),
+                    ("Burp Suite", "burp"), ("Acunetix", "acunetix"),
+                    ("Nessus", "nessus"), ("OpenVAS", "openvas"), ("w3af", "w3af"),
+                ):
+                    if t_pat in ua.lower():
+                        tool = t_name
+                        break
+                scanner_ua_counts[tool] = scanner_ua_counts.get(tool, 0) + 1
+                attacking_ips[ip] = attacking_ips.get(ip, 0) + 1
+
+            # ── Bot classification + skip ────────────────────────────────────────
             if self._BOT_PATTERNS.search(ua):
+                ua_lower = ua.lower()
+                if any(x in ua_lower for x in ("googlebot", "bingbot", "slurp", "duckduckbot", "baiduspider", "yandexbot")):
+                    cat = "Search Crawler"
+                elif any(x in ua_lower for x in ("facebot", "twitterbot", "linkedinbot", "applebot", "pinterestbot")):
+                    cat = "Social Bot"
+                elif any(x in ua_lower for x in ("semrush", "ahrefs", "mj12bot", "dotbot", "blexbot", "dataforseo")):
+                    cat = "SEO Crawler"
+                elif any(x in ua_lower for x in ("nikto", "nmap", "masscan", "zgrab", "nuclei", "sqlmap", "censys", "shodan")):
+                    cat = "Security Scanner"
+                elif any(x in ua_lower for x in ("curl", "wget", "python-requests", "python-urllib", "httpx", "go-http", "java/")):
+                    cat = "Automation/Script"
+                else:
+                    cat = "Other Bot"
+                bot_categories[cat] = bot_categories.get(cat, 0) + 1
                 devices["bot"] += 1
-                continue  # exclude bots from all counts
+                continue  # exclude bots from visitor / traffic counts
 
             # Skip non-GET requests for page analytics
             if method not in ("GET", "HEAD"):
@@ -1600,6 +1700,23 @@ class MonitorEngine:
             "trending_pages": trending_pages,
             "page_timelines": page_timelines,
             "unique_by_day": unique_by_day,
+            # Security / marketing fields
+            "error_breakdown": {k: v for k, v in sorted(error_code_counts.items())},
+            "hack_attempts": [
+                {"name": k, "count": v}
+                for k, v in sorted(hack_attempt_counts.items(), key=lambda x: -x[1])
+            ],
+            "attacking_ips": [
+                {"name": k, "count": v}
+                for k, v in sorted(attacking_ips.items(), key=lambda x: -x[1])[:20]
+            ],
+            "scanner_uas": [
+                {"name": k, "count": v}
+                for k, v in sorted(scanner_ua_counts.items(), key=lambda x: -x[1])
+            ],
+            "bot_categories": bot_categories,
+            "method_distribution": method_counts,
+            "http_versions": http_version_counts,
             "error": None,
         }
 

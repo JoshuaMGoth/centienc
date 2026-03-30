@@ -210,6 +210,17 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 .c-blue{color:var(--blue)}.c-green{color:var(--green)}.c-orange{color:var(--orange)}
 .c-red{color:var(--red)}.c-purple{color:var(--purple)}.c-teal{color:var(--teal)}
 .c-text2{color:var(--text2)}.c-text3{color:var(--text3)}
+/* ── Security dashboard ── */
+.sec-slabel{background:rgba(248,81,73,.06);border-radius:6px;padding:5px 10px;border-color:rgba(248,81,73,.15)}
+.threat-badge{padding:3px 10px;border-radius:14px;font-size:.72em;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-left:auto}
+.threat-none{background:rgba(63,185,80,.1);color:var(--green);border:1px solid rgba(63,185,80,.25)}
+.threat-low{background:rgba(38,198,218,.1);color:var(--teal);border:1px solid rgba(38,198,218,.25)}
+.threat-medium{background:rgba(210,153,34,.12);color:var(--yellow);border:1px solid rgba(210,153,34,.3)}
+.threat-high{background:rgba(255,167,38,.12);color:var(--orange);border:1px solid rgba(255,167,38,.3)}
+.threat-critical{background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+.sec-kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px}
+@media(max-width:900px){.sec-kpi-row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.sec-kpi-row{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:1100px){.kpi-grid,.a-kpi-grid{grid-template-columns:repeat(3,1fr)}.grid-2,.grid-3{grid-template-columns:1fr}}
 @media(max-width:700px){
   .header-links{display:none}.kpi-grid,.kpi-grid-4,.a-kpi-grid{grid-template-columns:repeat(2,1fr)}
@@ -255,7 +266,6 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
     <a href="/">🏠 Dashboard</a>
     <a href="/map">🗺️ Map</a>
     <a href="/tv">📺 TV</a>
-    <a href="/analytics">📊 Analytics</a>
     <a href="/reports" class="active">📋 Reports</a>
     <a href="/troubleshoot">🛠️ Troubleshoot</a>
     <a href="/updates">📣 Updates</a>
@@ -733,6 +743,41 @@ function buildAnalyticsHTML(d){
   const peakH=t.peak_hour!=null?hourLabel(t.peak_hour):'—';
   const topBrowser=(d.browsers&&d.browsers[0])?d.browsers[0].name:'—';
   const topPage=(d.pages&&d.pages[0])?d.pages[0].name:'—';
+  // ── Security analytics ──────────────────────────────────────
+  const hackAttempts=d.hack_attempts||[], attackingIps=d.attacking_ips||[];
+  const scannerUas=d.scanner_uas||[], botCats=d.bot_categories||{};
+  const errBreakdown=d.error_breakdown||{}, httpVs=d.http_versions||{};
+  const methods=d.method_distribution||{};
+  const totalAttacks=hackAttempts.reduce((s,x)=>s+(x.count||0),0);
+  const totalScanners=scannerUas.reduce((s,x)=>s+(x.count||0),0);
+  const errTotal=Object.values(errBreakdown).reduce((s,v)=>s+v,0);
+  const errRate=total>0?(errTotal/total*100).toFixed(1):'0.0';
+  const threatLevel=totalAttacks>500?'CRITICAL':totalAttacks>100?'HIGH':totalAttacks>20?'MEDIUM':totalAttacks>0?'LOW':'NONE';
+  const threatColors={CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--yellow)',LOW:'var(--teal)',NONE:'var(--green)'};
+  const threatColor=threatColors[threatLevel];
+  // pre-build dynamic blocks to avoid nested backtick issues
+  const hackTypesChart=hackAttempts.length
+    ?'<div class="chart-wrap"><canvas id="aChartHackTypes"></canvas></div>'
+    :'<div class="nodata">No attack patterns detected this period.</div>';
+  const botCatsChart=Object.keys(botCats).length
+    ?'<div class="chart-wrap"><canvas id="aChartBotCats"></canvas></div>'
+    :'<div class="nodata">No bot traffic categorized.</div>';
+  const httpVChart=Object.keys(httpVs).length
+    ?'<div class="chart-wrap"><canvas id="aChartHttpV"></canvas></div>'
+    :'<div class="nodata">No HTTP version data.</div>';
+  const methodChart=Object.keys(methods).length
+    ?'<div class="chart-wrap"><canvas id="aChartMethods"></canvas></div>'
+    :'<div class="nodata">No method data.</div>';
+  const errBreakHTML=Object.keys(errBreakdown).length?buildErrorBreakdown(errBreakdown,total):'';
+  const noAttackBlock=(!hackAttempts.length&&!attackingIps.length)
+    ?'<div class="card" style="margin-top:12px"><div class="nodata" style="color:var(--green)">🛡️ No attack patterns detected. Your site looks clean!</div></div>'
+    :'<div class="grid-2" style="margin-top:12px"><div class="card"><h3>⚔️ Attack Type Breakdown</h3>'+hackTypesChart+'</div><div class="card"><h3>🎯 Top Attacking IPs <span style="font-weight:400;font-size:.8em;color:var(--text3)">by threat score</span></h3>'+buildAttackIpsTable(attackingIps)+'</div></div>';
+  const scannerBlock=scannerUas.length
+    ?buildSimpleTableA(scannerUas,'Tool Name')
+    :'<div class="nodata" style="color:var(--green)">✅ No known scanner tools detected</div>';
+  const errCodeSection=Object.keys(errBreakdown).length
+    ?'<div class="card" style="margin-top:12px"><h3>🔴 HTTP Error Code Breakdown <span style="font-weight:400;font-size:.8em;color:var(--text3)">'+fmt(errTotal)+' errors of '+fmt(total)+' requests ('+errRate+'%)</span></h3>'+errBreakHTML+'</div>'
+    :'';
 
   return `<div class="a-section">
   <div class="a-section-title">📊 Web Traffic Analytics — Last ${activeDays} days
@@ -793,6 +838,45 @@ function buildAnalyticsHTML(d){
     <div class="card"><h3>🔢 HTTP Status Codes</h3>
       <div class="chart-wrap"><canvas id="aChartStatus"></canvas></div></div>
   </div>
+
+  <div class="slabel">👥 Visitor Loyalty &amp; Technology</div>
+  <div class="grid-3">
+    <div class="card"><h3>👥 New vs Returning Visitors</h3>
+      <div class="chart-wrap"><canvas id="aChartNvR"></canvas></div></div>
+    <div class="card"><h3>⚡ HTTP Protocol Versions</h3>${httpVChart}</div>
+    <div class="card"><h3>📡 Request Methods</h3>${methodChart}</div>
+  </div>
+
+  <div class="slabel sec-slabel">🛡️ Security Intelligence Dashboard
+    <span class="threat-badge threat-${threatLevel.toLowerCase()}">${threatLevel}</span>
+  </div>
+  <div class="sec-kpi-row">
+    <div class="a-kpi"><div class="a-kpi-label">Threat Level</div>
+      <div class="a-kpi-val" style="color:${threatColor}">${threatLevel}</div>
+      <div class="a-kpi-sub">${fmt(totalAttacks)} signals detected</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Attack Signals</div>
+      <div class="a-kpi-val c-red">${fmt(totalAttacks)}</div>
+      <div class="a-kpi-sub">${hackAttempts.length} type${hackAttempts.length===1?'':'s'} identified</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Hostile IPs</div>
+      <div class="a-kpi-val c-orange">${attackingIps.length}</div>
+      <div class="a-kpi-sub">unique attacking sources</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Scanner Probes</div>
+      <div class="a-kpi-val c-purple">${fmt(totalScanners)}</div>
+      <div class="a-kpi-sub">${scannerUas.length} tool${scannerUas.length===1?'':'s'} detected</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Error Rate</div>
+      <div class="a-kpi-val" style="color:${parseFloat(errRate)>10?'var(--red)':parseFloat(errRate)>5?'var(--orange)':'var(--teal)'}">${errRate}%</div>
+      <div class="a-kpi-sub">${fmt(errTotal)} error responses</div></div>
+  </div>
+
+  ${noAttackBlock}
+
+  <div class="grid-2" style="margin-top:12px">
+    <div class="card"><h3>🔬 Scanner &amp; Exploit Tools</h3>${scannerBlock}</div>
+    <div class="card"><h3>🤖 Bot &amp; Crawler Categories</h3>${botCatsChart}</div>
+  </div>
+
+  ${errCodeSection}
+
 </div>`;
 }
 
@@ -884,6 +968,48 @@ function buildSimpleTableA(rows,colLabel){
       <td class="scount">${fmt(r.count)}</td></tr>`;
   });
   return html+'</tbody></table>';
+}
+
+// ── Attack IPs table ──────────────────────────────────────────
+function buildAttackIpsTable(ips){
+  if(!ips||!ips.length) return '<div class="nodata">No hostile IP data yet.</div>';
+  const max=ips[0].count||1;
+  let html='<table class="stbl"><thead><tr><th>#</th><th>IP Address</th><th style="text-align:right">Threat Score</th></tr></thead><tbody>';
+  ips.slice(0,15).forEach((r,i)=>{
+    const pct=Math.round((r.count||0)/max*100);
+    const col=pct>66?'var(--red)':pct>33?'var(--orange)':'var(--text2)';
+    html+=`<tr><td class="srank">${i+1}</td>
+      <td class="sname mono">${esc(r.name)}<div class="bar-mini"><div class="bar-fill" style="width:${pct}%;background:${col}"></div></div></td>
+      <td class="scount" style="color:${col}">${r.count}</td></tr>`;
+  });
+  return html+'</tbody></table>';
+}
+
+// ── Error code breakdown ───────────────────────────────────────
+function buildErrorBreakdown(errBreakdown, totalViews){
+  const codes=Object.entries(errBreakdown).sort((a,b)=>b[1]-a[1]);
+  if(!codes.length) return '<div class="nodata">No errors recorded.</div>';
+  const codeDescs={'400':'Bad Request','401':'Unauthorized','403':'Forbidden',
+    '404':'Not Found','405':'Method Not Allowed','408':'Request Timeout',
+    '429':'Too Many Requests','500':'Internal Server Error',
+    '502':'Bad Gateway','503':'Service Unavailable','504':'Gateway Timeout'};
+  const max=codes[0][1]||1;
+  let html='<div style="display:flex;flex-direction:column;gap:7px;margin-top:6px">';
+  codes.forEach(([code,count])=>{
+    const pct=Math.round(count/max*100);
+    const rPct=totalViews>0?((count/totalViews)*100).toFixed(2):'0.00';
+    const col=code.startsWith('5')?'var(--red)':code==='429'?'var(--orange)':code==='403'?'var(--purple)':code==='404'?'var(--yellow)':'var(--text2)';
+    const lbl=codeDescs[code]||'Unknown';
+    html+=`<div style="display:flex;align-items:center;gap:10px;font-size:.82em">
+      <span style="font-family:monospace;font-weight:700;color:${col};min-width:36px">${esc(code)}</span>
+      <span style="color:var(--text3);min-width:140px">${esc(lbl)}</span>
+      <div style="flex:1;height:6px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col};border-radius:3px"></div></div>
+      <span style="color:${col};font-weight:600;min-width:44px;text-align:right">${fmt(count)}</span>
+      <span style="color:var(--text3);min-width:42px;text-align:right;font-size:.85em">${rPct}%</span>
+    </div>`;
+  });
+  return html+'</div>';
 }
 
 // ── Build all analytics Chart.js instances ─────────────────────
@@ -986,6 +1112,82 @@ function buildAnalyticsCharts(d){
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,color:TC}}}}
   });
+
+  // ── Visitor loyalty + tech charts ─────────────────────────────
+  const nvr2=d.new_vs_returning||{};
+  charts.aNvR=new Chart(document.getElementById('aChartNvR'),{
+    type:'doughnut',
+    data:{labels:['New Visitors','Returning'],
+      datasets:[{data:[nvr2.new||0,nvr2.returning||0],
+        backgroundColor:['rgba(102,187,106,.75)','rgba(88,166,255,.75)'],
+        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10,color:TC}}}}
+  });
+
+  const httpVs2=d.http_versions||{};
+  if(Object.keys(httpVs2).length&&document.getElementById('aChartHttpV')){
+    charts.aHttpV=new Chart(document.getElementById('aChartHttpV'),{
+      type:'bar',
+      data:{labels:Object.keys(httpVs2),
+        datasets:[{label:'Requests',data:Object.values(httpVs2),
+          backgroundColor:'rgba(38,198,218,.6)',borderColor:'rgba(38,198,218,.9)',
+          borderWidth:1,borderRadius:4}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:GC},ticks:{color:TC}},
+                y:{grid:{color:GC},ticks:{color:TC},beginAtZero:true}}}
+    });
+  }
+
+  const mths=d.method_distribution||{};
+  if(Object.keys(mths).length&&document.getElementById('aChartMethods')){
+    const mKeys=Object.keys(mths).sort((a,b)=>mths[b]-mths[a]);
+    const mCols={GET:'rgba(88,166,255,.7)',POST:'rgba(102,187,106,.7)',HEAD:'rgba(255,167,38,.7)',
+      PUT:'rgba(171,71,188,.7)',DELETE:'rgba(248,81,73,.7)',OPTIONS:'rgba(38,198,218,.7)',PATCH:'rgba(255,202,40,.7)'};
+    charts.aMethods=new Chart(document.getElementById('aChartMethods'),{
+      type:'bar',
+      data:{labels:mKeys,
+        datasets:[{label:'Count',data:mKeys.map(k=>mths[k]),
+          backgroundColor:mKeys.map(k=>mCols[k]||'rgba(158,158,158,.7)'),
+          borderWidth:1,borderRadius:4}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:GC},ticks:{color:TC},beginAtZero:true},
+                y:{grid:{color:'transparent'},ticks:{color:TC}}}}
+    });
+  }
+
+  // ── Security charts ────────────────────────────────────────────
+  const ha=d.hack_attempts||[];
+  if(ha.length&&document.getElementById('aChartHackTypes')){
+    charts.aHackTypes=new Chart(document.getElementById('aChartHackTypes'),{
+      type:'bar',
+      data:{labels:ha.map(x=>x.name),
+        datasets:[{label:'Signals',data:ha.map(x=>x.count),
+          backgroundColor:'rgba(248,81,73,.65)',borderColor:'rgba(248,81,73,.9)',
+          borderWidth:1,borderRadius:4}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:GC},ticks:{color:TC},beginAtZero:true},
+                y:{grid:{color:'transparent'},ticks:{color:TC,font:{size:10}}}}}
+    });
+  }
+
+  const bc=d.bot_categories||{};
+  if(Object.keys(bc).length&&document.getElementById('aChartBotCats')){
+    const bcKeys=Object.keys(bc);
+    const bcPal=['rgba(88,166,255,.75)','rgba(102,187,106,.75)','rgba(255,167,38,.75)',
+      'rgba(248,81,73,.75)','rgba(171,71,188,.75)','rgba(38,198,218,.75)'];
+    charts.aBotCats=new Chart(document.getElementById('aChartBotCats'),{
+      type:'doughnut',
+      data:{labels:bcKeys,
+        datasets:[{data:bcKeys.map(k=>bc[k]),
+          backgroundColor:bcPal.slice(0,bcKeys.length),
+          borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:6}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:8,color:TC}}}}
+    });
+  }
 }
 
 // ── Render: Incidents ─────────────────────────────────────────
