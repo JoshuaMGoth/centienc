@@ -241,6 +241,7 @@ let currentData = null;
 let sortCol = 'count';
 let sortDir = -1;
 let expandedIdx = -1;
+let _refreshTimer = null;
 
 // ── Utilities ──────────────────────────────────────────────────
 function fmt(n){
@@ -320,7 +321,11 @@ async function loadAnalytics(){
     currentData = d;
     sortCol = 'count'; sortDir = -1; expandedIdx = -1;
     render(d);
-    document.getElementById('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString();
+    const now = new Date().toLocaleTimeString();
+    document.getElementById('lastUpdated').textContent='Updated '+now+' · auto-refresh in 5 min';
+    // Schedule next auto-refresh
+    clearTimeout(_refreshTimer);
+    _refreshTimer = setTimeout(loadAnalytics, 5*60*1000);
   }catch(e){
     showError(e.message||'Unknown error');
   }
@@ -340,7 +345,37 @@ function showError(msg){
 
 // ── Main render ────────────────────────────────────────────────
 function render(d){
+  // SSH / log-read error
+  if(d.error){
+    document.getElementById('mainContent').innerHTML=
+      `<div class="state-overlay"><div class="error-box">
+        ⚠️ Could not read log data<br>
+        <code style="font-size:.8em;opacity:.65;word-break:break-all">${esc(d.error)}</code><br><br>
+        <small style="color:rgba(255,255,255,.35)">Check that this website has a valid
+        <strong>Log Path</strong> set in <a href="/admin" style="color:#58a6ff">Admin</a>
+        and that SSH access is working
+        (<a href="/troubleshoot" style="color:#58a6ff">Troubleshoot</a>).</small>
+      </div></div>`;
+    return;
+  }
+
   const t      = d.totals||{};
+  // No traffic in the selected period
+  if(!(t.views)){
+    document.getElementById('mainContent').innerHTML=
+      `<div class="state-overlay"><div class="error-box"
+        style="background:rgba(88,166,255,.06);border-color:rgba(88,166,255,.2);color:var(--text2)">
+        📊 No traffic data for this period.<br>
+        <small style="display:block;margin-top:8px;color:var(--text3);line-height:1.7">
+          <strong>Possible causes:</strong><br>
+          • Log path not set — configure it in <a href="/admin" style="color:#58a6ff">Admin</a><br>
+          • Website had no visitors in the last ${activeDays} days<br>
+          • SSH connection issue — see <a href="/troubleshoot" style="color:#58a6ff">Troubleshoot</a>
+        </small>
+      </div></div>`;
+    return;
+  }
+
   const nvr    = d.new_vs_returning||{};
   const total  = t.views||0;
   const humanT = (d.devices?.desktop||0)+(d.devices?.mobile||0)+(d.devices?.tablet||0)||1;
