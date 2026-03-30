@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+import base64
+from datetime import date, datetime, timezone
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -32,6 +35,58 @@ from .notifications import send_notification, test_channel
 from .reports import build_report_data, export_csv, export_html, export_pdf_html
 
 logger = logging.getLogger("centient.app")
+
+# ── Pro License System ────────────────────────────────────────────────────────
+# Set CENTIENT_LICENSE_SECRET in the environment for customer deployments.
+# If the env var is NOT set (default / self-hosted), all pro features are unlocked.
+_LICENSE_SECRET: str = os.getenv("CENTIENT_LICENSE_SECRET", "")
+
+
+def _validate_license_key(key: str) -> dict:
+    """Validate a CentienC Pro license key.
+    Key format: CENT-{base64url_payload}-{hmac16upper}
+    If _LICENSE_SECRET is not set, every install runs as Pro (self-hosted mode).
+    """
+    if not _LICENSE_SECRET:
+        return {"valid": True, "tier": "pro", "domain": "self-hosted",
+                "expires": None, "message": "Self-hosted mode — all features unlocked"}
+    if not key:
+        return {"valid": False, "tier": None, "domain": None, "expires": None,
+                "message": "No license key configured"}
+    try:
+        parts = key.strip().split("-")
+        if len(parts) < 3 or parts[0].upper() != "CENT":
+            return {"valid": False, "tier": None, "domain": None, "expires": None,
+                    "message": "Invalid key format"}
+        payload_b64 = parts[1]
+        sig = parts[2].upper()
+        # Constant-time HMAC compare
+        expected = hmac.new(_LICENSE_SECRET.encode(),
+                            payload_b64.encode(), hashlib.sha256).hexdigest()[:16].upper()
+        if not hmac.compare_digest(sig, expected):
+            return {"valid": False, "tier": None, "domain": None, "expires": None,
+                    "message": "Invalid license signature"}
+        pad = (4 - len(payload_b64) % 4) % 4
+        payload = json.loads(base64.b64decode(payload_b64 + "=" * pad).decode())
+        expires = payload.get("expires")
+        if expires and date.fromisoformat(expires) < date.today():
+            return {"valid": False, "tier": None, "domain": None, "expires": expires,
+                    "message": f"License expired {expires}"}
+        return {"valid": True, "tier": payload.get("tier", "pro"),
+                "domain": payload.get("domain"), "expires": expires,
+                "message": "License valid"}
+    except Exception:
+        return {"valid": False, "tier": None, "domain": None, "expires": None,
+                "message": "License validation error"}
+
+
+async def _require_pro(request: Request) -> None:
+    """Raise HTTP 402 if a valid Pro license is not active."""
+    key = await db.get_setting("pro_license_key", "")
+    result = _validate_license_key(key)
+    if not result["valid"]:
+        raise HTTPException(402, detail={"pro_required": True, "message": result["message"]})
+
 
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -1146,7 +1201,8 @@ async def get_settings(request: Request):
 async def update_settings(request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
-    safe_keys = {"app_title", "theme", "check_interval", "retention_days", "notifications_enabled", "auth_enabled"}
+    safe_keys = {"app_title", "theme", "check_interval", "retention_days",
+                 "notifications_enabled", "auth_enabled", "pro_license_key"}
     data = {k: str(v) for k, v in body.items() if k in safe_keys}
     await db.update_settings(data)
     return {"ok": True}
@@ -1328,6 +1384,27 @@ async def test_push(request: Request):
 #  Web Analytics API
 # ═══════════════════════════════════════════════════════════════════
 
+@app.get("/api/license")
+async def get_license(request: Request):
+    """Return current Pro license status."""
+    await _require_auth_or_401(request)
+    key = await db.get_setting("pro_license_key", "")
+    result = _validate_license_key(key)
+    return {"ok": True, **result}
+
+
+@app.post("/api/license")
+async def set_license(request: Request):
+    """Validate and save a Pro license key."""
+    await _require_auth_or_401(request)
+    body = await request.json()
+    key = str(body.get("key", "")).strip()
+    result = _validate_license_key(key)
+    if result["valid"] and _LICENSE_SECRET:  # only persist when secret is set (not self-hosted)
+        await db.set_setting("pro_license_key", key)
+    return {"ok": True, **result}
+
+
 @app.get("/api/analytics")
 async def api_analytics(request: Request):
     """Deep nginx log parse for web analytics.
@@ -1338,6 +1415,7 @@ async def api_analytics(request: Request):
         days       (int, default 30) – How many days of history to analyse
     """
     await _require_auth_or_401(request)
+    await _require_pro(request)
     days = max(1, min(int(request.query_params.get("days", "30")), 365))
 
     log_path: str | None = None
@@ -1443,6 +1521,7 @@ async def health():
 async def api_reports_summary(request: Request):
     """Overview report data for all targets."""
     await _require_auth_or_401(request)
+    await _require_pro(request)
     days = max(1, min(int(request.query_params.get("days", "7")), 365))
     data = await build_report_data(db, engine, "overview", days)
     return {"ok": True, **data}
@@ -1452,6 +1531,7 @@ async def api_reports_summary(request: Request):
 async def api_reports_detail(request: Request, target_type: str, target_id: int):
     """Drillable detail report for a single target."""
     await _require_auth_or_401(request)
+    await _require_pro(request)
     if target_type not in ("server", "website", "service"):
         raise HTTPException(400, "target_type must be server, website, or service")
     days = max(1, min(int(request.query_params.get("days", "7")), 365))
@@ -1543,6 +1623,7 @@ async def api_reports_detail(request: Request, target_type: str, target_id: int)
 async def api_reports_incidents(request: Request):
     """Incident report, optionally filtered by target."""
     await _require_auth_or_401(request)
+    await _require_pro(request)
     days = max(1, min(int(request.query_params.get("days", "7")), 365))
     tt = request.query_params.get("target_type")
     tid_str = request.query_params.get("target_id")
@@ -1557,6 +1638,7 @@ async def api_reports_incidents(request: Request):
 async def api_reports_bans(request: Request):
     """Fail2ban report across all servers."""
     await _require_auth_or_401(request)
+    await _require_pro(request)
     days = max(1, min(int(request.query_params.get("days", "7")), 365))
     data = await build_report_data(db, engine, "bans", days)
     return {"ok": True, **data}
@@ -1564,15 +1646,9 @@ async def api_reports_bans(request: Request):
 
 @app.get("/api/reports/export")
 async def api_reports_export(request: Request):
-    """Export a report as CSV, HTML, or PDF.
-
-    Query params:
-        format: csv | html | pdf
-        report_type: overview | server | website | service | incidents | bans
-        days: int (default 7)
-        target_type + target_id: optional drill-down filter
-    """
+    """Export a report as CSV, HTML, or PDF."""
     await _require_auth_or_401(request)
+    await _require_pro(request)
     fmt = request.query_params.get("format", "csv").lower()
     if fmt not in ("csv", "html", "pdf"):
         raise HTTPException(400, "format must be csv, html, or pdf")

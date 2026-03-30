@@ -7,10 +7,6 @@
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="shortcut icon" href="/static/favicon.ico">
 <link rel="apple-touch-icon" href="/static/centienc-logo.png">
-<meta property="og:type" content="website">
-<meta property="og:title" content="CentienC — Reports">
-<meta property="og:description" content="Comprehensive uptime, traffic, and security reports.">
-<meta property="og:image" content="/static/centienc-og.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -72,8 +68,11 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
 .card h3{font-size:.9em;font-weight:600;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:7px}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .chart-wrap{position:relative;height:260px}
 .chart-wrap-sm{position:relative;height:180px}
+.chart-wrap-xs{position:relative;height:140px}
+/* ── Uptime bar ── */
 .sla-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;
   font-size:.74em;font-weight:700;letter-spacing:.02em;white-space:nowrap}
 .sla-aplus{background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
@@ -85,6 +84,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
   justify-content:center;font-weight:900;font-size:1.1em}
 .uptime-bar{width:100%;height:7px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden}
 .uptime-fill{height:100%;border-radius:4px;transition:width .5s ease}
+/* ── Status grid ── */
 .status-grid-wrap{overflow-x:auto;padding-bottom:4px}
 .status-grid{display:flex;gap:3px;flex-wrap:wrap}
 .sg-day{width:14px;height:14px;border-radius:3px;cursor:default;transition:.1s;flex-shrink:0}
@@ -93,6 +93,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 .sg-legend-item{display:flex;align-items:center;gap:4px}
 .sg-legend-dot{width:12px;height:12px;border-radius:3px}
 .sg-summary{font-size:.75em;color:var(--text2);margin-top:8px;display:flex;gap:16px;flex-wrap:wrap}
+/* ── Tables ── */
 .rtbl{width:100%;border-collapse:collapse;font-size:.84em}
 .rtbl thead th{color:var(--text3);font-weight:600;text-transform:uppercase;font-size:.69em;
   letter-spacing:.05em;padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
@@ -112,16 +113,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 .badge-resolved{background:rgba(63,185,80,.1);color:var(--green);border:1px solid rgba(63,185,80,.2)}
 .badge-type{background:rgba(88,166,255,.1);color:var(--blue);border:1px solid rgba(88,166,255,.2);
   font-size:.7em;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.04em}
-.traffic-section{background:var(--surface2);border:1px solid rgba(88,166,255,.15);
-  border-radius:12px;padding:18px;margin-top:0}
-.traffic-loading{color:var(--text3);font-size:.83em;padding:14px 0;text-align:center}
-.traffic-mini-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
-.tmk{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center}
-.tmk-val{font-size:1.4em;font-weight:700}
-.tmk-lbl{font-size:.67em;color:var(--text3);margin-top:3px;text-transform:uppercase}
-.back-link{display:inline-flex;align-items:center;gap:6px;color:var(--blue);text-decoration:none;
-  font-size:.85em;padding:4px 0;margin-bottom:14px;transition:.15s}
-.back-link:hover{color:#fff}
+/* ── Insight strip ── */
 .insight-strip{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 0}
 .insight{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
   padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:.82em}
@@ -129,6 +121,84 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 .insight-body{display:flex;flex-direction:column;gap:2px}
 .insight-val{font-weight:700}
 .insight-lbl{color:var(--text3);font-size:.88em}
+/* ── Back link ── */
+.back-link{display:inline-flex;align-items:center;gap:6px;color:var(--blue);text-decoration:none;
+  font-size:.85em;padding:4px 0;margin-bottom:14px;transition:.15s}
+.back-link:hover{color:#fff}
+/* ── Analytics section in reports ── */
+.a-section{background:var(--surface2);border:1px solid rgba(88,166,255,.12);
+  border-radius:14px;padding:20px;margin-top:0}
+.a-section-title{font-size:.95em;font-weight:700;color:var(--teal);margin-bottom:16px;
+  display:flex;align-items:center;gap:8px}
+.a-kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:4px}
+.a-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.a-kpi-label{font-size:.65em;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.a-kpi-val{font-size:1.6em;font-weight:700;line-height:1}
+.a-kpi-sub{font-size:.68em;color:var(--text3);margin-top:3px}
+/* ── Heatmap ── */
+.heatmap-wrap{overflow-x:auto}
+.heatmap-grid{display:grid;grid-template-columns:44px repeat(24,1fr);gap:2px;min-width:520px}
+.hm-hour-lbl{font-size:.6em;color:var(--text3);text-align:center;padding-bottom:4px;white-space:nowrap}
+.hm-day-lbl{font-size:.7em;color:var(--text2);display:flex;align-items:center;justify-content:flex-end;padding-right:6px;white-space:nowrap}
+.hm-cell{height:20px;border-radius:3px;cursor:default;transition:.1s}
+.hm-cell:hover{outline:1px solid rgba(255,255,255,.4);z-index:2}
+.hm-peak-note{font-size:.72em;color:var(--text3);margin-top:10px;text-align:center}
+/* ── Source list ── */
+.src-list{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.src-item{display:flex;align-items:center;gap:8px;font-size:.82em}
+.src-icon{width:22px;text-align:center}
+.src-label{flex:1;color:var(--text2)}
+.src-bar-wrap{width:70px;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.src-bar-fill{height:100%;border-radius:3px}
+.src-count{color:var(--blue);font-weight:600;min-width:32px;text-align:right}
+.src-pct{color:var(--text3);font-size:.78em;min-width:30px;text-align:right}
+/* ── Device pills ── */
+.dev-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.dev-pill{background:var(--surface3);border:1px solid var(--border);border-radius:8px;
+  padding:9px 13px;flex:1;min-width:75px;text-align:center}
+.dev-pill-icon{font-size:1.2em;display:block;margin-bottom:3px}
+.dev-pill-val{font-size:1.05em;font-weight:700;color:var(--blue)}
+.dev-pill-lbl{font-size:.62em;color:var(--text3);margin-top:2px}
+/* ── Simple table ── */
+.stbl{width:100%;border-collapse:collapse;font-size:.81em}
+.stbl th{color:var(--text3);font-weight:600;text-transform:uppercase;font-size:.67em;
+  letter-spacing:.04em;padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)}
+.stbl td{padding:5px 8px;border-top:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.stbl tr:hover td{background:rgba(255,255,255,.03)}
+.stbl .srank{color:var(--text3);font-size:.78em;width:22px}
+.stbl .sname{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:'SF Mono',Consolas,monospace;font-size:.87em}
+.stbl .scount{text-align:right;color:var(--blue);font-weight:600;white-space:nowrap}
+.bar-mini{height:3px;border-radius:2px;background:rgba(88,166,255,.12);margin-top:3px}
+.bar-fill{height:100%;background:var(--blue);border-radius:2px}
+/* ── Privacy badge ── */
+.privacy-badge{display:inline-flex;align-items:center;gap:7px;font-size:.73em;
+  color:var(--text3);border:1px solid rgba(255,255,255,.06);border-radius:20px;
+  padding:3px 12px;margin-bottom:14px;background:rgba(255,255,255,.02)}
+/* ── Pro wall ── */
+.pro-wall{position:fixed;inset:0;z-index:999;background:rgba(13,17,23,.97);
+  backdrop-filter:blur(14px);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;padding:40px;text-align:center}
+.pro-wall h2{color:var(--text);font-size:1.5em;font-weight:700;margin:0}
+.pro-wall p{color:var(--text2);max-width:500px;line-height:1.8;font-size:.92em;margin:0}
+.pro-plans{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.pro-plan{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:20px 26px;min-width:150px;text-align:center}
+.pro-plan.featured{border-color:rgba(88,166,255,.4);background:rgba(88,166,255,.05)}
+.pro-plan-name{font-size:.72em;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.pro-plan-price{font-size:1.9em;font-weight:900;color:var(--text)}
+.pro-plan-period{font-size:.7em;color:var(--text3)}
+.pro-plan-features{font-size:.79em;color:var(--text2);margin-top:10px;line-height:2;text-align:left}
+.pro-key-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.pro-key-input{border:1px solid rgba(255,255,255,.2);border-radius:8px;background:rgba(255,255,255,.06);
+  color:var(--text);padding:10px 16px;font-size:.9em;outline:none;width:290px;letter-spacing:.04em}
+.pro-key-input::placeholder{color:var(--text3)}
+.pro-key-input:focus{border-color:rgba(88,166,255,.5)}
+.pro-activate-btn{background:rgba(88,166,255,.2);border:1px solid rgba(88,166,255,.4);
+  color:var(--blue);border-radius:8px;padding:10px 22px;cursor:pointer;font-size:.9em;
+  font-weight:600;transition:.15s}
+.pro-activate-btn:hover{background:rgba(88,166,255,.35)}
+/* ── Settings row ── */
 .settings-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border);
   margin-top:20px;font-size:.8em;color:var(--text3);flex-wrap:wrap}
 .settings-row input[type=number]{width:64px;border:1px solid rgba(255,255,255,.15);border-radius:6px;
@@ -136,18 +206,44 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
 .save-btn{background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3);color:var(--green);
   border-radius:7px;padding:4px 12px;cursor:pointer;font-size:.85em;transition:.15s}
 .save-btn:hover{background:rgba(63,185,80,.25)}
+/* ── Color helpers ── */
 .c-blue{color:var(--blue)}.c-green{color:var(--green)}.c-orange{color:var(--orange)}
 .c-red{color:var(--red)}.c-purple{color:var(--purple)}.c-teal{color:var(--teal)}
 .c-text2{color:var(--text2)}.c-text3{color:var(--text3)}
-@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.grid-2{grid-template-columns:1fr}}
+@media(max-width:1100px){.kpi-grid,.a-kpi-grid{grid-template-columns:repeat(3,1fr)}.grid-2,.grid-3{grid-template-columns:1fr}}
 @media(max-width:700px){
-  .header-links{display:none}.kpi-grid,.kpi-grid-4{grid-template-columns:repeat(2,1fr)}
+  .header-links{display:none}.kpi-grid,.kpi-grid-4,.a-kpi-grid{grid-template-columns:repeat(2,1fr)}
   .page{padding:14px 14px 80px}.controls{flex-direction:column;align-items:flex-start}
   .export-btns{margin-left:0}.kpi-val{font-size:1.5em}
 }
 </style>
 </head>
 <body>
+
+<!-- Pro Wall -->
+<div id="proWall" class="pro-wall" style="display:none">
+  <div style="font-size:3em">🔒</div>
+  <h2>CentienC Pro — Reports &amp; Analytics</h2>
+  <p>Comprehensive reports with SLA tracking, MTTR, traffic analytics, heatmaps, device/browser breakdown, referrers, and export are part of <strong style="color:var(--blue)">CentienC Pro</strong>.</p>
+  <div class="pro-plans">
+    <div class="pro-plan">
+      <div class="pro-plan-name">Starter</div>
+      <div class="pro-plan-price">$9<span class="pro-plan-period">/mo</span></div>
+      <div class="pro-plan-features">✓ Analytics<br>✓ Reports<br>✓ 3 websites<br>✓ 90-day history</div>
+    </div>
+    <div class="pro-plan featured">
+      <div class="pro-plan-name">Pro ⭐</div>
+      <div class="pro-plan-price">$29<span class="pro-plan-period">/mo</span></div>
+      <div class="pro-plan-features">✓ Everything<br>✓ Unlimited sites<br>✓ 1-year history<br>✓ CSV/PDF export</div>
+    </div>
+  </div>
+  <p style="font-size:.83em">Contact <a href="mailto:support@centienc.com" style="color:var(--blue)">support@centienc.com</a> to get started · or enter your license key:</p>
+  <div class="pro-key-row">
+    <input id="licKeyInput" class="pro-key-input" type="text" placeholder="CENT-XXXXXXXXXXXX-XXXXXXXX" autocomplete="off" spellcheck="false">
+    <button class="pro-activate-btn" onclick="activateLicense()">Activate</button>
+  </div>
+  <div id="licMsg" style="font-size:.81em;color:var(--red);min-height:18px"></div>
+</div>
 
 <div class="header">
   <h1>
@@ -218,86 +314,111 @@ let currentDetail = null;
 // ── Utilities ──────────────────────────────────────────────────
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
 function fmt(n){ n=Math.round(n||0); return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n) }
-function destroyCharts(){ Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}}); charts={} }
+function fmtPct(n){ return (n||0).toFixed(1)+'%' }
+function hourLabel(h){ const s=h%12||12,ap=h<12?'am':'pm'; return s+ap }
+function weekdayLabel(i){ return['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i] }
+function uptimeColor(p){ return p>=99.9?'#3fb950':p>=99?'#66bb6a':p>=95?'#ffa726':p>=90?'#ff7043':'#f85149' }
 function formatDuration(sec){
-  if(!sec && sec!==0) return '—';
+  if(!sec&&sec!==0) return '—';
   const s=Math.floor(sec);
   if(s<60) return s+'s';
-  const m=Math.floor(s/60), r=s%60;
+  const m=Math.floor(s/60),r=s%60;
   if(m<60) return m+'m'+(r?' '+r+'s':'');
-  const h=Math.floor(m/60), rm=m%60;
+  const h=Math.floor(m/60),rm=m%60;
   return h+'h'+(rm?' '+rm+'m':'');
 }
-function uptimeColor(p){
-  return p>=99.9?'#3fb950':p>=99?'#66bb6a':p>=95?'#ffa726':p>=90?'#ff7043':'#f85149';
+function destroyCharts(){
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
+  charts={};
 }
 
-// ── SLA Compliance ─────────────────────────────────────────────
-function calcSLA(pct, days){
-  const downMin = (1-pct/100)*days*1440;
-  const tiers = [
+// ── Pro License ────────────────────────────────────────────────
+async function checkProLicense(){
+  try{
+    const r = await fetch('/api/license');
+    if(!r.ok) return true;
+    const d = await r.json();
+    if(!d.valid){
+      document.getElementById('proWall').style.display='flex';
+      return false;
+    }
+    return true;
+  }catch(e){ return true; }
+}
+async function activateLicense(){
+  const key = (document.getElementById('licKeyInput').value||'').trim();
+  const msg = document.getElementById('licMsg');
+  if(!key){ msg.textContent='Enter a license key'; return; }
+  try{
+    const r = await fetch('/api/license',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+    const d = await r.json();
+    if(d.valid){
+      document.getElementById('proWall').style.display='none';
+      initReports();
+    } else {
+      msg.textContent = d.message||'Invalid license key';
+    }
+  }catch(e){ msg.textContent='Error validating key'; }
+}
+
+// ── SLA / Grade / MTTR / Status Grid ──────────────────────────
+function calcSLA(pct,days){
+  const downMin=(1-pct/100)*days*1440;
+  const tiers=[
     {label:'99.9% SLA',thr:99.9,cls:'sla-aplus'},
     {label:'99.5% SLA',thr:99.5,cls:'sla-a'},
-    {label:'99% SLA',  thr:99.0,cls:'sla-b'},
-    {label:'95% SLA',  thr:95.0,cls:'sla-c'},
+    {label:'99% SLA',thr:99.0,cls:'sla-b'},
+    {label:'95% SLA',thr:95.0,cls:'sla-c'},
   ];
-  const t = tiers.find(t=>pct>=t.thr)||{label:'Below 95%',cls:'sla-fail'};
-  return {tier:t.label, cls:t.cls, downtimeMin:Math.round(downMin)};
+  const t=tiers.find(t=>pct>=t.thr)||{label:'Below 95%',cls:'sla-fail'};
+  return {tier:t.label,cls:t.cls,downtimeMin:Math.round(downMin)};
 }
-function slaHTML(pct, days){ const s=calcSLA(pct,days); return `<span class="sla-badge ${s.cls}">✓ ${esc(s.tier)}</span>`; }
-
-// ── Reliability Grade ──────────────────────────────────────────
+function slaHTML(pct,days){ const s=calcSLA(pct,days); return `<span class="sla-badge ${s.cls}">✓ ${esc(s.tier)}</span>`; }
 function reliabilityGrade(p){
-  if(p>=99.9) return {grade:'A+',color:'#3fb950'};
-  if(p>=99.5) return {grade:'A', color:'#66bb6a'};
-  if(p>=99.0) return {grade:'B', color:'#ffc107'};
-  if(p>=95.0) return {grade:'C', color:'#ffa726'};
-  if(p>=90.0) return {grade:'D', color:'#ff7043'};
-  return {grade:'F',color:'#f85149'};
+  if(p>=99.9) return{grade:'A+',color:'#3fb950'};
+  if(p>=99.5) return{grade:'A',color:'#66bb6a'};
+  if(p>=99.0) return{grade:'B',color:'#ffc107'};
+  if(p>=95.0) return{grade:'C',color:'#ffa726'};
+  if(p>=90.0) return{grade:'D',color:'#ff7043'};
+  return{grade:'F',color:'#f85149'};
 }
-
-// ── MTTR ───────────────────────────────────────────────────────
 function calcMTTR(inc){
-  const res = (inc||[]).filter(i=>i.status==='resolved'&&i.duration>0);
-  return res.length ? Math.round(res.reduce((s,i)=>s+i.duration,0)/res.length) : null;
+  const res=(inc||[]).filter(i=>i.status==='resolved'&&i.duration>0);
+  return res.length?Math.round(res.reduce((s,i)=>s+i.duration,0)/res.length):null;
 }
-
-// ── Status History Grid ────────────────────────────────────────
-function buildStatusGrid(daily_data, days){
+function buildStatusGrid(daily_data,days){
   const map={};
   (daily_data||[]).forEach(d=>{ const k=d.date||d.day; if(k) map[k]=d.uptime_pct; });
   const today=new Date(), dots=[];
   for(let i=days-1;i>=0;i--){
     const dt=new Date(today); dt.setDate(dt.getDate()-i);
     const key=dt.toISOString().slice(0,10);
-    dots.push({key, pct:map[key]});
+    dots.push({key,pct:map[key]});
   }
   function dotCol(p){
     if(p===undefined||p===null) return 'rgba(255,255,255,.06)';
-    if(p>=99.9) return '#3fb950';
-    if(p>=99)   return '#66bb6a';
-    if(p>=95)   return '#ffa726';
-    if(p>=90)   return '#ff7043';
-    return '#f85149';
+    if(p>=99.9) return '#3fb950'; if(p>=99) return '#66bb6a';
+    if(p>=95) return '#ffa726'; if(p>=90) return '#ff7043'; return '#f85149';
   }
   const pf=dots.filter(d=>d.pct===100).length;
   const pd=dots.filter(d=>d.pct!==undefined&&d.pct<100).length;
   const pn=dots.filter(d=>d.pct===undefined).length;
   let html='<div class="status-grid">';
   dots.forEach(d=>{
-    const tip = d.pct!==undefined ? `${d.key}: ${d.pct.toFixed(1)}% uptime` : `${d.key}: no data`;
-    html += `<div class="sg-day" style="background:${dotCol(d.pct)}" title="${esc(tip)}"></div>`;
+    const tip=d.pct!==undefined?`${d.key}: ${d.pct.toFixed(1)}% uptime`:`${d.key}: no data`;
+    html+=`<div class="sg-day" style="background:${dotCol(d.pct)}" title="${esc(tip)}"></div>`;
   });
-  html += '</div>';
-  html += '<div class="sg-legend">'
+  html+='</div>';
+  html+='<div class="sg-legend">'
     +'<div class="sg-legend-item"><div class="sg-legend-dot" style="background:#3fb950"></div> 100%</div>'
     +'<div class="sg-legend-item"><div class="sg-legend-dot" style="background:#66bb6a"></div> ≥99%</div>'
     +'<div class="sg-legend-item"><div class="sg-legend-dot" style="background:#ffa726"></div> ≥95%</div>'
     +'<div class="sg-legend-item"><div class="sg-legend-dot" style="background:#f85149"></div> &lt;95%</div>'
     +'<div class="sg-legend-item"><div class="sg-legend-dot" style="background:rgba(255,255,255,.06)"></div> No data</div>'
     +'</div>';
-  html += `<div class="sg-summary"><span>📅 ${days}-day view</span><span>✅ ${pf} perfect days</span>`
-    +(pd?`<span>⚠️ ${pd} degraded days</span>`:'')+
+  html+=`<div class="sg-summary"><span>📅 ${days}-day view</span><span>✅ ${pf} perfect days</span>`
+    +(pd?`<span>⚠️ ${pd} degraded</span>`:'')+
     (pn?`<span style="color:var(--text3)">▪ ${pn} no data</span>`:'')+
     '</div>';
   return html;
@@ -329,26 +450,31 @@ async function loadReport(){
     else if(tid) url=`/api/reports/detail/${type}/${tid}?days=${activeDays}`;
     else url=`/api/reports/summary?days=${activeDays}`;
     const r=await fetch(url);
+    if(r.status===402){ showProRequired(); return; }
     const data=await r.json();
     if(!data.ok) throw new Error(data.detail||'API error');
-    if(type==='overview'||(!tid&&['server','website','service'].includes(type))) renderOverview(data);
-    else if(type==='incidents') renderIncidents(data);
+    if(type==='incidents') renderIncidents(data);
     else if(type==='bans') renderBans(data);
-    else renderDetail(data, type, parseInt(tid), null);
+    else if(tid&&['server','website','service'].includes(type)) renderDetail(data,type,parseInt(tid),null);
+    else renderOverview(data);
     document.getElementById('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString();
-  } catch(e){ showError(e.message||'Unknown error'); }
+  }catch(e){ showError(e.message||'Unknown error'); }
+}
+function showProRequired(){
+  document.getElementById('proWall').style.display='flex';
 }
 
 // ── Drill into target ──────────────────────────────────────────
-async function drillInto(type, id, name){
+async function drillInto(type,id,name){
   currentDetail={type,id,name};
   showLoading('Loading detailed report…');
   try{
     const r=await fetch(`/api/reports/detail/${type}/${id}?days=${activeDays}`);
+    if(r.status===402){ showProRequired(); return; }
     const data=await r.json();
     if(!data.ok) throw new Error(data.detail||'API error');
-    renderDetail(data, type, id, name);
-  } catch(e){ showError(e.message||'Unknown error'); }
+    renderDetail(data,type,id,name);
+  }catch(e){ showError(e.message||'Unknown error'); }
 }
 
 // ── Render: Overview ──────────────────────────────────────────
@@ -357,8 +483,6 @@ function renderOverview(data){
   const mttr=calcMTTR(inc);
   const avgUp=t.avg_uptime||100;
   const sla=calcSLA(avgUp,activeDays);
-
-  // Count incidents per target
   const incCounts={};
   inc.forEach(i=>{ const k=`${i.target_type}:${i.target_id}`; incCounts[k]=(incCounts[k]||0)+1; });
 
@@ -380,24 +504,21 @@ function renderOverview(data){
       <div class="kpi-sub">mean time to repair</div></div>
     <div class="kpi"><div class="kpi-label">Platform Health</div>
       <div class="kpi-val" style="font-size:.95em;color:${uptimeColor(avgUp)}">${
-        sla.downtimeMin===0?'✅ Perfect':(sla.downtimeMin<60?'⚠️ Minor issues':'🔴 Outages')}</div>
-      <div class="kpi-sub">${sla.downtimeMin} min downtime total</div></div>
+        sla.downtimeMin===0?'✅ Perfect':(sla.downtimeMin<60?'⚠️ Minor':'🔴 Outages')}</div>
+      <div class="kpi-sub">${sla.downtimeMin} min total downtime</div></div>
   </div>`;
 
   if(sm.length){
     html+=`<div class="slabel">🏁 All Targets — click any row to drill down</div>
     <div class="card" style="margin-bottom:12px">
-      <h3><span class="icon">📊</span> Uptime by Target</h3>
+      <h3>📊 Uptime by Target</h3>
       <div class="chart-wrap-sm" style="margin-bottom:18px"><canvas id="chartUptime"></canvas></div>
-      <div style="overflow-x:auto">
-      <table class="rtbl"><thead><tr>
-        <th>#</th><th>Type</th><th>Target</th>
-        <th style="width:160px">Uptime</th><th>SLA</th>
-        <th>Avg Resp</th><th>Peak Resp</th><th>Checks</th><th>Incidents</th>
+      <div style="overflow-x:auto"><table class="rtbl"><thead><tr>
+        <th>#</th><th>Type</th><th>Target</th><th style="width:160px">Uptime</th>
+        <th>SLA</th><th>Avg Resp</th><th>Checks</th><th>Incidents</th>
       </tr></thead><tbody>`;
     sm.forEach((s,i)=>{
       const c=uptimeColor(s.uptime_pct);
-      const sl=calcSLA(s.uptime_pct,activeDays);
       const iCnt=incCounts[`${s.target_type}:${s.target_id}`]||0;
       html+=`<tr class="clickable" onclick="drillInto('${esc(s.target_type)}',${s.target_id},'${esc(s.name)}')">
         <td class="rank">${i+1}</td>
@@ -409,19 +530,18 @@ function renderOverview(data){
         </div></td>
         <td>${slaHTML(s.uptime_pct,activeDays)}</td>
         <td>${s.avg_response?s.avg_response+' ms':'—'}</td>
-        <td>${s.max_response?s.max_response+' ms':'—'}</td>
         <td>${fmt(s.checks||0)}</td>
         <td>${iCnt>0?`<span style="color:var(--orange);font-weight:600">${iCnt}</span>`:'—'}</td>
       </tr>`;
     });
     html+='</tbody></table></div></div>';
   } else {
-    html+='<div class="card"><div class="nodata">No monitoring data for this period. Configure targets in <a href="/admin" style="color:var(--blue)">Admin</a>.</div></div>';
+    html+='<div class="card"><div class="nodata">No monitoring data. Configure targets in <a href="/admin" style="color:var(--blue)">Admin</a>.</div></div>';
   }
 
   if(inc.length){
     html+=`<div class="slabel">🚨 Recent Incidents</div>
-    <div class="card"><h3><span class="icon">🚨</span> Incident Log</h3>${incidentTableHTML(inc,true)}</div>`;
+    <div class="card"><h3>🚨 Incident Log</h3>${incidentTableHTML(inc,true)}</div>`;
   }
 
   html+='<div class="settings-row"><label>Data retention:</label>'
@@ -430,28 +550,28 @@ function renderOverview(data){
     +'<span id="retentionMsg" style="color:var(--text3);font-size:.8em;margin-left:4px"></span></div>';
   html+='</div>';
   document.getElementById('mainContent').innerHTML=html;
-  if(sm.length) buildOverviewCharts(sm);
+  if(sm.length) buildOverviewChart(sm);
   loadRetention();
 }
 
 // ── Render: Detail ─────────────────────────────────────────────
-function renderDetail(data, type, id, name){
-  // API returns daily_data / hourly_data / recent_checks (or legacy daily / hourly / timeline)
+function renderDetail(data,type,id,name){
   const daily   = data.daily_data   || data.daily   || [];
   const hourly  = data.hourly_data  || data.hourly  || [];
   const timeline= data.recent_checks|| data.timeline || [];
   const incidents=data.incidents    || [];
   const totals  = data.totals       || {};
 
-  const tname = name || data.target_name || ('#'+id);
-  const totalChecks = totals.total_checks || daily.reduce((a,d)=>a+(d.checks||0),0);
-  const uptimePct = totals.uptime_pct ??
-    (daily.length ? daily.reduce((a,d)=>a+(d.uptime_pct||0),0)/daily.length : 100);
-  const avgResp = totals.avg_response || (()=>{
-    const rows=daily.filter(d=>d.avg_response); return rows.length?
-      Math.round(rows.reduce((a,d)=>a+d.avg_response,0)/rows.length):null; })();
-  const maxResp = totals.max_response || (daily.length?Math.max(...daily.map(d=>d.max_response||0)):0);
-  const sla   = calcSLA(uptimePct, activeDays);
+  const tname = name||data.target_name||('#'+id);
+  const totalChecks = totals.total_checks||daily.reduce((a,d)=>a+(d.checks||0),0);
+  const uptimePct = totals.uptime_pct??
+    (daily.length?daily.reduce((a,d)=>a+(d.uptime_pct||0),0)/daily.length:100);
+  const avgResp = totals.avg_response||(()=>{
+    const rows=daily.filter(d=>d.avg_response);
+    return rows.length?Math.round(rows.reduce((a,d)=>a+d.avg_response,0)/rows.length):null;
+  })();
+  const maxResp = totals.max_response||(daily.length?Math.max(...daily.map(d=>d.max_response||0)):0);
+  const sla   = calcSLA(uptimePct,activeDays);
   const grade = reliabilityGrade(uptimePct);
   const mttr  = calcMTTR(incidents);
   const openInc=incidents.filter(i=>i.status==='open').length;
@@ -500,45 +620,44 @@ function renderDetail(data, type, id, name){
 
   if(daily.length){
     html+=`<div class="slabel">📅 ${activeDays}-Day Status History</div>
-    <div class="card"><h3><span class="icon">📅</span> Daily Status Grid — hover each square for details</h3>
+    <div class="card"><h3>📅 Daily Status Grid</h3>
       <div class="status-grid-wrap">${buildStatusGrid(daily,activeDays)}</div></div>
     <div class="slabel">📈 Performance Charts</div>
     <div class="grid-2">
-      <div class="card"><h3><span class="icon">📈</span> Daily Uptime %</h3>
+      <div class="card"><h3>📈 Daily Uptime %</h3>
         <div class="chart-wrap"><canvas id="chartDailyUptime"></canvas></div></div>
-      <div class="card"><h3><span class="icon">⏱️</span> Response Time (ms)</h3>
+      <div class="card"><h3>⏱️ Response Time (ms)</h3>
         <div class="chart-wrap"><canvas id="chartDailyResp"></canvas></div></div>
     </div>`;
   }
 
   if(hourly.length){
     html+=`<div class="slabel">🕐 Hourly Response Breakdown</div>
-    <div class="card"><h3><span class="icon">🕐</span> Avg Response Time by Hour of Day</h3>
+    <div class="card"><h3>🕐 Avg Response by Hour of Day</h3>
       <div class="chart-wrap"><canvas id="chartHourly"></canvas></div></div>`;
   }
 
+  // ── Website: full traffic analytics section ────────────────
   if(type==='website'){
     html+=`<div class="slabel">📊 Web Traffic Analytics</div>
-    <div class="traffic-section">
-      <div class="traffic-loading" id="trafficLoading">⏳ Loading traffic analytics…</div>
-      <div id="trafficContent" style="display:none"></div>
-    </div>`;
+    <div id="analyticsSec"><div class="state-overlay" style="min-height:120px">
+      <div class="spinner"></div><span style="color:var(--text3)">Loading traffic analytics…</span>
+    </div></div>`;
   }
 
   if(daily.length){
     html+=`<div class="slabel">📋 Daily Breakdown</div>
-    <div class="card"><h3><span class="icon">📋</span> Day-by-Day Report</h3>
-    <div style="overflow-x:auto">
-    <table class="rtbl"><thead><tr>
+    <div class="card"><h3>📋 Day-by-Day</h3>
+    <div style="overflow-x:auto"><table class="rtbl"><thead><tr>
       <th>Date</th><th style="width:160px">Uptime</th>
       <th>Avg Resp</th><th>Min</th><th>Max</th><th>Checks</th><th>Down</th>
     </tr></thead><tbody>`;
     daily.forEach(d=>{
-      const dateKey=d.date||d.day||'?';
+      const dk=d.date||d.day||'?';
       const cc=uptimeColor(d.uptime_pct||0);
       const dn=d.down_checks??(d.checks-(d.up_checks||0));
       html+=`<tr>
-        <td class="mono">${esc(dateKey)}</td>
+        <td class="mono">${esc(dk)}</td>
         <td><div style="display:flex;align-items:center;gap:8px">
           <div class="uptime-bar"><div class="uptime-fill" style="width:${Math.min(100,d.uptime_pct||0)}%;background:${cc}"></div></div>
           <span style="color:${cc};font-weight:600;font-size:.84em;min-width:48px">${(d.uptime_pct||0).toFixed(1)}%</span>
@@ -554,14 +673,13 @@ function renderDetail(data, type, id, name){
   }
 
   if(timeline.length){
-    html+=`<div class="slabel">🕒 Recent Status Timeline</div>
-    <div class="card"><h3><span class="icon">🕒</span> Last ${Math.min(timeline.length,50)} Checks</h3>
-    <div style="overflow-x:auto">
-    <table class="rtbl"><thead><tr><th>Time</th><th>Status</th><th>Response</th></tr></thead><tbody>`;
+    html+=`<div class="slabel">🕒 Recent Checks</div>
+    <div class="card"><h3>🕒 Last ${Math.min(timeline.length,50)} Checks</h3>
+    <div style="overflow-x:auto"><table class="rtbl">
+    <thead><tr><th>Time</th><th>Status</th><th>Response</th></tr></thead><tbody>`;
     timeline.slice(0,50).forEach(t=>{
       const ts=t.timestamp||t.checked_at||'?';
-      html+=`<tr>
-        <td class="mono">${esc(ts)}</td>
+      html+=`<tr><td class="mono">${esc(ts)}</td>
         <td><span class="badge ${t.status==='up'?'badge-up':'badge-down'}">${esc(t.status)}</span></td>
         <td>${t.response_time?t.response_time+' ms':'—'}</td></tr>`;
     });
@@ -570,76 +688,304 @@ function renderDetail(data, type, id, name){
 
   if(incidents.length){
     html+=`<div class="slabel">🚨 Incidents</div>
-    <div class="card"><h3><span class="icon">🚨</span> Incident Log</h3>${incidentTableHTML(incidents,false)}</div>`;
+    <div class="card"><h3>🚨 Incident Log</h3>${incidentTableHTML(incidents,false)}</div>`;
   }
 
   html+='</div>';
   document.getElementById('mainContent').innerHTML=html;
+
   if(daily.length) buildDetailCharts(daily);
   if(hourly.length) buildHourlyChart(hourly);
-  if(type==='website') loadWebsiteTraffic(id);
+  if(type==='website') loadFullAnalytics(id);
 }
 
-// ── Website Traffic Enrichment ────────────────────────────────
-async function loadWebsiteTraffic(websiteId){
+// ══════════════════════════════════════════════════════════════════
+//  Full Traffic Analytics (website drilldown)
+// ══════════════════════════════════════════════════════════════════
+async function loadFullAnalytics(websiteId){
+  const el=document.getElementById('analyticsSec');
+  if(!el) return;
   try{
     const r=await fetch(`/api/analytics?website_id=${encodeURIComponent(websiteId)}&days=${activeDays}`);
+    if(r.status===402){ el.innerHTML=`<div class="nodata">Analytics require Pro. <a href="#" onclick="showProRequired()" style="color:var(--blue)">Upgrade</a></div>`; return; }
     const d=await r.json();
-    const tl=document.getElementById('trafficLoading');
-    const tc=document.getElementById('trafficContent');
-    if(!tl||!tc) return;
     if(!d.ok||d.error||!(d.totals&&d.totals.views)){
-      tl.textContent=d.error
-        ?'⚠️ Could not load traffic: '+d.error
-        :'📊 No traffic data found. Set the log path in Admin to enable analytics.';
-      tl.style.color='var(--text3)'; return;
+      el.innerHTML=`<div class="a-section">
+        <div class="a-section-title">📊 Web Traffic Analytics</div>
+        <div class="nodata">${d.error?'⚠️ '+esc(d.error):'📊 No traffic data for this period. Make sure the <strong>Log Path</strong> is set in <a href="/admin" style="color:var(--blue)">Admin</a> and SSH is working.'}</div>
+      </div>`;
+      return;
     }
-    tl.style.display='none'; tc.style.display='';
-    const t=d.totals||{}, devs=d.devices||{}, nvr=d.new_vs_returning||{};
-    const hT=(devs.desktop||0)+(devs.mobile||0)+(devs.tablet||0)||1;
-    const mobP=Math.round((devs.mobile||0)/hT*100);
-    const newP=t.views>0?Math.round((nvr.new||0)/((nvr.new||0)+(nvr.returning||0)||1)*100):0;
-    tc.innerHTML=`
-    <h3 style="font-size:.9em;font-weight:600;color:var(--teal);margin-bottom:12px">📊 Web Traffic — Last ${activeDays} days</h3>
-    <div class="traffic-mini-kpi">
-      <div class="tmk"><div class="tmk-val c-blue">${fmt(t.views||0)}</div><div class="tmk-lbl">Pageviews</div></div>
-      <div class="tmk"><div class="tmk-val c-green">${fmt(t.unique_visitors||0)}</div><div class="tmk-lbl">Unique IPs</div></div>
-      <div class="tmk"><div class="tmk-val c-teal">${mobP}%</div><div class="tmk-lbl">Mobile</div></div>
-      <div class="tmk"><div class="tmk-val c-purple">${newP}%</div><div class="tmk-lbl">New Visitors</div></div>
-    </div>
-    <div class="grid-2" style="gap:10px">
-      <div><div style="font-size:.75em;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Top Pages</div>
-        ${topItemsHTML(d.pages||[])}</div>
-      <div><div style="font-size:.75em;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Top Referrers</div>
-        ${topItemsHTML(d.referrers||[])}</div>
-    </div>
-    <div style="margin-top:12px;font-size:.72em;color:var(--text3);text-align:right">
-      <a href="/analytics" style="color:var(--blue)">→ Full Analytics page</a>
-    </div>`;
-  } catch(e){
-    const tl=document.getElementById('trafficLoading');
-    if(tl){ tl.textContent='⚠️ Traffic data unavailable'; tl.style.color='var(--text3)'; }
+    el.innerHTML = buildAnalyticsHTML(d);
+    buildAnalyticsCharts(d);
+  }catch(e){
+    if(el) el.innerHTML=`<div class="nodata">⚠️ ${esc(e.message)}</div>`;
   }
 }
 
-function topItemsHTML(items){
-  if(!items||!items.length) return '<div class="nodata" style="padding:6px 0">No data</div>';
-  const max=items[0].count||1;
-  let html='<div style="display:flex;flex-direction:column;gap:5px">';
-  items.slice(0,6).forEach(p=>{
+// ── Build full analytics HTML ──────────────────────────────────
+function buildAnalyticsHTML(d){
+  const t=d.totals||{}, nvr=d.new_vs_returning||{};
+  const total=t.views||0;
+  const humanT=(d.devices?.desktop||0)+(d.devices?.mobile||0)+(d.devices?.tablet||0)||1;
+  const mobileP=Math.round((d.devices?.mobile||0)/humanT*100);
+  const newP=total>0?Math.round((nvr.new||0)/(nvr.new+nvr.returning||1)*100):0;
+  const peakH=t.peak_hour!=null?hourLabel(t.peak_hour):'—';
+  const topBrowser=(d.browsers&&d.browsers[0])?d.browsers[0].name:'—';
+  const topPage=(d.pages&&d.pages[0])?d.pages[0].name:'—';
+
+  return `<div class="a-section">
+  <div class="a-section-title">📊 Web Traffic Analytics — Last ${activeDays} days
+    <span style="margin-left:auto">
+      <span class="privacy-badge">● No cookies · Privacy-first</span>
+    </span>
+  </div>
+  <div class="a-kpi-grid">
+    <div class="a-kpi"><div class="a-kpi-label">Pageviews</div><div class="a-kpi-val c-blue">${fmt(total)}</div><div class="a-kpi-sub">${fmt(t.unique_visitors||0)} unique IPs</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Daily Avg</div><div class="a-kpi-val c-orange">${fmt(t.avg_daily||0)}</div><div class="a-kpi-sub">views / day</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Peak Hour</div><div class="a-kpi-val c-purple">${esc(peakH)}</div><div class="a-kpi-sub">highest traffic</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">New Visitors</div><div class="a-kpi-val c-green">${newP}%</div><div class="a-kpi-sub">${fmt(nvr.new||0)} first-time IPs</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Mobile</div><div class="a-kpi-val c-teal">${mobileP}%</div><div class="a-kpi-sub">${fmt(d.devices?.mobile||0)} sessions</div></div>
+    <div class="a-kpi"><div class="a-kpi-label">Top Browser</div><div class="a-kpi-val" style="font-size:1.1em;color:var(--blue)">${esc(topBrowser)}</div><div class="a-kpi-sub">most common</div></div>
+  </div>
+
+  <div class="slabel" style="margin-top:20px">📈 Traffic over time</div>
+  <div class="card"><h3>📈 Daily Pageviews &amp; Unique Visitors</h3>
+    <div class="chart-wrap"><canvas id="aChartTraffic"></canvas></div></div>
+
+  <div class="slabel">🔥 Best time to publish</div>
+  <div class="card"><h3>🔥 Hour-of-Day × Day-of-Week Heatmap
+    <span style="color:var(--text3);font-size:.75em;font-weight:400;margin-left:8px">(blue = quiet · orange = peak)</span></h3>
+    <div class="heatmap-wrap">${buildHeatmapA(d.heatmap)}</div>
+  </div>
+
+  <div class="slabel">📄 Top pages</div>
+  <div class="card"><h3>📄 Pages &amp; Content</h3>
+    ${buildTopPagesA(d.pages||[], d.traffic_by_day||[])}</div>
+
+  <div class="slabel">🌐 Audience &amp; sources</div>
+  <div class="grid-3">
+    <div class="card"><h3>🌐 Traffic Sources</h3>${buildTrafficSourcesA(d.traffic_sources)}</div>
+    <div class="card"><h3>📱 Devices</h3>
+      ${buildDevPillsA(d.devices,humanT)}
+      <div class="chart-wrap-sm" style="margin-top:12px"><canvas id="aChartDevices"></canvas></div>
+    </div>
+    <div class="card"><h3>🌍 Browsers</h3>
+      <div class="chart-wrap" style="margin-top:4px"><canvas id="aChartBrowsers"></canvas></div></div>
+  </div>
+
+  <div class="slabel">📅 When your audience shows up</div>
+  <div class="grid-2">
+    <div class="card"><h3>📅 Traffic by Day of Week</h3>
+      <div class="chart-wrap"><canvas id="aChartWeekday"></canvas></div></div>
+    <div class="card"><h3>🕐 Traffic by Hour of Day</h3>
+      <div class="chart-wrap"><canvas id="aChartHour"></canvas></div></div>
+  </div>
+
+  <div class="slabel">🔍 Discovery &amp; health</div>
+  <div class="grid-2">
+    <div class="card"><h3>🔗 Top Referrers</h3>${buildSimpleTableA(d.referrers||[],'Referrer Domain')}</div>
+    <div class="card"><h3>🔍 Search Keywords</h3>${buildSimpleTableA(d.search_queries||[],'Search Term')}</div>
+  </div>
+  <div class="grid-2" style="margin-top:12px">
+    <div class="card"><h3>🗂️ Site Sections</h3>
+      <div class="chart-wrap"><canvas id="aChartSections"></canvas></div></div>
+    <div class="card"><h3>🔢 HTTP Status Codes</h3>
+      <div class="chart-wrap"><canvas id="aChartStatus"></canvas></div></div>
+  </div>
+</div>`;
+}
+
+// ── Heatmap ────────────────────────────────────────────────────
+function buildHeatmapA(heatmap){
+  if(!heatmap||!heatmap.length)
+    return '<div class="nodata">Not enough data for heatmap yet.</div>';
+  let maxVal=0, peakDay=0, peakHour=0;
+  heatmap.forEach((row,d)=>row.forEach((v,h)=>{if(v>maxVal){maxVal=v;peakDay=d;peakHour=h;}}));
+  if(!maxVal) return '<div class="nodata">Not enough data yet.</div>';
+  function heatColor(v){
+    const tv=maxVal>0?v/maxVal:0;
+    return `rgb(${Math.round(88+(255-88)*tv)},${Math.round(166+0)},${Math.round(255+(38-255)*tv)})`;
+  }
+  let grid='<div class="heatmap-grid">';
+  grid+='<div></div>';
+  for(let h=0;h<24;h++) grid+=`<div class="hm-hour-lbl">${hourLabel(h)}</div>`;
+  heatmap.forEach((row,day)=>{
+    grid+=`<div class="hm-day-lbl">${weekdayLabel(day)}</div>`;
+    row.forEach((v,h)=>{
+      const bg=v>0?heatColor(v):'rgba(255,255,255,.04)';
+      grid+=`<div class="hm-cell" style="background:${bg};opacity:${v>0?1:0.25}" title="${weekdayLabel(day)} ${hourLabel(h)}: ${v} hits"></div>`;
+    });
+  });
+  grid+='</div>';
+  grid+=`<div class="hm-peak-note">🔥 Peak: <strong>${weekdayLabel(peakDay)} at ${hourLabel(peakHour)}</strong> — best time to publish for maximum reach</div>`;
+  return grid;
+}
+
+// ── Top pages table ────────────────────────────────────────────
+function buildTopPagesA(pages, byDay){
+  if(!pages.length) return '<div class="nodata">No page data yet.</div>';
+  const max=pages[0].count||1;
+  let html='<table class="stbl"><thead><tr><th>#</th><th>Page</th><th style="text-align:right">Views</th></tr></thead><tbody>';
+  pages.slice(0,20).forEach((p,i)=>{
     const pct=Math.round((p.count||0)/max*100);
-    const nm=String(p.name||'?');
-    const sh=nm.length>36?'…'+nm.slice(-34):nm;
-    html+=`<div style="font-size:.8em">
-      <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-        <span class="mono" style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="${esc(nm)}">${esc(sh)}</span>
-        <span style="color:var(--blue);font-weight:600;min-width:36px;text-align:right">${fmt(p.count)}</span>
-      </div>
-      <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px">
-        <div style="height:100%;width:${pct}%;background:rgba(88,166,255,.5);border-radius:2px"></div>
-      </div></div>`;
+    html+=`<tr><td class="srank">${i+1}</td>
+      <td class="sname">${esc(p.name)}<div class="bar-mini"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+      <td class="scount">${fmt(p.count)}</td></tr>`;
+  });
+  return html+'</tbody></table>';
+}
+
+// ── Traffic sources ────────────────────────────────────────────
+function buildTrafficSourcesA(srcs){
+  if(!srcs) return '<div class="nodata">No source data.</div>';
+  const items=[
+    {key:'search',icon:'🔍',label:'Organic Search',color:'var(--blue)'},
+    {key:'social',icon:'📣',label:'Social Media',color:'var(--purple)'},
+    {key:'referral',icon:'🔗',label:'Referral',color:'var(--teal)'},
+    {key:'direct',icon:'🏠',label:'Direct / Dark',color:'var(--text2)'},
+  ];
+  const total=items.reduce((s,x)=>s+(srcs[x.key]||0),0)||1;
+  let html='<div class="src-list">';
+  items.forEach(item=>{
+    const v=srcs[item.key]||0, pct=Math.round(v/total*100);
+    html+=`<div class="src-item">
+      <span class="src-icon">${item.icon}</span>
+      <span class="src-label">${item.label}</span>
+      <div class="src-bar-wrap"><div class="src-bar-fill" style="width:${pct}%;background:${item.color}"></div></div>
+      <span class="src-count">${fmt(v)}</span>
+      <span class="src-pct">${pct}%</span>
+    </div>`;
   });
   return html+'</div>';
+}
+
+// ── Device pills ───────────────────────────────────────────────
+function buildDevPillsA(devs,total){
+  if(!devs) return '';
+  const list=[{key:'desktop',icon:'💻',label:'Desktop'},{key:'mobile',icon:'📱',label:'Mobile'},{key:'tablet',icon:'📟',label:'Tablet'}];
+  let html='<div class="dev-pills">';
+  list.forEach(d=>{
+    const v=devs[d.key]||0, pct=total>0?Math.round(v/total*100):0;
+    html+=`<div class="dev-pill"><span class="dev-pill-icon">${d.icon}</span><div class="dev-pill-val">${pct}%</div><div class="dev-pill-lbl">${d.label}</div></div>`;
+  });
+  if(devs.bot>0) html+=`<div class="dev-pill" style="opacity:.4"><span class="dev-pill-icon">🤖</span><div class="dev-pill-val">${fmt(devs.bot)}</div><div class="dev-pill-lbl">Bots</div></div>`;
+  return html+'</div>';
+}
+
+// ── Simple table (referrers / keywords) ───────────────────────
+function buildSimpleTableA(rows,colLabel){
+  if(!rows||!rows.length) return '<div class="nodata">No data yet.</div>';
+  const max=rows[0].count||1;
+  let html=`<table class="stbl"><thead><tr><th>#</th><th>${esc(colLabel)}</th><th style="text-align:right">Hits</th></tr></thead><tbody>`;
+  rows.slice(0,15).forEach((r,i)=>{
+    html+=`<tr><td class="srank">${i+1}</td>
+      <td class="sname">${esc(r.name)}<div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.count/max*100)}%"></div></div></td>
+      <td class="scount">${fmt(r.count)}</td></tr>`;
+  });
+  return html+'</tbody></table>';
+}
+
+// ── Build all analytics Chart.js instances ─────────────────────
+function buildAnalyticsCharts(d){
+  const GC='rgba(255,255,255,.05)', TC='rgba(255,255,255,.5)';
+
+  // Daily traffic line
+  const dayData=d.traffic_by_day||[], uniqueByDay=d.unique_by_day||[];
+  charts.aTraffic=new Chart(document.getElementById('aChartTraffic'),{
+    type:'line',
+    data:{labels:dayData.map(x=>x.date),datasets:[
+      {label:'Pageviews',data:dayData.map(x=>x.count),fill:true,
+       backgroundColor:'rgba(88,166,255,.1)',borderColor:'#58a6ff',borderWidth:2,
+       pointRadius:dayData.length>60?0:2,tension:.35},
+      {label:'Unique Visitors',data:uniqueByDay,fill:false,
+       borderColor:'#66bb6a',borderWidth:1.5,pointRadius:0,tension:.35,borderDash:[5,3]}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:12,padding:14,color:TC}}},
+      scales:{x:{grid:{color:GC},ticks:{maxTicksLimit:10,color:TC}},
+              y:{grid:{color:GC},ticks:{color:TC},beginAtZero:true}}}
+  });
+
+  // Devices doughnut
+  const devs=d.devices||{};
+  charts.aDevices=new Chart(document.getElementById('aChartDevices'),{
+    type:'doughnut',
+    data:{labels:['Desktop','Mobile','Tablet'],
+      datasets:[{data:[devs.desktop||0,devs.mobile||0,devs.tablet||0],
+        backgroundColor:['rgba(88,166,255,.75)','rgba(102,187,106,.75)','rgba(255,167,38,.75)'],
+        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:10,color:TC}}}}
+  });
+
+  // Browsers bar
+  const brows=(d.browsers||[]).slice(0,7);
+  charts.aBrowsers=new Chart(document.getElementById('aChartBrowsers'),{
+    type:'bar',
+    data:{labels:brows.map(b=>b.name),
+      datasets:[{label:'Sessions',data:brows.map(b=>b.count),
+        backgroundColor:'rgba(171,71,188,.6)',borderColor:'rgba(171,71,188,.9)',
+        borderWidth:1,borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:GC},ticks:{color:TC},beginAtZero:true},
+              y:{grid:{color:'transparent'},ticks:{color:TC}}}}
+  });
+
+  // Weekday
+  const wkd=d.traffic_by_weekday||Array(7).fill(0), wkdMax=Math.max(...wkd,1);
+  charts.aWeekday=new Chart(document.getElementById('aChartWeekday'),{
+    type:'bar',
+    data:{labels:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+      datasets:[{label:'Pageviews',data:wkd,
+        backgroundColor:wkd.map(v=>v===wkdMax?'rgba(255,167,38,.8)':'rgba(88,166,255,.5)'),
+        borderColor:wkd.map(v=>v===wkdMax?'rgba(255,167,38,1)':'rgba(88,166,255,.8)'),
+        borderWidth:1,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:GC},ticks:{color:TC}},y:{grid:{color:GC},ticks:{color:TC},beginAtZero:true}}}
+  });
+
+  // Hourly
+  const hours=d.traffic_by_hour||Array(24).fill(0), hourMax=Math.max(...hours,1);
+  charts.aHour=new Chart(document.getElementById('aChartHour'),{
+    type:'bar',
+    data:{labels:[...Array(24).keys()].map(h=>hourLabel(h)),
+      datasets:[{label:'Hits',data:hours,
+        backgroundColor:hours.map(v=>v===hourMax?'rgba(255,167,38,.8)':'rgba(38,198,218,.4)'),
+        borderColor:hours.map(v=>v===hourMax?'rgba(255,167,38,1)':'rgba(38,198,218,.7)'),
+        borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:GC},ticks:{color:TC,font:{size:9},maxRotation:0}},
+              y:{grid:{color:GC},ticks:{color:TC},beginAtZero:true}}}
+  });
+
+  // Sections doughnut
+  const secs=(d.sections||[]).slice(0,8);
+  const secColors=['#58a6ff','#66bb6a','#ffa726','#ab47bc','#26c6da','#ef5350','#ffca28','#8d6e63'];
+  charts.aSections=new Chart(document.getElementById('aChartSections'),{
+    type:'doughnut',
+    data:{labels:secs.map(s=>s.name),
+      datasets:[{data:secs.map(s=>s.count),
+        backgroundColor:secColors.slice(0,secs.length),
+        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,color:TC}}}}
+  });
+
+  // Status codes doughnut
+  const sc=d.status_codes||{}, scLabels=Object.keys(sc);
+  const scPalette={'2xx':'rgba(102,187,106,.8)','3xx':'rgba(88,166,255,.8)','4xx':'rgba(255,167,38,.8)','5xx':'rgba(239,83,80,.8)'};
+  charts.aStatus=new Chart(document.getElementById('aChartStatus'),{
+    type:'doughnut',
+    data:{labels:scLabels,
+      datasets:[{data:scLabels.map(l=>sc[l]),
+        backgroundColor:scLabels.map(l=>scPalette[l]||'rgba(158,158,158,.7)'),
+        borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:12,color:TC}}}}
+  });
 }
 
 // ── Render: Incidents ─────────────────────────────────────────
@@ -665,12 +1011,12 @@ function renderIncidents(data){
   if(inc.length){
     html+=`<div class="slabel">📊 By Target</div>
     <div class="card" style="margin-bottom:12px">
-      <h3><span class="icon">📊</span> Incidents per Target</h3>
+      <h3>📊 Incidents per Target</h3>
       <div class="chart-wrap-sm"><canvas id="chartIncTrend"></canvas></div></div>
     <div class="slabel">📋 Incident Log</div>
-    <div class="card"><h3><span class="icon">📋</span> All Incidents</h3>${incidentTableHTML(inc,true)}</div>`;
+    <div class="card"><h3>📋 All Incidents</h3>${incidentTableHTML(inc,true)}</div>`;
   } else {
-    html+='<div class="card"><div class="nodata" style="padding:40px 0">🎉 No incidents in this period — everything is running great!</div></div>';
+    html+='<div class="card"><div class="nodata" style="padding:40px 0">🎉 No incidents in this period!</div></div>';
   }
   html+='</div>';
   document.getElementById('mainContent').innerHTML=html;
@@ -690,11 +1036,11 @@ function renderBans(data){
     <div class="kpi"><div class="kpi-label">Currently Active</div><div class="kpi-val c-orange">${fmt(actB)}</div><div class="kpi-sub">blocked right now</div></div>
     <div class="kpi"><div class="kpi-label">Servers Tracked</div><div class="kpi-val c-blue">${bans.length}</div><div class="kpi-sub">with fail2ban data</div></div>
     <div class="kpi"><div class="kpi-label">Protection</div><div class="kpi-val c-green" style="font-size:.95em">${actB>0?'🛡️ Active':'✅ Clean'}</div>
-      <div class="kpi-sub">${actB>0?actB+' IPs blocked':'no threats detected'}</div></div>
+      <div class="kpi-sub">${actB>0?actB+' IPs blocked':'no active threats'}</div></div>
   </div>`;
   if(bans.length){
     html+=`<div class="slabel">🖥️ Per-Server Breakdown</div>
-    <div class="card"><h3><span class="icon">🖥️</span> Fail2Ban by Server</h3>
+    <div class="card"><h3>🖥️ Fail2Ban by Server</h3>
     <div style="overflow-x:auto"><table class="rtbl">
     <thead><tr><th>Server</th><th>Total Bans</th><th>Active Bans</th><th>Jails</th></tr></thead><tbody>`;
     bans.forEach(b=>{
@@ -706,14 +1052,14 @@ function renderBans(data){
     });
     html+='</tbody></table></div></div>';
   } else {
-    html+='<div class="card"><div class="nodata">No fail2ban data. Install fail2ban on servers to enable security reporting.</div></div>';
+    html+='<div class="card"><div class="nodata">No fail2ban data available.</div></div>';
   }
   html+='</div>';
   document.getElementById('mainContent').innerHTML=html;
 }
 
 // ── Incident table ────────────────────────────────────────────
-function incidentTableHTML(incidents, showTarget){
+function incidentTableHTML(incidents,showTarget){
   if(!incidents||!incidents.length) return '<div class="nodata">No incidents found.</div>';
   let html='<div style="overflow-x:auto"><table class="rtbl"><thead><tr>';
   if(showTarget) html+='<th>Type</th><th>Target</th>';
@@ -734,11 +1080,11 @@ function incidentTableHTML(incidents, showTarget){
   return html+'</tbody></table></div>';
 }
 
-// ── Charts ─────────────────────────────────────────────────────
+// ── Charts (uptime) ────────────────────────────────────────────
 const GC='rgba(255,255,255,.05)', TC='rgba(255,255,255,.5)';
 Chart.defaults.color=TC; Chart.defaults.borderColor=GC;
 
-function buildOverviewCharts(sm){
+function buildOverviewChart(sm){
   charts.uptime=new Chart(document.getElementById('chartUptime'),{
     type:'bar',
     data:{labels:sm.map(s=>s.name),
@@ -751,7 +1097,6 @@ function buildOverviewCharts(sm){
               x:{ticks:{color:TC,maxRotation:35},grid:{display:false}}}}
   });
 }
-
 function buildDetailCharts(daily){
   charts.dailyUptime=new Chart(document.getElementById('chartDailyUptime'),{
     type:'line',
@@ -778,7 +1123,6 @@ function buildDetailCharts(daily){
               x:{ticks:{color:TC,maxRotation:45,maxTicksLimit:10},grid:{display:false}}}}
   });
 }
-
 function buildHourlyChart(hourly){
   const maxR=Math.max(...hourly.map(h=>h.avg_response||0),1);
   charts.hourly=new Chart(document.getElementById('chartHourly'),{
@@ -794,7 +1138,6 @@ function buildHourlyChart(hourly){
               x:{ticks:{color:TC,maxRotation:0},grid:{color:GC}}}}
   });
 }
-
 function buildIncidentChart(incidents){
   const cnt={};
   incidents.forEach(i=>{ const k=i.target_name||('#'+i.target_id); cnt[k]=(cnt[k]||0)+1; });
@@ -815,7 +1158,7 @@ function buildIncidentChart(incidents){
 async function loadRetention(){
   try{ const r=await fetch('/api/settings'); const d=await r.json();
     const el=document.getElementById('retentionDays');
-    if(d.ok&&d.settings&&el) el.value=d.settings.retention_days||'7'; } catch(e){}
+    if(d.ok&&d.settings&&el) el.value=d.settings.retention_days||'7'; }catch(e){}
 }
 async function saveRetention(){
   const val=parseInt(document.getElementById('retentionDays').value);
@@ -824,7 +1167,7 @@ async function saveRetention(){
     body:JSON.stringify({retention_days:String(val)})});
     const d=await r.json();
     const el=document.getElementById('retentionMsg');
-    if(el){ el.textContent=d.ok?'Saved ✓':'Error'; setTimeout(()=>el.textContent='',2000); } } catch(e){}
+    if(el){ el.textContent=d.ok?'Saved ✓':'Error'; setTimeout(()=>el.textContent='',2000); }}catch(e){}
 }
 
 // ── Export ─────────────────────────────────────────────────────
@@ -832,8 +1175,8 @@ function exportReport(format){
   const type=document.getElementById('reportType').value;
   const tid=document.getElementById('targetFilter').value;
   let url=`/api/reports/export?format=${format}&report_type=${type}&days=${activeDays}`;
-  if(tid&&['server','website','service'].includes(type)) url+=`&target_type=${type}&target_id=${tid}`;
   if(currentDetail) url=`/api/reports/export?format=${format}&report_type=${currentDetail.type}&days=${activeDays}&target_type=${currentDetail.type}&target_id=${currentDetail.id}`;
+  else if(tid&&['server','website','service'].includes(type)) url+=`&target_type=${type}&target_id=${tid}`;
   if(format==='pdf') window.open(url+'&autoprint=1','_blank');
   else window.location.href=url;
 }
@@ -849,7 +1192,7 @@ async function loadTargets(){
     targets.server =(sr.servers||[]).map(s=>({id:s.id,name:s.name}));
     targets.website=(wr.websites||[]).map(w=>({id:w.id,name:w.name}));
     targets.service=(svcr.services||[]).map(s=>({id:s.id,name:s.name}));
-  } catch(e){}
+  }catch(e){}
 }
 function updateTargetFilter(){
   const type=document.getElementById('reportType').value;
@@ -875,11 +1218,13 @@ document.getElementById('daysPills').addEventListener('click',e=>{
 document.getElementById('reportType').addEventListener('change',()=>{ updateTargetFilter(); loadReport(); });
 document.getElementById('targetFilter').addEventListener('change',loadReport);
 
-(async function(){
+async function initReports(){
   await loadTargets();
   updateTargetFilter();
   loadReport();
-})();
+}
+
+(async()=>{ if(await checkProLicense()) initReports(); })();
 </script>
 <script src="/static/update-notifier.js"></script>
 </body>
