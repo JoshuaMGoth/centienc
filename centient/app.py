@@ -41,6 +41,11 @@ logger = logging.getLogger("centient.app")
 # If the env var is NOT set (default / self-hosted), all pro features are unlocked.
 _LICENSE_SECRET: str = os.getenv("CENTIENT_LICENSE_SECRET", "")
 
+# ── GitHub Updates ─────────────────────────────────────────────────────────────
+# Set GITHUB_TOKEN to a PAT with repo scope so /api/updates can fetch releases
+# from a private repo.  Not required for public repos.
+_GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
+
 
 def _validate_license_key(key: str) -> dict:
     """Validate a CentienC Pro license key.
@@ -1471,11 +1476,20 @@ async def api_updates():
     if _updates_cache["data"] and now - _updates_cache["ts"] < _UPDATES_TTL:
         return _updates_cache["data"]
     try:
+        gh_headers: dict[str, str] = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if _GITHUB_TOKEN:
+            gh_headers["Authorization"] = f"Bearer {_GITHUB_TOKEN}"
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(
                 "https://api.github.com/repos/JoshuaMGoth/centienc/releases",
-                headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"},
+                headers=gh_headers,
             )
+        if resp.status_code == 404:
+            hint = " (repo is private — set GITHUB_TOKEN env var)" if not _GITHUB_TOKEN else ""
+            return {"ok": False, "error": f"GitHub returned 404{hint}"}
         if resp.status_code != 200:
             return {"ok": False, "error": f"GitHub returned {resp.status_code}"}
         releases = resp.json()
@@ -1706,10 +1720,13 @@ async def update_check(request: Request = None):
 
     try:
         import httpx
+        uc_headers: dict[str, str] = {"Accept": "application/vnd.github.v3+json"}
+        if _GITHUB_TOKEN:
+            uc_headers["Authorization"] = f"Bearer {_GITHUB_TOKEN}"
         async with httpx.AsyncClient(timeout=10) as client:
             r = await client.get(
                 "https://api.github.com/repos/JoshuaMGoth/centienc/releases/latest",
-                headers={"Accept": "application/vnd.github.v3+json"},
+                headers=uc_headers,
             )
             if r.status_code == 200:
                 data = r.json()
