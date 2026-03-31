@@ -1395,41 +1395,60 @@ class MonitorEngine:
         import shlex
 
         # Build SSH command — use specific log file if provided, else auto-detect
+        async def _ssh(c: str, timeout: int = 120) -> str:
+            if sudo_pass:
+                return await self._ssh_sudo_cmd(conn, c, sudo_pass, timeout=timeout)
+            return await self._ssh_cmd(conn, c, timeout=timeout)
+
         if log_path:
             sp = shlex.quote(log_path)
             cmd = (
                 f"(zcat {sp}-*.gz 2>/dev/null; zcat {sp}.gz 2>/dev/null; cat {sp} 2>/dev/null) "
                 "| tail -n 2000000 || echo ''"
             )
+            raw = await _ssh(cmd)
             log_source = log_path
         else:
-            # Try nginx first, fall back to apache2 if nginx returns nothing
-            cmd = (
-                "(zcat /var/log/nginx/*.gz 2>/dev/null; "
-                "cat /var/log/nginx/*access*.log 2>/dev/null) "
-                "| tail -n 2000000 || echo ''"
-            )
-            log_source = "auto:nginx"
-        if sudo_pass:
-            raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass, timeout=120)
-        else:
-            raw = await self._ssh_cmd(conn, cmd, timeout=120)
+            # Auto-discover: try well-known paths in order, then search if all empty
+            log_source = "auto"
+            raw = ""
+            well_known = [
+                ("nginx", "(zcat /var/log/nginx/*.gz 2>/dev/null; cat /var/log/nginx/*.log 2>/dev/null) | tail -n 2000000 || echo ''"),
+                ("apache2", "(zcat /var/log/apache2/*.gz 2>/dev/null; cat /var/log/apache2/*.log 2>/dev/null) | tail -n 2000000 || echo ''"),
+                ("httpd", "(zcat /var/log/httpd/*.gz 2>/dev/null; cat /var/log/httpd/*.log 2>/dev/null) | tail -n 2000000 || echo ''"),
+                ("caddy", "(zcat /var/log/caddy/*.gz 2>/dev/null; cat /var/log/caddy/*.log 2>/dev/null) | tail -n 2000000 || echo ''"),
+            ]
+            for name, try_cmd in well_known:
+                result = await _ssh(try_cmd)
+                if result.strip():
+                    raw = result
+                    log_source = f"auto:{name}"
+                    break
 
-        # If no nginx data found, try apache2
-        if not log_path and raw.strip() == "":
-            apache_cmd = (
-                "(zcat /var/log/apache2/*.gz 2>/dev/null; "
-                "cat /var/log/apache2/*access*.log 2>/dev/null; "
-                "zcat /var/log/httpd/*.gz 2>/dev/null; "
-                "cat /var/log/httpd/*access*.log 2>/dev/null) "
-                "| tail -n 2000000 || echo ''"
-            )
-            if sudo_pass:
-                raw = await self._ssh_sudo_cmd(conn, apache_cmd, sudo_pass, timeout=120)
-            else:
-                raw = await self._ssh_cmd(conn, apache_cmd, timeout=120)
-            if raw.strip():
-                log_source = "auto:apache2"
+            # Last resort: find any *access* log file under /var/log
+            if not raw.strip():
+                find_cmd = (
+                    "find /var/log -maxdepth 3 -name '*access*' -type f "
+                    "\\( -name '*.log' -o -name '*.log.*' -o -name '*.gz' \\) "
+                    "2>/dev/null | head -5"
+                )
+                found_paths = (await _ssh(find_cmd, timeout=15)).strip()
+                if found_paths:
+                    # Read whatever we found
+                    parts = []
+                    for fp in found_paths.split("\n"):
+                        fp = fp.strip()
+                        if not fp:
+                            continue
+                        sfp = shlex.quote(fp)
+                        if fp.endswith(".gz"):
+                            parts.append(f"zcat {sfp} 2>/dev/null")
+                        else:
+                            parts.append(f"cat {sfp} 2>/dev/null")
+                    if parts:
+                        cat_cmd = f"({'; '.join(parts)}) | tail -n 2000000 || echo ''"
+                        raw = await _ssh(cat_cmd)
+                        log_source = f"auto:discovered ({found_paths.split(chr(10))[0]})"
 
         lines_raw = sum(1 for ln in raw.split("\n") if ln.strip())
         lines_matched = 0
