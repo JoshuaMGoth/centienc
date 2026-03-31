@@ -722,12 +722,27 @@ async function loadFullAnalytics(websiteId){
     // Surface real errors: d.error (our soft errors), d.detail (FastAPI HTTP exceptions)
     const apiErr = d.error || d.detail || null;
     if(!d.ok||apiErr||!(d.totals&&d.totals.views)){
-      const noDataMsg = d.totals&&d.totals.views===0&&!apiErr
-        ? `📊 No traffic data for this period. If logs exist on the server, check that SSH is working and the nginx/apache log path is readable.`
-        : null;
+      let noDataMsg;
+      if(apiErr){
+        noDataMsg = '⚠️ '+esc(apiErr);
+      } else {
+        const diag = d._diag || {};
+        if(diag.lines_raw === 0){
+          noDataMsg = '📂 No log files were found on the server. The system checked the default nginx and apache2 log paths. '
+            +'Set a specific <strong>Log Path</strong> in <a href="/admin" style="color:var(--blue)">Admin → Websites</a> to point directly to your access log.';
+        } else if(diag.lines_matched === 0){
+          noDataMsg = `📄 Log files were found (<strong>${diag.lines_raw.toLocaleString()} lines</strong> read from <code>${esc(diag.log_source||'server')}</code>) but none matched the expected Combined Log Format. `
+            +'Your web server may use a custom log format. Check your nginx/apache <code>log_format</code> directive.';
+        } else if(diag.lines_in_window === 0){
+          noDataMsg = `📅 Logs were read (<strong>${diag.lines_matched.toLocaleString()} entries matched</strong>) but all entries are older than the selected <strong>${diag.days}-day</strong> window. `
+            +'Try a longer period using the pills above.';
+        } else {
+          noDataMsg = '📊 No traffic data available for this period.';
+        }
+      }
       el.innerHTML=`<div class="a-section">
         <div class="a-section-title">📊 Web Traffic Analytics</div>
-        <div class="nodata">${apiErr?'⚠️ '+esc(apiErr):noDataMsg||'📊 No traffic data found.'}</div>
+        <div class="nodata" style="text-align:left;line-height:1.7">${noDataMsg}</div>
       </div>`;
       return;
     }

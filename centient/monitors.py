@@ -1394,23 +1394,45 @@ class MonitorEngine:
         from datetime import datetime, timezone
         import shlex
 
-        # Build SSH command — use specific log file if provided, else all nginx access logs
+        # Build SSH command — use specific log file if provided, else auto-detect
         if log_path:
             sp = shlex.quote(log_path)
             cmd = (
                 f"(zcat {sp}-*.gz 2>/dev/null; zcat {sp}.gz 2>/dev/null; cat {sp} 2>/dev/null) "
                 "| tail -n 2000000 || echo ''"
             )
+            log_source = log_path
         else:
+            # Try nginx first, fall back to apache2 if nginx returns nothing
             cmd = (
                 "(zcat /var/log/nginx/*.gz 2>/dev/null; "
                 "cat /var/log/nginx/*access*.log 2>/dev/null) "
                 "| tail -n 2000000 || echo ''"
             )
+            log_source = "auto:nginx"
         if sudo_pass:
             raw = await self._ssh_sudo_cmd(conn, cmd, sudo_pass, timeout=120)
         else:
             raw = await self._ssh_cmd(conn, cmd, timeout=120)
+
+        # If no nginx data found, try apache2
+        if not log_path and raw.strip() == "":
+            apache_cmd = (
+                "(zcat /var/log/apache2/*.gz 2>/dev/null; "
+                "cat /var/log/apache2/*access*.log 2>/dev/null; "
+                "zcat /var/log/httpd/*.gz 2>/dev/null; "
+                "cat /var/log/httpd/*access*.log 2>/dev/null) "
+                "| tail -n 2000000 || echo ''"
+            )
+            if sudo_pass:
+                raw = await self._ssh_sudo_cmd(conn, apache_cmd, sudo_pass, timeout=120)
+            else:
+                raw = await self._ssh_cmd(conn, apache_cmd, timeout=120)
+            if raw.strip():
+                log_source = "auto:apache2"
+
+        lines_raw = sum(1 for ln in raw.split("\n") if ln.strip())
+        lines_matched = 0
 
         cutoff = time.time() - days * 86400
 
@@ -1450,10 +1472,12 @@ class MonitorEngine:
         scanner_ua_counts: dict[str, int] = {}
         bot_categories: dict[str, int] = {}
 
+        lines_in_window = 0
         for line in raw.split("\n"):
             m = log_re.search(line)
             if not m:
                 continue
+            lines_matched += 1
 
             ua = m.group("ua")
             method = m.group("method")
@@ -1471,6 +1495,7 @@ class MonitorEngine:
 
             if ts < cutoff:
                 continue
+            lines_in_window += 1
 
             status_int = int(status)
             proto_val = (m.group("proto") or "HTTP/1.1").upper()
@@ -1700,6 +1725,14 @@ class MonitorEngine:
             "trending_pages": trending_pages,
             "page_timelines": page_timelines,
             "unique_by_day": unique_by_day,
+            # Diagnostics
+            "_diag": {
+                "lines_raw": lines_raw,
+                "lines_matched": lines_matched,
+                "lines_in_window": lines_in_window,
+                "log_source": log_source,
+                "days": days,
+            },
             # Security / marketing fields
             "error_breakdown": {k: v for k, v in sorted(error_code_counts.items())},
             "hack_attempts": [
