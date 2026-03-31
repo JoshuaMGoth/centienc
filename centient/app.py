@@ -1432,14 +1432,30 @@ async def api_analytics(request: Request):
         if not website:
             raise HTTPException(404, "Website not found")
         lp = website.get("log_path") or ""
-        # Validate log_path to prevent path traversal
-        if lp and lp.startswith("/") and ".." not in lp and lp.endswith(".log"):
+        # Validate log_path to prevent path traversal (allow any absolute path without ..)
+        if lp and lp.startswith("/") and ".." not in lp and "\x00" not in lp:
             log_path = lp
         if not server_id_str:
             server_id_str = str(website.get("server_id") or "")
 
     if not server_id_str:
-        raise HTTPException(400, "server_id or website_id (with a linked server) is required")
+        # Auto-select the only server if exactly one exists
+        servers_all = await db.list_servers()
+        if len(servers_all) == 1:
+            server_id_str = str(servers_all[0]["id"])
+        else:
+            return {"ok": False, "error": "No server linked to this website. Open Admin → Websites and set a Server, or link an SSH server to enable traffic analytics.",
+                    "pages": [], "topics": [], "sections": [], "traffic_by_day": [],
+                    "traffic_by_hour": [0]*24, "status_codes": {}, "top_ips": [],
+                    "referrers": [], "devices": {"mobile":0,"desktop":0,"bot":0,"tablet":0},
+                    "totals": {"views":0,"unique_visitors":0,"avg_daily":0,"peak_hour":0},
+                    "traffic_by_weekday": [0]*7, "heatmap": [[0]*24 for _ in range(7)],
+                    "browsers": [], "traffic_sources": {"search":0,"social":0,"direct":0,"referral":0},
+                    "search_queries": [], "new_vs_returning": {"new":0,"returning":0},
+                    "trending_pages": [], "page_timelines": {}, "unique_by_day": [],
+                    "error_breakdown": {}, "hack_attempts": [], "attacking_ips": [],
+                    "scanner_uas": [], "bot_categories": {}, "method_distribution": {},
+                    "http_versions": {}}
     try:
         server_id_int = int(server_id_str)
     except ValueError:

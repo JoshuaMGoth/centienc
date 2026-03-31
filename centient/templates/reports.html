@@ -719,10 +719,15 @@ async function loadFullAnalytics(websiteId){
     const r=await fetch(`/api/analytics?website_id=${encodeURIComponent(websiteId)}&days=${activeDays}`);
     if(r.status===402){ el.innerHTML=`<div class="nodata">Analytics require Pro. <a href="#" onclick="showProRequired()" style="color:var(--blue)">Upgrade</a></div>`; return; }
     const d=await r.json();
-    if(!d.ok||d.error||!(d.totals&&d.totals.views)){
+    // Surface real errors: d.error (our soft errors), d.detail (FastAPI HTTP exceptions)
+    const apiErr = d.error || d.detail || null;
+    if(!d.ok||apiErr||!(d.totals&&d.totals.views)){
+      const noDataMsg = d.totals&&d.totals.views===0&&!apiErr
+        ? `📊 No traffic data for this period. If logs exist on the server, check that SSH is working and the nginx/apache log path is readable.`
+        : null;
       el.innerHTML=`<div class="a-section">
         <div class="a-section-title">📊 Web Traffic Analytics</div>
-        <div class="nodata">${d.error?'⚠️ '+esc(d.error):'📊 No traffic data for this period. Make sure the <strong>Log Path</strong> is set in <a href="/admin" style="color:var(--blue)">Admin</a> and SSH is working.'}</div>
+        <div class="nodata">${apiErr?'⚠️ '+esc(apiErr):noDataMsg||'📊 No traffic data found.'}</div>
       </div>`;
       return;
     }
