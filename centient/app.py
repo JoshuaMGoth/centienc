@@ -1422,6 +1422,7 @@ async def api_analytics(request: Request):
     website_id_str = request.query_params.get("website_id", "").strip()
     server_id_str = request.query_params.get("server_id", "").strip()
 
+    website: dict | None = None
     if website_id_str:
         try:
             website_id_int = int(website_id_str)
@@ -1465,6 +1466,21 @@ async def api_analytics(request: Request):
     server = next((s for s in servers if s["id"] == server_id_int), None)
     if not server:
         raise HTTPException(404, "Server not found")
+
+    # Auto-detect log path from web server config if not manually configured
+    if not log_path and website:
+        url = website.get("url") or ""
+        url_host = url.replace("https://", "").replace("http://", "").split("/")[0].split(":")[0].lower()
+        try:
+            detection = await engine.detect_web_server(server, url_host=url_host)
+            suggested = detection.get("suggested_path")
+            if suggested and suggested.startswith("/") and ".." not in suggested and "\x00" not in suggested:
+                log_path = suggested
+                # Persist so detection doesn't need to run again
+                await db.update_website(website["id"], {"log_path": suggested})
+                logger.info("Auto-detected log path %s for website %s", suggested, website.get("name"))
+        except Exception as exc:
+            logger.debug("Log path auto-detection failed for website %s: %s", website.get("name"), exc)
 
     result = await engine.get_analytics(server, days=days, log_path=log_path)
     return {"ok": True, **result}

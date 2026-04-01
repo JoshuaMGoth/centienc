@@ -728,8 +728,8 @@ async function loadFullAnalytics(websiteId){
       } else {
         const diag = d._diag || {};
         if(diag.lines_raw === 0){
-          noDataMsg = '📂 No log files were found on the server. The system checked the default nginx and apache2 log paths. '
-            +'Set a specific <strong>Log Path</strong> in <a href="/admin" style="color:var(--blue)">Admin → Websites</a> to point directly to your access log.';
+          noDataMsg = '📂 No log files were found on the server. The system checked web server configs and default log paths (nginx, apache2, httpd, caddy). '
+            +'Ensure the SSH user has read access to your log files, or set a specific <strong>Log Path</strong> in <a href="/admin" style="color:var(--blue)">Admin → Websites</a>.';
         } else if(diag.lines_matched === 0){
           noDataMsg = `📄 Log files were found (<strong>${diag.lines_raw.toLocaleString()} lines</strong> read from <code>${esc(diag.log_source||'server')}</code>) but none matched the expected Combined Log Format. `
             +'Your web server may use a custom log format. Check your nginx/apache <code>log_format</code> directive.';

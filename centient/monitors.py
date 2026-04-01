@@ -1425,6 +1425,32 @@ class MonitorEngine:
                     log_source = f"auto:{name}"
                     break
 
+            # Parse nginx/apache configs to find actual log paths
+            if not raw.strip():
+                cfg_cmd = (
+                    "grep -rh 'access_log' /etc/nginx/sites-enabled/ /etc/nginx/conf.d/ 2>/dev/null; "
+                    "grep -rh 'CustomLog' /etc/apache2/sites-enabled/ /etc/httpd/conf.d/ 2>/dev/null"
+                )
+                cfg_raw = await _ssh(cfg_cmd, timeout=10)
+                cfg_paths: list[str] = []
+                for cfg_line in cfg_raw.splitlines():
+                    cfg_line = cfg_line.strip().lstrip("#").strip()
+                    for directive in ("access_log ", "CustomLog "):
+                        if directive in cfg_line:
+                            path_part = cfg_line.split(directive, 1)[1].split()[0].rstrip(";")
+                            if path_part.startswith("/") and ".log" in path_part and ".." not in path_part:
+                                if path_part not in cfg_paths:
+                                    cfg_paths.append(path_part)
+                if cfg_paths:
+                    parts = []
+                    for cp in cfg_paths[:5]:
+                        scp = shlex.quote(cp)
+                        parts.append(f"zcat {scp}-*.gz 2>/dev/null; zcat {scp}.gz 2>/dev/null; cat {scp} 2>/dev/null")
+                    cat_cmd = f"({'; '.join(parts)}) | tail -n 2000000 || echo ''"
+                    raw = await _ssh(cat_cmd)
+                    if raw.strip():
+                        log_source = f"auto:config ({cfg_paths[0]})"
+
             # Last resort: find any *access* log file under /var/log
             if not raw.strip():
                 find_cmd = (
