@@ -86,11 +86,11 @@ def _validate_license_key(key: str) -> dict:
 
 
 async def _require_pro(request: Request) -> None:
-    """Raise HTTP 402 if a valid Pro license is not active."""
-    key = await db.get_setting("pro_license_key", "")
-    result = _validate_license_key(key)
-    if not result["valid"]:
-        raise HTTPException(402, detail={"pro_required": True, "message": result["message"]})
+    """Raise HTTP 402 if a valid Pro license is not active.
+
+    Currently disabled — all features are unlocked during development.
+    """
+    return
 
 
 STATIC_DIR = Path(__file__).parent / "static"

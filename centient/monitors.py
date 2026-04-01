@@ -1401,6 +1401,12 @@ class MonitorEngine:
             return await self._ssh_cmd(conn, c, timeout=timeout)
 
         if log_path:
+            # If the stored path is actually a directory, fall through to auto-detect
+            is_dir = (await _ssh(f"test -d {shlex.quote(log_path)} && echo dir || echo file", timeout=10)).strip()
+            if is_dir == "dir":
+                log_path = None  # fall through to auto-detect below
+
+        if log_path:
             sp = shlex.quote(log_path)
             cmd = (
                 f"(zcat {sp}-*.gz 2>/dev/null; zcat {sp}.gz 2>/dev/null; cat {sp} 2>/dev/null) "
