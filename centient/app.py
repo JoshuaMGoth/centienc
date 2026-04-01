@@ -1482,6 +1482,8 @@ async def api_analytics(request: Request):
         except Exception as exc:
             logger.debug("Log path auto-detection failed for website %s: %s", website.get("name"), exc)
 
+    logger.info("ANALYTICS DEBUG: server=%s log_path=%r website=%s", 
+                server.get("name"), log_path, website.get("name") if website else None)
     result = await engine.get_analytics(server, days=days, log_path=log_path)
     return {"ok": True, **result}
 

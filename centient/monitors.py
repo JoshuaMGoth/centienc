@@ -436,11 +436,16 @@ class MonitorEngine:
 
     async def _ssh_sudo_cmd(self, conn: asyncssh.SSHClientConnection, cmd: str,
                             sudo_pass: str | None = None, timeout: int = 15) -> str:
-        """Run a sudo command over SSH."""
+        """Run a sudo command over SSH.
+
+        Wraps the command in ``bash -c`` so complex shell constructs
+        (sub-shells, pipes, ``||``) survive the sudo wrapper.
+        """
+        import shlex
         if sudo_pass:
-            remote = f'echo "{sudo_pass}" | sudo -S {cmd} 2>/dev/null'
+            remote = f'echo {shlex.quote(sudo_pass)} | sudo -S bash -c {shlex.quote(cmd)} 2>/dev/null'
         else:
-            remote = f'sudo {cmd} 2>/dev/null'
+            remote = f'sudo bash -c {shlex.quote(cmd)} 2>/dev/null'
         return await self._ssh_cmd(conn, remote, timeout)
 
     async def discover_nginx_sites(self, server: dict[str, Any]) -> list[dict[str, str]]:
