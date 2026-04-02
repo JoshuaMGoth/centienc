@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CentienC | Free Infrastructure Monitoring</title>
+    <meta name="description" content="CentienC is a free and open-source infrastructure monitoring tool for servers, websites, Proxmox, services, and live traffic analytics. Pro upgrade available for deep analytics, reports, and attack detection.">
+    <meta name="keywords" content="free monitoring tool, open source monitoring, infrastructure monitoring, server monitoring, website monitoring, proxmox monitoring, self hosted monitoring, fail2ban monitoring, traffic analytics dashboard">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+    <link rel="canonical" href="https://centienc.joshuagoth.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="CentienC">
+    <meta property="og:title" content="CentienC | Free Infrastructure Monitoring">
+    <meta property="og:description" content="Download the free open-source monitoring stack for servers, websites, Proxmox, and traffic analytics. Pro upgrade for deep analytics and reports.">
+    <meta property="og:image" content="https://centienc.joshuagoth.com/assets/centienc-og.png">
+    <meta property="og:url" content="https://centienc.joshuagoth.com/">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@joshuagoth">
+    <meta name="twitter:title" content="CentienC | Free Infrastructure Monitoring">
+    <meta name="twitter:description" content="Beautiful self-hosted monitoring with a free open-source server stack and a fully featured companion iPhone app.">
+    <meta name="twitter:image" content="https://centienc.joshuagoth.com/assets/centienc-og.png">
+    <link rel="icon" type="image/png" href="assets/centienc-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "CentienC",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Linux",
+        "description": "Free and open-source infrastructure monitoring for servers, websites, Proxmox, services, and traffic analytics.",
+        "url": "https://centienc.joshuagoth.com/",
+        "downloadUrl": "https://centienc.joshuagoth.com/#downloads",
+        "offers": [
+            {
+                "@type": "Offer",
+                "name": "Free",
+                "price": "0",
+                "priceCurrency": "USD"
+            },
+            {
+                "@type": "Offer",
+                "name": "Pro",
+                "price": "69.99",
+                "priceCurrency": "USD",
+                "priceSpecification": {
+                    "@type": "UnitPriceSpecification",
+                    "billingDuration": "P1Y"
+                }
+            }
+        ],
+        "author": {
+            "@type": "Person",
+            "name": "Joshua M. Goth",
+            "url": "https://joshuagoth.com"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "JoshuaGoth Software",
+            "url": "https://joshuagoth.com"
+        },
+        "sameAs": [
+            "https://github.com/JoshuaMGoth/centienc",
+            "https://joshuagoth.com"
+        ]
+    }
+    </script>
+</head>
+<body>
+    <div class="site-shell">
+        <div class="demo-banner">
+            <span class="pulse"></span>
+            FREE OPEN-SOURCE MONITORING PLATFORM · SELF-HOSTED · BEAUTIFUL BY DEFAULT
+            <span class="pulse"></span>
+        </div>
+
+        <header class="topbar">
+            <a class="brand" href="#hero" aria-label="CentienC home">
+                <img src="assets/centienc-logo.png" alt="CentienC logo">
+                <div>
+                    <strong>CentienC</strong>
+                    <span>Open-source monitoring for modern infrastructure</span>
+                </div>
+            </a>
+
+            <button class="mobile-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false">
+                <i data-lucide="menu"></i>
+            </button>
+
+            <nav class="nav" aria-label="Primary navigation">
+                <a href="#overview">Overview</a>
+                <a href="#features">Features</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#downloads">Downloads</a>
+                <a href="#demo">Demo</a>
+                <a href="#iphone-app">iPhone App</a>
+                <a href="#faq">FAQ</a>
+                <a href="docs.html">Docs</a>
+                <a href="https://github.com/JoshuaMGoth/centienc" target="_blank" rel="noreferrer">GitHub</a>
+            </nav>
+        </header>
+
+        <main>
+            <!-- ═══ Hero ═══ -->
+            <section class="hero section" id="hero">
+                <div class="hero-copy reveal">
+                    <div class="eyebrow">Designed by a web creator, for web creators</div>
+                    <h1>CentienC makes infrastructure feel alive.</h1>
+                    <p class="hero-text">
+                        CentienC was built to cut through monitoring bloat. You get plain-view, common-sense data for
+                        servers, websites, Proxmox, traffic, PM2, and security events without jargon or noise.
+                        Clean. Simple. Exact.
+                    </p>
+                    <div class="hero-actions">
+                        <a class="button button-primary" href="#downloads">Download Free Software</a>
+                        <a class="button button-secondary" href="#pricing">See Pricing</a>
+                    </div>
+                    <div class="hero-note">
+                        <span><i data-lucide="shield-check"></i> Free and open-source core</span>
+                        <span><i data-lucide="server-cog"></i> Self-hosted</span>
+                        <span><i data-lucide="smartphone"></i> iPhone companion app</span>
+                    </div>
+                </div>
+
+                <div class="hero-panel reveal reveal-delay-1">
+                    <div class="panel-header">
+                        <h2>Live Overview</h2>
+                        <span class="panel-clock" id="heroClock">--:--:--</span>
+                    </div>
+                    <div class="status-banner ok">All systems operational</div>
+                    <div class="metric-strip">
+                        <article class="metric-card">
+                            <span class="metric-label">Req / min</span>
+                            <strong class="metric-value counter" data-target="24.6">0</strong>
+                            <span class="metric-sub">Traffic at a glance</span>
+                        </article>
+                        <article class="metric-card">
+                            <span class="metric-label">PM2</span>
+                            <strong class="metric-value counter" data-target="29">0</strong>
+                            <span class="metric-sub">Processes online</span>
+                        </article>
+                        <article class="metric-card">
+                            <span class="metric-label">Sites</span>
+                            <strong class="metric-value counter" data-target="7">0</strong>
+                            <span class="metric-sub">Monitored domains</span>
+                        </article>
+                        <article class="metric-card">
+                            <span class="metric-label">Blocked IPs</span>
+                            <strong class="metric-value counter" data-target="51">0</strong>
+                            <span class="metric-sub">Historical defense</span>
+                        </article>
+                    </div>
+                    <div class="server-stack">
+                        <div class="server-pill">
+                            <div class="server-pill-head"><span class="pill-dot on"></span> Production VPS</div>
+                            <div class="server-pill-grid">
+                                <div><strong>0.88</strong><span>CPU</span></div>
+                                <div><strong>18.4%</strong><span>Memory</span></div>
+                                <div><strong>18.8%</strong><span>Disk</span></div>
+                                <div><strong>15</strong><span>Conns</span></div>
+                            </div>
+                        </div>
+                        <div class="server-pill">
+                            <div class="server-pill-head"><span class="pill-dot on"></span> Proxmox Host</div>
+                            <div class="server-pill-grid">
+                                <div><strong>0.14</strong><span>CPU</span></div>
+                                <div><strong>25.0%</strong><span>Memory</span></div>
+                                <div><strong>14.9%</strong><span>Disk</span></div>
+                                <div><strong>4</strong><span>Conns</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ Overview ═══ -->
+            <section class="section" id="overview">
+                <div class="section-heading reveal">
+                    <div class="section-title">Overview</div>
+                    <h2>Why CentienC exists</h2>
+                    <p>
+                        Other monitoring tools can offer great features, but too often they bury the signal in bloat.
+                        CentienC was designed to solve that problem by showing exactly what you need to see, exactly where
+                        you need to see it. It is built for website administrators, marketers, technical teams, and
+                        non-technical users alike.
+                    </p>
+                </div>
+
+                <div class="overview-grid">
+                    <article class="feature-panel reveal">
+                        <div class="icon-badge"><i data-lucide="radar"></i></div>
+                        <h3>Plain-view data first</h3>
+                        <p>Read your infrastructure at a glance with clear cards, direct labels, and practical metrics that make immediate sense</p>
+                    </article>
+                    <article class="feature-panel reveal reveal-delay-1">
+                        <div class="icon-badge"><i data-lucide="zap"></i></div>
+                        <h3>No jargon, no digging</h3>
+                        <p>CentienC removes unnecessary complexity so you do not need to sift through weeds to find what matters most</p>
+                    </article>
+                    <article class="feature-panel reveal reveal-delay-2">
+                        <div class="icon-badge"><i data-lucide="shield"></i></div>
+                        <h3>Built for every role</h3>
+                        <p>From web administrators to marketers to non-technical stakeholders, everyone can understand system health quickly and act with confidence</p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ═══ Features ═══ -->
+            <section class="section" id="features">
+                <div class="section-heading reveal">
+                    <div class="section-title">Features</div>
+                    <h2>Everything you need to monitor with confidence</h2>
+                    <p>The free open-source core gives you a fully functional monitoring system. Upgrade to Pro for deep analytics, reports, and attack intelligence.</p>
+                </div>
+
+                <div class="cards-grid cards-grid-3">
+                    <article class="card reveal">
+                        <div class="card-badge free">Free</div>
+                        <i data-lucide="server" class="card-icon"></i>
+                        <h3>Server Monitoring</h3>
+                        <p>Track CPU, RAM, disk, network, uptime, connection counts, and load through SSH-based telemetry</p>
+                    </article>
+                    <article class="card reveal reveal-delay-1">
+                        <div class="card-badge free">Free</div>
+                        <i data-lucide="globe" class="card-icon"></i>
+                        <h3>Website Monitoring</h3>
+                        <p>Validate status codes, response health, SSL state, and per-site request activity from one dashboard</p>
+                    </article>
+                    <article class="card reveal reveal-delay-2">
+                        <div class="card-badge free">Free</div>
+                        <i data-lucide="boxes" class="card-icon"></i>
+                        <h3>Proxmox Awareness</h3>
+                        <p>See containers and VMs alongside your infrastructure with API-token powered Proxmox integration</p>
+                    </article>
+                    <article class="card reveal">
+                        <div class="card-badge free">Free</div>
+                        <i data-lucide="activity" class="card-icon"></i>
+                        <h3>Live Request Feed</h3>
+                        <p>Follow live nginx traffic with method, path, visitor IP, status behavior, and site-level context</p>
+                    </article>
+                    <article class="card reveal reveal-delay-1">
+                        <div class="card-badge free">Free</div>
+                        <i data-lucide="bell-ring" class="card-icon"></i>
+                        <h3>Notifications</h3>
+                        <p>Configure webhook, email, Discord, and push alerts so outages and incidents reach you immediately</p>
+                    </article>
+                    <article class="card reveal reveal-delay-2">
+                        <div class="card-badge free">Free</div>
+                        <i data-lucide="shield-alert" class="card-icon"></i>
+                        <h3>Incident Tracking</h3>
+                        <p>Automatic incident creation and resolution with downtime duration tracking and alert history</p>
+                    </article>
+                    <article class="card reveal">
+                        <div class="card-badge pro">Pro</div>
+                        <i data-lucide="bar-chart-3" class="card-icon"></i>
+                        <h3>Deep Analytics</h3>
+                        <p>Top pages, unique visitors, heatmaps, device and browser breakdown, traffic sources, search queries</p>
+                    </article>
+                    <article class="card reveal reveal-delay-1">
+                        <div class="card-badge pro">Pro</div>
+                        <i data-lucide="file-text" class="card-icon"></i>
+                        <h3>Reports &amp; Export</h3>
+                        <p>SLA tracking, uptime reports, incident summaries, and fail2ban reports — export to CSV, HTML, or PDF</p>
+                    </article>
+                    <article class="card reveal reveal-delay-2">
+                        <div class="card-badge pro">Pro</div>
+                        <i data-lucide="scan-search" class="card-icon"></i>
+                        <h3>Attack Detection</h3>
+                        <p>SQL injection, XSS, path traversal, command injection, bot classification, and scanner identification</p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ═══ Pricing ═══ -->
+            <section class="section" id="pricing">
+                <div class="section-heading reveal">
+                    <div class="section-title">Pricing</div>
+                    <h2>Free to start. Pro when you're ready.</h2>
+                    <p>The core monitoring platform is free and open source forever. Upgrade to Pro for deep analytics, reports, and security intelligence that help you understand your audience and protect your infrastructure.</p>
+                </div>
+
+                <div class="pricing-grid">
+                    <article class="pricing-card reveal">
+                        <div class="pricing-tier">Free</div>
+                        <div class="pricing-price">$0</div>
+                        <div class="pricing-period">forever</div>
+                        <ul class="pricing-features">
+                            <li class="included">Server monitoring (CPU, RAM, disk, network)</li>
+                            <li class="included">Website &amp; service monitoring</li>
+                            <li class="included">Proxmox integration (LXC + VM)</li>
+                            <li class="included">Live nginx request feed</li>
+                            <li class="included">Live traffic map with IP geolocation</li>
+                            <li class="included">Email, Discord &amp; webhook alerts</li>
+                            <li class="included">Push notifications (iPhone app)</li>
+                            <li class="included">Incident tracking &amp; history</li>
+                            <li class="included">TV / kiosk mode</li>
+                            <li class="included">PM2 &amp; systemd monitoring</li>
+                            <li class="included">Fail2ban visibility</li>
+                            <li class="included">Admin panel &amp; setup wizard</li>
+                            <li class="excluded">Deep web analytics</li>
+                            <li class="excluded">Reports &amp; CSV/PDF export</li>
+                            <li class="excluded">Attack detection</li>
+                        </ul>
+                        <div class="card-actions">
+                            <a class="button button-secondary" href="#downloads" style="width:100%">Download Free</a>
+                        </div>
+                    </article>
+
+                    <article class="pricing-card pricing-featured reveal reveal-delay-1">
+                        <div class="pricing-popular">Most Popular</div>
+                        <div class="pricing-tier">Pro</div>
+                        <div class="pricing-price">$69.99</div>
+                        <div class="pricing-period">per year</div>
+                        <ul class="pricing-features">
+                            <li class="included">Everything in Free, plus:</li>
+                            <li class="included"><strong>Deep web analytics</strong> — top pages, unique visitors, heatmaps</li>
+                            <li class="included"><strong>Traffic intelligence</strong> — device, browser, source breakdown</li>
+                            <li class="included"><strong>Search query extraction</strong> from referrer data</li>
+                            <li class="included"><strong>Attack detection</strong> — SQLi, XSS, path traversal, scanners</li>
+                            <li class="included"><strong>Bot classification</strong> — SEMrush, Ahrefs, Moz, Googlebot</li>
+                            <li class="included"><strong>Reports</strong> — SLA, uptime, incidents, fail2ban</li>
+                            <li class="included"><strong>Export</strong> — CSV, HTML, and PDF</li>
+                            <li class="included"><strong>iPhone app</strong> — full analytics &amp; reports on mobile</li>
+                            <li class="included">Priority email support</li>
+                        </ul>
+                        <div class="card-actions">
+                            <a class="button button-primary" href="mailto:pro@centienc.com?subject=CentienC%20Pro%20License" style="width:100%">Get Pro License</a>
+                        </div>
+                        <p class="pricing-note">Annual license: $69.99/year. License tied to your server instance. Unlimited users and devices.</p>
+                    </article>
+                </div>
+
+                <div class="pricing-note-block reveal">
+                    <p><strong>How it works:</strong> Purchase a Pro license → receive your key instantly via email → paste it into Admin → License → all Pro features unlock immediately. No cloud dependency. Your data stays on your server.</p>
+                </div>
+            </section>
+
+            <!-- ═══ How It Works ═══ -->
+            <section class="section" id="how-it-works">
+                <div class="section-heading reveal">
+                    <div class="section-title">How It Works</div>
+                    <h2>From server install to mobile visibility</h2>
+                </div>
+
+                <div class="timeline">
+                    <article class="timeline-item reveal">
+                        <span class="timeline-step">1</span>
+                        <div>
+                            <h3>Install the monitoring server</h3>
+                            <p>Deploy the CentienC server stack on Linux or a Proxmox LXC using the provided installers</p>
+                        </div>
+                    </article>
+                    <article class="timeline-item reveal reveal-delay-1">
+                        <span class="timeline-step">2</span>
+                        <div>
+                            <h3>Add infrastructure targets</h3>
+                            <p>Configure servers, websites, ports, and Proxmox endpoints from the setup wizard and admin interface</p>
+                        </div>
+                    </article>
+                    <article class="timeline-item reveal reveal-delay-2">
+                        <span class="timeline-step">3</span>
+                        <div>
+                            <h3>Watch your data converge</h3>
+                            <p>Live requests, uptime checks, service states, PM2 data, banned IPs, and analytics populate automatically</p>
+                        </div>
+                    </article>
+                    <article class="timeline-item reveal">
+                        <span class="timeline-step">4</span>
+                        <div>
+                            <h3>Upgrade to Pro (optional)</h3>
+                            <p>Paste a Pro license key into Admin → License to unlock deep analytics, reports, attack detection, and full iPhone app features</p>
+                        </div>
+                    </article>
+                    <article class="timeline-item reveal reveal-delay-1">
+                        <span class="timeline-step">5</span>
+                        <div>
+                            <h3>Connect the iPhone app</h3>
+                            <p>Download the companion app, point it at your server, and get push notifications and mobile visibility from anywhere</p>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ═══ Downloads ═══ -->
+            <section class="section" id="downloads">
+                <div class="section-heading reveal">
+                    <div class="section-title">Downloads</div>
+                    <h2>Get the software</h2>
+                    <p>Download a free, open-source monitoring platform for servers, websites, Proxmox, traffic, PM2, services, and security events. Pair it with the companion iPhone app for push-style visibility from anywhere.</p>
+                </div>
+
+                <div class="cards-grid cards-grid-3">
+                    <article class="card card-accent reveal">
+                        <h3>Open-Source Core</h3>
+                        <p>CentienC is open-source software created by Joshua Goth and released under GNU GPLv3. Download the latest release of the monitoring engine from GitHub.</p>
+                        <div class="card-actions">
+                            <a class="button button-primary" href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noreferrer">Latest Release</a>
+                            <a class="button button-secondary" href="https://github.com/JoshuaMGoth/centienc" target="_blank" rel="noreferrer">Source Code</a>
+                        </div>
+                    </article>
+                    <article class="card reveal reveal-delay-1">
+                        <h3>One-Line Installers</h3>
+                        <p>Copy and paste to deploy on Linux or Proxmox:</p>
+                        <div>
+                            <p style="margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600;">Universal Linux Installer</p>
+                            <pre><code>curl -fsSL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/universal/install.sh | sudo bash</code></pre>
+                        </div>
+                        <div style="margin-top: 1rem;">
+                            <p style="margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600;">Proxmox LXC Helper</p>
+                            <pre><code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/proxmox/create-centienc-lxc.sh) \
+--name centienc --ip dhcp --cores 1 --memory 512</code></pre>
+                        </div>
+                    </article>
+                    <article class="card reveal reveal-delay-2">
+                        <h3>Documentation</h3>
+                        <p>Get installation instructions, configuration help, onboarding flow, and Tailscale guidance.</p>
+                        <div class="card-actions">
+                            <a class="button button-secondary" href="docs.html">Open Docs</a>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ═══ iPhone App ═══ -->
+            <section class="section" id="iphone-app">
+                <div class="section-heading reveal">
+                    <div class="section-title">iPhone App</div>
+                    <h2>A fully featured companion — not a stripped-down viewer</h2>
+                    <p>The CentienC iPhone app is currently in development and will be a complete mobile monitoring experience. Free users get core monitoring on mobile. Pro subscribers unlock the full analytics and reports experience directly on their phone.</p>
+                </div>
+
+                <div class="iphone-layout">
+                    <article class="feature-panel reveal">
+                        <div class="icon-badge"><i data-lucide="smartphone-charging"></i></div>
+                        <h3>Free mobile features</h3>
+                        <p>Every CentienC user gets essential mobile monitoring at no cost:</p>
+                        <ul class="feature-list">
+                            <li>Live server health and status overview</li>
+                            <li>Push notifications for outages and incidents</li>
+                            <li>Website and service status at a glance</li>
+                            <li>Proxmox container and VM visibility</li>
+                            <li>Live nginx request feed on mobile</li>
+                        </ul>
+                    </article>
+                    <article class="feature-panel pricing-featured-panel reveal reveal-delay-1">
+                        <div class="icon-badge"><i data-lucide="sparkles"></i></div>
+                        <h3>Pro subscriber features</h3>
+                        <p>Connect to a Pro-licensed CentienC server and the app automatically unlocks everything:</p>
+                        <ul class="feature-list">
+                            <li><strong>Full analytics dashboard</strong> on mobile</li>
+                            <li>Traffic heatmaps, device and browser breakdown</li>
+                            <li>Attack detection alerts and security intelligence</li>
+                            <li>Reports with export (CSV, PDF, HTML)</li>
+                            <li>Search query and referrer analysis</li>
+                        </ul>
+                        <p class="pricing-note" style="margin-top:16px">No separate app subscription needed. The Pro license on your server unlocks all iPhone features.</p>
+                    </article>
+                    <article class="feature-panel reveal reveal-delay-2">
+                        <div class="icon-badge"><i data-lucide="app-window"></i></div>
+                        <h3>How it connects</h3>
+                        <p>The iPhone app connects securely to your self-hosted CentienC server. Your data never passes through our cloud. The app reads the license status from your server and adapts automatically.</p>
+                        <ul class="feature-list">
+                            <li>Point the app at your server URL</li>
+                            <li>Authenticate with your CentienC credentials</li>
+                            <li>Pro features appear when server has a Pro license</li>
+                        </ul>
+                        <div class="card-actions">
+                            <a class="button button-secondary disabled" href="#iphone-app" aria-disabled="true">iPhone App Coming Soon</a>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ═══ Demo ═══ -->
+            <section class="section" id="demo">
+                <div class="section-heading reveal">
+                    <div class="section-title">Demo</div>
+                    <h2>Try the live product walkthrough</h2>
+                    <p>The full interactive demo from the project is now included in this site. Open it directly for the full experience.</p>
+                </div>
+
+                <div class="demo-preview reveal">
+                    <iframe class="demo-frame" src="demo.html" title="CentienC Interactive Demo" loading="lazy"></iframe>
+                    <div class="card-actions">
+                        <a class="button button-primary" href="demo.html">Open Full Demo</a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ═══ FAQ ═══ -->
+            <section class="section" id="faq">
+                <div class="section-heading reveal">
+                    <div class="section-title">FAQ</div>
+                    <h2>Common questions answered</h2>
+                    <p>New to infrastructure monitoring? Here are the questions we hear most often.</p>
+                </div>
+
+                <div class="faq-list">
+
+                    <details class="faq-item reveal">
+                        <summary>What exactly is server monitoring, and do I actually need it?</summary>
+                        <div class="faq-body">
+                            <p>Server monitoring means continuously watching your infrastructure — CPU usage, memory, disk space, running processes, network traffic, and uptime — so you know immediately when something goes wrong. Without it, you find out about problems the same way your users do: when things break.</p>
+                            <p>If you run a website, app, or any online service, monitoring is essential. It's the difference between fixing an issue in two minutes and finding out about it hours later from a frustrated user.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>Do I need to be technical to use CentienC?</summary>
+                        <div class="faq-body">
+                            <p>The install requires basic Linux command-line comfort — you'll need to run a one-line installer and have SSH access to your server. After that, everything is managed through a clean web dashboard built for humans, not just sysadmins.</p>
+                            <p>If you can copy-paste a terminal command and own a server or VPS, you can run CentienC.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>Is CentienC really free? What's the catch?</summary>
+                        <div class="faq-body">
+                            <p>The server software is completely free and open-source under GNU GPLv3. The core monitoring experience — server health, website checks, live traffic, notifications, incident tracking — is free forever with no limits.</p>
+                            <p><strong>Pro features</strong> (deep analytics, reports, attack detection, and export) require a paid license. This is how the project sustains itself. The free tier is a fully functional monitoring system, not a crippled trial.</p>
+                            <p>The companion iPhone app is free to download. It connects to your server and shows core monitoring data. When your server has a Pro license, the app automatically unlocks full analytics and reports on mobile too.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>What do I get with a Pro license?</summary>
+                        <div class="faq-body">
+                            <p>Pro unlocks the business intelligence layer of CentienC:</p>
+                            <ul class="feature-list" style="margin:8px 0">
+                                <li><strong>Deep web analytics</strong> — top pages, unique visitors, heatmaps, hourly/daily traffic patterns</li>
+                                <li><strong>Traffic intelligence</strong> — device types, browsers, traffic sources, search query extraction</li>
+                                <li><strong>Attack detection</strong> — SQL injection, XSS, path traversal, command injection, bot classification</li>
+                                <li><strong>Reports</strong> — SLA tracking, uptime reports, incident summaries, fail2ban reports</li>
+                                <li><strong>Export</strong> — CSV, HTML, and PDF report exports</li>
+                                <li><strong>Full iPhone app</strong> — all analytics and reports available on mobile</li>
+                            </ul>
+                            <p>The license is tied to your server instance. All users and devices connecting to that server get Pro features — no per-seat charges.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>How does the Pro license work technically?</summary>
+                        <div class="faq-body">
+                            <p>You receive a license key after purchase (e.g. <code>CENT-xxxxxxxxxx-XXXXXXXX</code>). Paste it into your CentienC dashboard under Admin → License. The key is cryptographically verified locally — no "phone home" to our servers. Pro features unlock immediately.</p>
+                            <p>The key is HMAC-signed and contains your tier and expiration date. Your CentienC install validates it entirely offline.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>How is CentienC different from Grafana, Datadog, or Zabbix?</summary>
+                        <div class="faq-body">
+                            <p>Grafana, Datadog, and Zabbix are powerful — but they're built for large engineering teams and require significant configuration to get anything useful out of them. Datadog is also expensive at scale.</p>
+                            <p>CentienC is built for the individual developer, small team, or self-hoster who wants instant clarity without a week of setup. You install it, connect your servers, and your dashboard is populated. No PromQL, no complex agent configs, no bloat.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>How does CentienC collect data from my servers?</summary>
+                        <div class="faq-body">
+                            <p>CentienC uses SSH to connect to your target servers and collect metrics directly — CPU load, memory usage, disk space, running processes, nginx access logs, and fail2ban state. For Proxmox, it uses the Proxmox API with a read-only token.</p>
+                            <p>Nothing is installed on your monitored servers. The CentienC backend polls them on a schedule, processes the data, stores it, and serves it to your dashboard and mobile app. Your servers stay clean.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>Can I monitor multiple servers and websites at once?</summary>
+                        <div class="faq-body">
+                            <p>Yes. CentienC is built for multi-target monitoring from the start. Add as many servers, websites, Proxmox nodes, and services as you need. Everything appears on a single unified dashboard.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>Is my monitoring data sent to the cloud or kept private?</summary>
+                        <div class="faq-body">
+                            <p>All data stays on your own server. CentienC is entirely self-hosted — metrics, logs, historical data, and credentials never touch an external cloud service. You run the backend, you own the database, and nothing leaves your infrastructure unless you explicitly configure an outbound notification (like a webhook or email alert).</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>What about the iPhone app? Do I need to pay separately?</summary>
+                        <div class="faq-body">
+                            <p>The iPhone app is free to download. It connects to your self-hosted CentienC server and provides:</p>
+                            <ul class="feature-list" style="margin:8px 0">
+                                <li><strong>Free users:</strong> live health overview, push notifications, server/site status</li>
+                                <li><strong>Pro subscribers:</strong> full analytics, reports, attack detection — everything the web dashboard has, on your phone</li>
+                            </ul>
+                            <p>There is no separate app subscription. The app reads the license status from your server. If your server has a Pro license, the app unlocks all features automatically.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>Why can't the iPhone app connect directly to my servers without the CentienC backend?</summary>
+                        <div class="faq-body">
+                            <p>It's technically possible — iOS can make SSH connections — but it would be a genuinely bad experience. Here's why the backend architecture isn't optional:</p>
+                            <p><strong>Without a backend (direct SSH from iPhone):</strong> The app would have to re-parse raw log files from scratch every time you open it. A 500MB nginx log would drain your battery and take minutes to render. iOS aggressively kills background apps, so there would be no monitoring while the app is closed, no push notifications possible, and any data from periods when the app was closed would be gone once logs rotate. SSH keys stored on your phone also become a serious security risk if your device is lost or stolen.</p>
+                            <p><strong>With the CentienC backend:</strong> Your server runs 24/7 doing all the heavy lifting — parsing logs, aggregating metrics, storing history in a database. The iPhone app simply calls an API endpoint and receives pre-computed JSON. Charts render instantly from small payloads, not raw files. Push notifications work because the backend monitors continuously and pings Apple's push service when thresholds are crossed. Your SSH keys and credentials never leave your server. Multiple devices and users can share the same live dashboard.</p>
+                            <div class="faq-table-wrap">
+                                <table class="faq-table">
+                                    <thead><tr><th>Capability</th><th>Direct SSH (no backend)</th><th>CentienC Backend</th></tr></thead>
+                                    <tbody>
+                                        <tr><td>Real-time charts</td><td class="bad">Slow, battery drain</td><td class="good">Instant, lightweight</td></tr>
+                                        <tr><td>Historical data</td><td class="bad">None — re-parse every time</td><td class="good">Stored in database</td></tr>
+                                        <tr><td>Push notifications</td><td class="bad">Impossible</td><td class="good">Yes, 24/7</td></tr>
+                                        <tr><td>Background monitoring</td><td class="bad">No — iOS kills it</td><td class="good">Always on</td></tr>
+                                        <tr><td>Multi-device support</td><td class="bad">No</td><td class="good">Yes</td></tr>
+                                        <tr><td>Security</td><td class="bad">SSH keys on phone</td><td class="good">Keys stay on server</td></tr>
+                                        <tr><td>Log parsing</td><td class="bad">Phone CPU (slow)</td><td class="good">Server CPU (fast)</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>How often does data refresh on the dashboard?</summary>
+                        <div class="faq-body">
+                            <p>The live request feed updates in near real-time. Server metrics and uptime checks poll on a configurable interval (default: every 30–60 seconds). Historical aggregates update continuously in the background.</p>
+                        </div>
+                    </details>
+
+                    <details class="faq-item reveal">
+                        <summary>What happens if my monitored server goes offline?</summary>
+                        <div class="faq-body">
+                            <p>CentienC marks the target as unreachable on the dashboard and triggers any configured alerts (webhook, email, Discord, push notification). The dashboard clearly shows which services are down vs. healthy, so you always know the current state of your infrastructure at a glance.</p>
+                        </div>
+                    </details>
+
+                </div>
+            </section>
+
+            <!-- ═══ CTA ═══ -->
+            <section class="section cta-section reveal">
+                <div class="cta-card">
+                    <div>
+                        <div class="section-title">Ready to Deploy</div>
+                        <h2>Stand up your monitoring stack today.</h2>
+                        <p>Install the free server software, connect your infrastructure, and upgrade to Pro when you're ready for deep analytics and reports.</p>
+                    </div>
+                    <div class="hero-actions">
+                        <a class="button button-primary" href="https://github.com/JoshuaMGoth/centienc/releases" target="_blank" rel="noreferrer">Download Now</a>
+                        <a class="button button-secondary" href="#pricing">See Pricing</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-grid">
+                <div>
+                    <a class="brand footer-brand" href="#hero">
+                        <img src="assets/centienc-logo.png" alt="CentienC logo">
+                        <div>
+                            <strong>CentienC</strong>
+                            <span>Free infrastructure monitoring</span>
+                        </div>
+                    </a>
+                    <p class="footer-copy">Open-source infrastructure monitoring with an optional Pro upgrade for deep analytics, reports, and attack detection.</p>
+                </div>
+                <nav class="footer-links" aria-label="Footer links">
+                    <a href="#overview">Overview</a>
+                    <a href="#features">Features</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="#downloads">Downloads</a>
+                    <a href="#demo">Demo</a>
+                    <a href="docs.html">Docs</a>
+                    <a href="https://github.com/JoshuaMGoth/centienc" target="_blank" rel="noreferrer">GitHub</a>
+                </nav>
+            </div>
+            <div class="footer-bottom">
+                <span>Copyright &copy; 2026 CentienC</span>
+                <span>A JoshuaGoth Software</span>
+                <a href="https://joshuagoth.com" target="_blank" rel="noreferrer">joshuagoth.com</a>
+                <a href="https://centienc.joshuagoth.com" target="_blank" rel="noreferrer">centienc.joshuagoth.com</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

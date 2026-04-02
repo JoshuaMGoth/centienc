@@ -260,6 +260,26 @@ async def lifespan(application: FastAPI):
     engine = MonitorEngine(db)
     await engine.start()
 
+    # Optional: attempt to load a proprietary plugin package `centienc_pro`
+    # when a valid Pro license is present. This keeps Pro code out of the
+    # public repo and allows the plugin to register additional routes,
+    # report builders, or report/export handlers.
+    try:
+        settings = await db.get_all_settings()
+        license_key = settings.get("pro_license_key", "")
+        license_info = _validate_license_key(license_key)
+        if license_info.get("pro_features"):
+            try:
+                import importlib
+                pro_pkg = importlib.import_module("centienc_pro")
+                if hasattr(pro_pkg, "register_pro"):
+                    pro_pkg.register_pro(app=application, db=db, engine=engine)
+                    logger.info("centienc_pro plugin loaded and registered")
+            except Exception as exc:
+                logger.warning("Failed to load centienc_pro plugin: %s", exc)
+    except Exception:
+        pass
+
     global _ws_broadcast_task
     _ws_broadcast_task = asyncio.create_task(_ws_broadcast_loop())
 
