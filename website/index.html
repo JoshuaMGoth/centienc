@@ -329,9 +329,10 @@
                             <li class="included">Priority email support</li>
                         </ul>
                         <div class="card-actions">
-                            <a class="button button-primary" href="mailto:pro@centienc.com?subject=CentienC%20Pro%20License" style="width:100%">Get Pro License</a>
+                            <button class="button button-primary" id="buyProBtn" onclick="upgradeToPro()" style="width:100%">Get Pro License &mdash; $69.99/yr</button>
                         </div>
-                        <p class="pricing-note">Annual license: $69.99/year. License tied to your server instance. Unlimited users and devices.</p>
+                        <p class="pricing-note" id="checkoutMsg" style="min-height:1.2em"></p>
+                        <p class="pricing-note">Annual license. License tied to your server instance. Unlimited users and devices.</p>
                     </article>
                 </div>
 
