@@ -51,17 +51,24 @@ def _validate_license_key(key: str) -> dict:
     """Validate a CentienC Pro license key.
     Key format: CENT-{base64url_payload}-{hmac16upper}
     If _LICENSE_SECRET is not set, every install runs as Pro (self-hosted mode).
+
+    Always includes:
+      mode         – "self_hosted" | "licensed" | "free"
+      pro_features – bool, whether Pro features are active
     """
     if not _LICENSE_SECRET:
         return {"valid": True, "tier": "pro", "domain": "self-hosted",
-                "expires": None, "message": "Self-hosted mode — all features unlocked"}
+                "expires": None, "mode": "self_hosted", "pro_features": True,
+                "message": "Self-hosted mode — all features unlocked"}
     if not key:
         return {"valid": False, "tier": None, "domain": None, "expires": None,
+                "mode": "free", "pro_features": False,
                 "message": "No license key configured"}
     try:
         parts = key.strip().split("-")
         if len(parts) < 3 or parts[0].upper() != "CENT":
             return {"valid": False, "tier": None, "domain": None, "expires": None,
+                    "mode": "free", "pro_features": False,
                     "message": "Invalid key format"}
         payload_b64 = parts[1]
         sig = parts[2].upper()
@@ -70,27 +77,36 @@ def _validate_license_key(key: str) -> dict:
                             payload_b64.encode(), hashlib.sha256).hexdigest()[:16].upper()
         if not hmac.compare_digest(sig, expected):
             return {"valid": False, "tier": None, "domain": None, "expires": None,
+                    "mode": "free", "pro_features": False,
                     "message": "Invalid license signature"}
         pad = (4 - len(payload_b64) % 4) % 4
         payload = json.loads(base64.b64decode(payload_b64 + "=" * pad).decode())
         expires = payload.get("expires")
         if expires and date.fromisoformat(expires) < date.today():
             return {"valid": False, "tier": None, "domain": None, "expires": expires,
+                    "mode": "free", "pro_features": False,
                     "message": f"License expired {expires}"}
         return {"valid": True, "tier": payload.get("tier", "pro"),
                 "domain": payload.get("domain"), "expires": expires,
+                "mode": "licensed", "pro_features": True,
                 "message": "License valid"}
     except Exception:
         return {"valid": False, "tier": None, "domain": None, "expires": None,
+                "mode": "free", "pro_features": False,
                 "message": "License validation error"}
 
 
 async def _require_pro(request: Request) -> None:
     """Raise HTTP 402 if a valid Pro license is not active.
 
-    Currently disabled — all features are unlocked during development.
+    Self-hosted installs (no CENTIENT_LICENSE_SECRET set) always pass.
     """
-    return
+    if not _LICENSE_SECRET:
+        return  # self-hosted mode — everything unlocked
+    key = await db.get_setting("pro_license_key", "")
+    result = _validate_license_key(key)
+    if not result["valid"]:
+        raise HTTPException(402, result.get("message", "Pro license required"))
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -162,6 +178,11 @@ async def _build_overview_payload() -> dict[str, Any]:
             node["error"] = cache.get("error")
             overview["proxmox_nodes"].append(node)
 
+    # Embed license status so every client (dashboard, WebSocket, iPhone app)
+    # can detect free vs licensed vs self-hosted without a separate round-trip.
+    license_key = settings.get("pro_license_key", "")
+    license_info = _validate_license_key(license_key)
+
     return {
         **overview,
         "settings": {
@@ -171,6 +192,13 @@ async def _build_overview_payload() -> dict[str, Any]:
             "check_interval": settings.get("check_interval", "60"),
         },
         "incidents": incidents,
+        "license": {
+            "mode": license_info["mode"],
+            "pro_features": license_info["pro_features"],
+            "tier": license_info.get("tier"),
+            "expires": license_info.get("expires"),
+            "message": license_info.get("message"),
+        },
     }
 
 

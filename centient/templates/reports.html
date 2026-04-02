@@ -238,17 +238,17 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-se
   <p>Comprehensive reports with SLA tracking, MTTR, traffic analytics, heatmaps, device/browser breakdown, referrers, and export are part of <strong style="color:var(--blue)">CentienC Pro</strong>.</p>
   <div class="pro-plans">
     <div class="pro-plan">
-      <div class="pro-plan-name">Starter</div>
-      <div class="pro-plan-price">$9<span class="pro-plan-period">/mo</span></div>
-      <div class="pro-plan-features">✓ Analytics<br>✓ Reports<br>✓ 3 websites<br>✓ 90-day history</div>
+      <div class="pro-plan-name">Free</div>
+      <div class="pro-plan-price">$0<span class="pro-plan-period"> forever</span></div>
+      <div class="pro-plan-features">✓ Server &amp; site monitoring<br>✓ Live traffic feed<br>✓ Notifications &amp; alerts<br>✓ Incident tracking</div>
     </div>
     <div class="pro-plan featured">
       <div class="pro-plan-name">Pro ⭐</div>
       <div class="pro-plan-price">$29<span class="pro-plan-period">/mo</span></div>
-      <div class="pro-plan-features">✓ Everything<br>✓ Unlimited sites<br>✓ 1-year history<br>✓ CSV/PDF export</div>
+      <div class="pro-plan-features">✓ Deep web analytics<br>✓ Reports &amp; export (CSV/PDF)<br>✓ Attack detection<br>✓ Full iPhone app features</div>
     </div>
   </div>
-  <p style="font-size:.83em">Contact <a href="mailto:support@centienc.com" style="color:var(--blue)">support@centienc.com</a> to get started · or enter your license key:</p>
+  <p style="font-size:.83em">Visit <a href="https://centienc.joshuagoth.com/#pricing" target="_blank" style="color:var(--blue)">centienc.joshuagoth.com</a> to get a Pro license · or activate one below:</p>
   <div class="pro-key-row">
     <input id="licKeyInput" class="pro-key-input" type="text" placeholder="CENT-XXXXXXXXXXXX-XXXXXXXX" autocomplete="off" spellcheck="false">
     <button class="pro-activate-btn" onclick="activateLicense()">Activate</button>
@@ -343,17 +343,21 @@ function destroyCharts(){
 }
 
 // ── Pro License ────────────────────────────────────────────────
+// The server always returns mode: "self_hosted" | "licensed" | "free"
+// and pro_features: true/false so the app never has to guess.
 async function checkProLicense(){
   try{
     const r = await fetch('/api/license');
-    if(!r.ok) return true;
+    if(!r.ok) return true; // network error — allow access rather than block
     const d = await r.json();
-    if(!d.valid){
+    // pro_features is explicitly false only when the server is in "free" mode
+    // (i.e. _LICENSE_SECRET is set but no valid key is configured)
+    if(d.pro_features === false){
       document.getElementById('proWall').style.display='flex';
       return false;
     }
     return true;
-  }catch(e){ return true; }
+  }catch(e){ return true; } // fail open — don't block on network errors
 }
 async function activateLicense(){
   const key = (document.getElementById('licKeyInput').value||'').trim();
