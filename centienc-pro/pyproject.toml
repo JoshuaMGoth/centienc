@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "centienc-pro"
+version = "0.1.0"
+description = "CentienC Pro private plugin (sample skeleton)"
+authors = [
+  {name = "Joshua M. Goth"}
+]
+dependencies = []
