@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-from datetime import date, datetime, timezone
-import hashlib
-import hmac
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -36,77 +33,10 @@ from .reports import build_report_data, export_csv, export_html, export_pdf_html
 
 logger = logging.getLogger("centient.app")
 
-# ── Pro License System ────────────────────────────────────────────────────────
-# Set CENTIENT_LICENSE_SECRET in the environment for customer deployments.
-# If the env var is NOT set (default / self-hosted), all pro features are unlocked.
-_LICENSE_SECRET: str = os.getenv("CENTIENT_LICENSE_SECRET", "")
-
 # ── GitHub Updates ─────────────────────────────────────────────────────────────
 # Set GITHUB_TOKEN to a PAT with repo scope so /api/updates can fetch releases
 # from a private repo.  Not required for public repos.
 _GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
-
-
-def _validate_license_key(key: str) -> dict:
-    """Validate a CentienC Pro license key.
-    Key format: CENT-{base64url_payload}-{hmac16upper}
-    If _LICENSE_SECRET is not set, every install runs as Pro (self-hosted mode).
-
-    Always includes:
-      mode         – "self_hosted" | "licensed" | "free"
-      pro_features – bool, whether Pro features are active
-    """
-    if not _LICENSE_SECRET:
-        return {"valid": True, "tier": "pro", "domain": "self-hosted",
-                "expires": None, "mode": "self_hosted", "pro_features": True,
-                "message": "Self-hosted mode — all features unlocked"}
-    if not key:
-        return {"valid": False, "tier": None, "domain": None, "expires": None,
-                "mode": "free", "pro_features": False,
-                "message": "No license key configured"}
-    try:
-        parts = key.strip().split("-")
-        if len(parts) < 3 or parts[0].upper() != "CENT":
-            return {"valid": False, "tier": None, "domain": None, "expires": None,
-                    "mode": "free", "pro_features": False,
-                    "message": "Invalid key format"}
-        payload_b64 = parts[1]
-        sig = parts[2].upper()
-        # Constant-time HMAC compare
-        expected = hmac.new(_LICENSE_SECRET.encode(),
-                            payload_b64.encode(), hashlib.sha256).hexdigest()[:16].upper()
-        if not hmac.compare_digest(sig, expected):
-            return {"valid": False, "tier": None, "domain": None, "expires": None,
-                    "mode": "free", "pro_features": False,
-                    "message": "Invalid license signature"}
-        pad = (4 - len(payload_b64) % 4) % 4
-        payload = json.loads(base64.b64decode(payload_b64 + "=" * pad).decode())
-        expires = payload.get("expires")
-        if expires and date.fromisoformat(expires) < date.today():
-            return {"valid": False, "tier": None, "domain": None, "expires": expires,
-                    "mode": "free", "pro_features": False,
-                    "message": f"License expired {expires}"}
-        return {"valid": True, "tier": payload.get("tier", "pro"),
-                "domain": payload.get("domain"), "expires": expires,
-                "mode": "licensed", "pro_features": True,
-                "message": "License valid"}
-    except Exception:
-        return {"valid": False, "tier": None, "domain": None, "expires": None,
-                "mode": "free", "pro_features": False,
-                "message": "License validation error"}
-
-
-async def _require_pro(request: Request) -> None:
-    """Raise HTTP 402 if a valid Pro license is not active.
-
-    Self-hosted installs (no CENTIENT_LICENSE_SECRET set) always pass.
-    """
-    if not _LICENSE_SECRET:
-        return  # self-hosted mode — everything unlocked
-    key = await db.get_setting("pro_license_key", "")
-    result = _validate_license_key(key)
-    if not result["valid"]:
-        raise HTTPException(402, result.get("message", "Pro license required"))
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -178,11 +108,6 @@ async def _build_overview_payload() -> dict[str, Any]:
             node["error"] = cache.get("error")
             overview["proxmox_nodes"].append(node)
 
-    # Embed license status so every client (dashboard, WebSocket, iPhone app)
-    # can detect free vs licensed vs self-hosted without a separate round-trip.
-    license_key = settings.get("pro_license_key", "")
-    license_info = _validate_license_key(license_key)
-
     return {
         **overview,
         "settings": {
@@ -192,13 +117,7 @@ async def _build_overview_payload() -> dict[str, Any]:
             "check_interval": settings.get("check_interval", "60"),
         },
         "incidents": incidents,
-        "license": {
-            "mode": license_info["mode"],
-            "pro_features": license_info["pro_features"],
-            "tier": license_info.get("tier"),
-            "expires": license_info.get("expires"),
-            "message": license_info.get("message"),
-        },
+        "license": {"mode": "open_source", "pro_features": True},
     }
 
 
@@ -259,26 +178,6 @@ async def lifespan(application: FastAPI):
 
     engine = MonitorEngine(db)
     await engine.start()
-
-    # Optional: attempt to load a proprietary plugin package `centienc_pro`
-    # when a valid Pro license is present. This keeps Pro code out of the
-    # public repo and allows the plugin to register additional routes,
-    # report builders, or report/export handlers.
-    try:
-        settings = await db.get_all_settings()
-        license_key = settings.get("pro_license_key", "")
-        license_info = _validate_license_key(license_key)
-        if license_info.get("pro_features"):
-            try:
-                import importlib
-                pro_pkg = importlib.import_module("centienc_pro")
-                if hasattr(pro_pkg, "register_pro"):
-                    pro_pkg.register_pro(app=application, db=db, engine=engine)
-                    logger.info("centienc_pro plugin loaded and registered")
-            except Exception as exc:
-                logger.warning("Failed to load centienc_pro plugin: %s", exc)
-    except Exception:
-        pass
 
     global _ws_broadcast_task
     _ws_broadcast_task = asyncio.create_task(_ws_broadcast_loop())
@@ -1248,7 +1147,7 @@ async def update_settings(request: Request):
     await _require_auth_or_401(request)
     body = await request.json()
     safe_keys = {"app_title", "theme", "check_interval", "retention_days",
-                 "notifications_enabled", "auth_enabled", "pro_license_key"}
+                 "notifications_enabled", "auth_enabled"}
     data = {k: str(v) for k, v in body.items() if k in safe_keys}
     await db.update_settings(data)
     return {"ok": True}
@@ -1430,43 +1329,19 @@ async def test_push(request: Request):
 #  Web Analytics API
 # ═══════════════════════════════════════════════════════════════════
 
-@app.get("/api/license")
-async def get_license(request: Request):
-    """Return current Pro license status."""
-    await _require_auth_or_401(request)
-    key = await db.get_setting("pro_license_key", "")
-    result = _validate_license_key(key)
-    return {"ok": True, **result}
-
-
-@app.post("/api/license")
-async def set_license(request: Request):
-    """Validate and save a Pro license key."""
-    await _require_auth_or_401(request)
-    body = await request.json()
-    key = str(body.get("key", "")).strip()
-    result = _validate_license_key(key)
-    if result["valid"] and _LICENSE_SECRET:  # only persist when secret is set (not self-hosted)
-        await db.set_setting("pro_license_key", key)
-    return {"ok": True, **result}
-
-
 @app.get("/api/analytics")
 async def api_analytics(request: Request):
     """Deep nginx log parse for web analytics.
 
     Query params:
-        server_id  (int)          – SSH server to read from (required unless website_id given)
-        website_id (int, optional) – Website ID; auto-selects server and log_path
-        days       (int, default 30) – How many days of history to analyse
+        server_id  (int)           – SSH server to read from
+        website_id (int, optional) – auto-selects server and log_path
+        days       (int, default 30)
     """
     await _require_auth_or_401(request)
-    await _require_pro(request)
     days = max(1, min(int(request.query_params.get("days", "30")), 365))
 
     log_path: str | None = None
-
-    # Resolve server via website_id if provided
     website_id_str = request.query_params.get("website_id", "").strip()
     server_id_str = request.query_params.get("server_id", "").strip()
 
@@ -1481,30 +1356,33 @@ async def api_analytics(request: Request):
         if not website:
             raise HTTPException(404, "Website not found")
         lp = website.get("log_path") or ""
-        # Validate log_path to prevent path traversal (allow any absolute path without ..)
+        # Validate log_path to prevent path traversal
         if lp and lp.startswith("/") and ".." not in lp and "\x00" not in lp:
             log_path = lp
         if not server_id_str:
             server_id_str = str(website.get("server_id") or "")
 
     if not server_id_str:
-        # Auto-select the only server if exactly one exists
         servers_all = await db.list_servers()
         if len(servers_all) == 1:
             server_id_str = str(servers_all[0]["id"])
         else:
-            return {"ok": False, "error": "No server linked to this website. Open Admin → Websites and set a Server, or link an SSH server to enable traffic analytics.",
-                    "pages": [], "topics": [], "sections": [], "traffic_by_day": [],
-                    "traffic_by_hour": [0]*24, "status_codes": {}, "top_ips": [],
-                    "referrers": [], "devices": {"mobile":0,"desktop":0,"bot":0,"tablet":0},
-                    "totals": {"views":0,"unique_visitors":0,"avg_daily":0,"peak_hour":0},
-                    "traffic_by_weekday": [0]*7, "heatmap": [[0]*24 for _ in range(7)],
-                    "browsers": [], "traffic_sources": {"search":0,"social":0,"direct":0,"referral":0},
-                    "search_queries": [], "new_vs_returning": {"new":0,"returning":0},
-                    "trending_pages": [], "page_timelines": {}, "unique_by_day": [],
-                    "error_breakdown": {}, "hack_attempts": [], "attacking_ips": [],
-                    "scanner_uas": [], "bot_categories": {}, "method_distribution": {},
-                    "http_versions": {}}
+            return {
+                "ok": False,
+                "error": "No server linked to this website. Open Admin → Websites and set a Server, or link an SSH server to enable traffic analytics.",
+                "pages": [], "topics": [], "sections": [], "traffic_by_day": [],
+                "traffic_by_hour": [0] * 24, "status_codes": {}, "top_ips": [],
+                "referrers": [], "devices": {"mobile": 0, "desktop": 0, "bot": 0, "tablet": 0},
+                "totals": {"views": 0, "unique_visitors": 0, "avg_daily": 0, "peak_hour": 0},
+                "traffic_by_weekday": [0] * 7, "heatmap": [[0] * 24 for _ in range(7)],
+                "browsers": [], "traffic_sources": {"search": 0, "social": 0, "direct": 0, "referral": 0},
+                "search_queries": [], "new_vs_returning": {"new": 0, "returning": 0},
+                "trending_pages": [], "page_timelines": {}, "unique_by_day": [],
+                "error_breakdown": {}, "hack_attempts": [], "attacking_ips": [],
+                "scanner_uas": [], "bot_categories": {}, "method_distribution": {},
+                "http_versions": {},
+            }
+
     try:
         server_id_int = int(server_id_str)
     except ValueError:
@@ -1515,7 +1393,6 @@ async def api_analytics(request: Request):
     if not server:
         raise HTTPException(404, "Server not found")
 
-    # Auto-detect log path from web server config if not manually configured
     if not log_path and website:
         url = website.get("url") or ""
         url_host = url.replace("https://", "").replace("http://", "").split("/")[0].split(":")[0].lower()
@@ -1524,16 +1401,162 @@ async def api_analytics(request: Request):
             suggested = detection.get("suggested_path")
             if suggested and suggested.startswith("/") and ".." not in suggested and "\x00" not in suggested:
                 log_path = suggested
-                # Persist so detection doesn't need to run again
                 await db.update_website(website["id"], {"log_path": suggested})
                 logger.info("Auto-detected log path %s for website %s", suggested, website.get("name"))
         except Exception as exc:
-            logger.debug("Log path auto-detection failed for website %s: %s", website.get("name"), exc)
+            logger.debug("Log path auto-detection failed for %s: %s", website.get("name"), exc)
 
-    logger.info("ANALYTICS DEBUG: server=%s log_path=%r website=%s", 
+    logger.info("ANALYTICS: server=%s log_path=%r website=%s",
                 server.get("name"), log_path, website.get("name") if website else None)
     result = await engine.get_analytics(server, days=days, log_path=log_path)
     return {"ok": True, **result}
+
+
+# ── Reports ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/reports/summary")
+async def api_reports_summary(request: Request):
+    """Overview report data for all targets."""
+    await _require_auth_or_401(request)
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    data = await build_report_data(db, engine, "overview", days)
+    return {"ok": True, **data}
+
+
+@app.get("/api/reports/detail/{target_type}/{target_id}")
+async def api_reports_detail(request: Request, target_type: str, target_id: int):
+    """Drillable detail report for a single target."""
+    await _require_auth_or_401(request)
+    if target_type not in ("server", "website", "service"):
+        raise HTTPException(400, "target_type must be server, website, or service")
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+
+    if target_type == "server":
+        targets = {s["id"]: s["name"] for s in await db.list_servers()}
+    elif target_type == "website":
+        targets = {w["id"]: w["name"] for w in await db.list_websites()}
+    else:
+        targets = {s["id"]: s["name"] for s in await db.list_services()}
+    target_name = targets.get(target_id, f"#{target_id}")
+
+    daily_raw = await db.get_daily_summary(target_type, target_id, days)
+    hourly_raw = await db.get_hourly_summary(target_type, target_id, min(days, 3))
+    timeline_raw = await db.get_status_timeline(target_type, target_id, days)
+    incidents_raw = await db.get_incidents_for_period(days, target_type, target_id)
+    incidents = [{**inc, "target_name": target_name} for inc in incidents_raw]
+
+    daily_data = [
+        {
+            "date": d["day"],
+            "uptime_pct": d["uptime_pct"],
+            "avg_response": d["avg_response"],
+            "min_response": d["min_response"],
+            "max_response": d["max_response"],
+            "checks": d["checks"],
+            "up_checks": d["up_count"],
+            "down_checks": d["checks"] - d["up_count"],
+        }
+        for d in daily_raw
+    ]
+    hourly_data = [
+        {
+            "hour": int(h["hour"].split(" ")[1].split(":")[0]),
+            "avg_response": h["avg_response"],
+            "checks": h["checks"],
+        }
+        for h in hourly_raw
+    ]
+    recent_checks = [
+        {
+            "timestamp": t["checked_at"],
+            "status": t["status"],
+            "response_time": t["response_time"],
+        }
+        for t in timeline_raw[:50]
+    ]
+
+    total_checks = sum(d["checks"] for d in daily_data)
+    up_checks = sum(d["up_checks"] for d in daily_data)
+    all_avg = [d["avg_response"] for d in daily_data if d["avg_response"] is not None]
+    all_max = [d["max_response"] for d in daily_data if d["max_response"] is not None]
+    totals = {
+        "uptime_pct": round(up_checks / total_checks * 100, 2) if total_checks else 100.0,
+        "total_checks": total_checks,
+        "avg_response": round(sum(all_avg) / len(all_avg), 2) if all_avg else None,
+        "max_response": max(all_max) if all_max else None,
+        "total_incidents": len(incidents),
+    }
+
+    return {
+        "ok": True,
+        "target_type": target_type,
+        "target_id": target_id,
+        "target_name": target_name,
+        "days": days,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "totals": totals,
+        "daily_data": daily_data,
+        "hourly_data": hourly_data,
+        "recent_checks": recent_checks,
+        "incidents": incidents,
+    }
+
+
+@app.get("/api/reports/incidents")
+async def api_reports_incidents(request: Request):
+    """Incident report, optionally filtered by target."""
+    await _require_auth_or_401(request)
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    tt = request.query_params.get("target_type")
+    tid_str = request.query_params.get("target_id")
+    tid = int(tid_str) if tid_str else None
+    if tt and tt not in ("server", "website", "service"):
+        raise HTTPException(400, "target_type must be server, website, or service")
+    data = await build_report_data(db, engine, "incidents", days, tt, tid)
+    return {"ok": True, **data}
+
+
+@app.get("/api/reports/bans")
+async def api_reports_bans(request: Request):
+    """Fail2ban report across all servers."""
+    await _require_auth_or_401(request)
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    data = await build_report_data(db, engine, "bans", days)
+    return {"ok": True, **data}
+
+
+@app.get("/api/reports/export")
+async def api_reports_export(request: Request):
+    """Export a report as CSV, HTML, or PDF."""
+    await _require_auth_or_401(request)
+    fmt = request.query_params.get("format", "csv").lower()
+    if fmt not in ("csv", "html", "pdf"):
+        raise HTTPException(400, "format must be csv, html, or pdf")
+    report_type = request.query_params.get("report_type", "overview")
+    days = max(1, min(int(request.query_params.get("days", "7")), 365))
+    tt = request.query_params.get("target_type")
+    tid_str = request.query_params.get("target_id")
+    tid = int(tid_str) if tid_str else None
+
+    data = await build_report_data(db, engine, report_type, days, tt, tid)
+    settings = await db.get_all_settings()
+    title = f"{settings.get('app_title', 'CentienC')} — {report_type.title()} Report"
+
+    if fmt == "csv":
+        content = export_csv(data)
+        return Response(
+            content, media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="centienc-{report_type}-report.csv"'},
+        )
+    elif fmt == "html":
+        content = export_html(data, title)
+        return Response(
+            content, media_type="text/html",
+            headers={"Content-Disposition": f'attachment; filename="centienc-{report_type}-report.html"'},
+        )
+    else:  # pdf
+        content = export_pdf_html(data, title)
+        return HTMLResponse(content)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1600,168 +1623,6 @@ async def health():
         "version": __version__,
         "product": "CentienC",
     }
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Reports API
-# ═══════════════════════════════════════════════════════════════════
-
-@app.get("/api/reports/summary")
-async def api_reports_summary(request: Request):
-    """Overview report data for all targets."""
-    await _require_auth_or_401(request)
-    await _require_pro(request)
-    days = max(1, min(int(request.query_params.get("days", "7")), 365))
-    data = await build_report_data(db, engine, "overview", days)
-    return {"ok": True, **data}
-
-
-@app.get("/api/reports/detail/{target_type}/{target_id}")
-async def api_reports_detail(request: Request, target_type: str, target_id: int):
-    """Drillable detail report for a single target."""
-    await _require_auth_or_401(request)
-    await _require_pro(request)
-    if target_type not in ("server", "website", "service"):
-        raise HTTPException(400, "target_type must be server, website, or service")
-    days = max(1, min(int(request.query_params.get("days", "7")), 365))
-
-    # Resolve target name
-    if target_type == "server":
-        targets = {s["id"]: s["name"] for s in await db.list_servers()}
-    elif target_type == "website":
-        targets = {w["id"]: w["name"] for w in await db.list_websites()}
-    else:
-        targets = {s["id"]: s["name"] for s in await db.list_services()}
-    target_name = targets.get(target_id, f"#{target_id}")
-
-    # Fetch raw data
-    daily_raw = await db.get_daily_summary(target_type, target_id, days)
-    hourly_raw = await db.get_hourly_summary(target_type, target_id, min(days, 3))
-    timeline_raw = await db.get_status_timeline(target_type, target_id, days)
-    incidents_raw = await db.get_incidents_for_period(days, target_type, target_id)
-    incidents = [
-        {
-            **inc,
-            "target_name": target_name,
-        }
-        for inc in incidents_raw
-    ]
-
-    # Map to iOS-expected field names
-    daily_data = [
-        {
-            "date": d["day"],
-            "uptime_pct": d["uptime_pct"],
-            "avg_response": d["avg_response"],
-            "min_response": d["min_response"],
-            "max_response": d["max_response"],
-            "checks": d["checks"],
-            "up_checks": d["up_count"],
-            "down_checks": d["checks"] - d["up_count"],
-        }
-        for d in daily_raw
-    ]
-    # Extract hour number (0-23) from "YYYY-MM-DD HH:00" strings
-    hourly_data = [
-        {
-            "hour": int(h["hour"].split(" ")[1].split(":")[0]),
-            "avg_response": h["avg_response"],
-            "checks": h["checks"],
-        }
-        for h in hourly_raw
-    ]
-    # Map timeline status-change events to recent_checks
-    recent_checks = [
-        {
-            "timestamp": t["checked_at"],
-            "status": t["status"],
-            "response_time": t["response_time"],
-        }
-        for t in timeline_raw[:50]
-    ]
-
-    # Compute aggregate totals from daily_data
-    total_checks = sum(d["checks"] for d in daily_data)
-    up_checks = sum(d["up_checks"] for d in daily_data)
-    all_avg = [d["avg_response"] for d in daily_data if d["avg_response"] is not None]
-    all_max = [d["max_response"] for d in daily_data if d["max_response"] is not None]
-    totals = {
-        "uptime_pct": round(up_checks / total_checks * 100, 2) if total_checks else 100.0,
-        "total_checks": total_checks,
-        "avg_response": round(sum(all_avg) / len(all_avg), 2) if all_avg else None,
-        "max_response": max(all_max) if all_max else None,
-        "total_incidents": len(incidents),
-    }
-
-    return {
-        "ok": True,
-        "target_type": target_type,
-        "target_id": target_id,
-        "target_name": target_name,
-        "days": days,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "totals": totals,
-        "daily_data": daily_data,
-        "hourly_data": hourly_data,
-        "recent_checks": recent_checks,
-        "incidents": incidents,
-    }
-
-
-@app.get("/api/reports/incidents")
-async def api_reports_incidents(request: Request):
-    """Incident report, optionally filtered by target."""
-    await _require_auth_or_401(request)
-    await _require_pro(request)
-    days = max(1, min(int(request.query_params.get("days", "7")), 365))
-    tt = request.query_params.get("target_type")
-    tid_str = request.query_params.get("target_id")
-    tid = int(tid_str) if tid_str else None
-    if tt and tt not in ("server", "website", "service"):
-        raise HTTPException(400, "target_type must be server, website, or service")
-    data = await build_report_data(db, engine, "incidents", days, tt, tid)
-    return {"ok": True, **data}
-
-
-@app.get("/api/reports/bans")
-async def api_reports_bans(request: Request):
-    """Fail2ban report across all servers."""
-    await _require_auth_or_401(request)
-    await _require_pro(request)
-    days = max(1, min(int(request.query_params.get("days", "7")), 365))
-    data = await build_report_data(db, engine, "bans", days)
-    return {"ok": True, **data}
-
-
-@app.get("/api/reports/export")
-async def api_reports_export(request: Request):
-    """Export a report as CSV, HTML, or PDF."""
-    await _require_auth_or_401(request)
-    await _require_pro(request)
-    fmt = request.query_params.get("format", "csv").lower()
-    if fmt not in ("csv", "html", "pdf"):
-        raise HTTPException(400, "format must be csv, html, or pdf")
-    report_type = request.query_params.get("report_type", "overview")
-    days = max(1, min(int(request.query_params.get("days", "7")), 365))
-    tt = request.query_params.get("target_type")
-    tid_str = request.query_params.get("target_id")
-    tid = int(tid_str) if tid_str else None
-
-    data = await build_report_data(db, engine, report_type, days, tt, tid)
-    settings = await db.get_all_settings()
-    title = f"{settings.get('app_title', 'CentienC')} — {report_type.title()} Report"
-
-    if fmt == "csv":
-        content = export_csv(data)
-        return Response(content, media_type="text/csv",
-                        headers={"Content-Disposition": f'attachment; filename="centienc-{report_type}-report.csv"'})
-    elif fmt == "html":
-        content = export_html(data, title)
-        return Response(content, media_type="text/html",
-                        headers={"Content-Disposition": f'attachment; filename="centienc-{report_type}-report.html"'})
-    else:  # pdf
-        content = export_pdf_html(data, title)
-        return HTMLResponse(content)
 
 
 # ═══════════════════════════════════════════════════════════════════

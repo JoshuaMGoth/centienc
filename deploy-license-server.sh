@@ -27,7 +27,9 @@ if [[ "$FIRST_RUN" == false ]]; then
         cp ~/centienc-license/main.py /opt/centienc-license/main.py &&
         cp ~/centienc-license/requirements.txt /opt/centienc-license/requirements.txt &&
         /opt/centienc-license/venv/bin/pip install -q -r /opt/centienc-license/requirements.txt &&
-        sudo systemctl restart centienc-license
+        cp ~/centienc-license/start.sh /opt/centienc-license/start.sh &&
+        cp ~/centienc-license/ecosystem.config.js /opt/centienc-license/ecosystem.config.js &&
+        pm2 reload centienc-license --update-env
     "
     echo "✓ License server updated"
     exit 0
@@ -55,23 +57,29 @@ echo ""
 read -r -p "Press Enter to open .env on the server (nano) ..."
 ssh -t "$REMOTE" "sudo nano /opt/centienc-license/.env"
 
-# 3. Restart after secrets are set
+# 3. Copy new files to install dir, then start via PM2 (no sudo needed after this)
 echo ""
-echo "→ Restarting service with new .env ..."
-ssh "$REMOTE" "sudo systemctl restart centienc-license && sleep 2 && sudo systemctl status centienc-license --no-pager | head -20"
+echo "→ Copying files and starting centienc-license via PM2 ..."
+ssh "$REMOTE" "
+    cp ~/centienc-license/start.sh /opt/centienc-license/start.sh &&
+    chmod +x /opt/centienc-license/start.sh &&
+    cp ~/centienc-license/ecosystem.config.js /opt/centienc-license/ecosystem.config.js &&
+    mkdir -p /var/log/pm2 &&
+    cd /opt/centienc-license &&
+    pm2 start ecosystem.config.js &&
+    pm2 save
+"
 
 # 4. Health check
 echo ""
 echo "→ Health check ..."
-sleep 2
-ssh "$REMOTE" "curl -sf http://127.0.0.1:8001/health && echo '  ✓ License server healthy' || echo '  ✗ Health check failed — check: journalctl -u centienc-license -f'"
+sleep 3
+ssh "$REMOTE" "curl -sf http://127.0.0.1:8001/health && echo '  ✓ License server healthy' || echo '  ✗ Health check failed — check: pm2 logs centienc-license'"
 
 echo ""
 echo "✓ Done. The license server is running at https://centienc.joshuagoth.com/license/"
 echo ""
-echo "Next steps:"
-echo "  1. In Stripe Dashboard → create a Product 'CentienC Pro', Price \$69.99/year"
-echo "  2. Add webhook: https://centienc.joshuagoth.com/license/stripe-webhook"
-echo "     Event: checkout.session.completed"
-echo "  3. Copy whsec_... → paste into /opt/centienc-license/.env STRIPE_WEBHOOK_SECRET"
-echo "  4. Restart: ssh $REMOTE sudo systemctl restart centienc-license"
+echo "Manage with:"
+echo "  pm2 logs centienc-license"
+echo "  pm2 reload centienc-license"
+echo "  pm2 monit"

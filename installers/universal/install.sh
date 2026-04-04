@@ -24,6 +24,8 @@ VERSION="1.0.0"
 PORT=9099
 MODE="service"
 UNINSTALL=false
+LICENSE_SECRET=""
+PRO_PACKAGE=""
 
 # Linux paths
 L_INSTALL_DIR="/opt/centienc"
@@ -47,12 +49,16 @@ err()   { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
 # ── Parse arguments ───────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --tray)      MODE="tray";;
-        --service)   MODE="service";;
-        --uninstall) UNINSTALL=true;;
-        --port)      shift; PORT="${1:-9099}";;
-        --port=*)    PORT="${1#*=}";;
-        *)           ;;
+        --tray)            MODE="tray";;
+        --service)         MODE="service";;
+        --uninstall)       UNINSTALL=true;;
+        --port)            shift; PORT="${1:-9099}";;
+        --port=*)          PORT="${1#*=}";;
+        --license-secret)  shift; LICENSE_SECRET="${1:-}";;
+        --license-secret=*)LICENSE_SECRET="${1#*=}";;
+        --pro-package)     shift; PRO_PACKAGE="${1:-}";;
+        --pro-package=*)   PRO_PACKAGE="${1#*=}";;
+        *)                 ;;
     esac
     shift
 done
@@ -226,6 +232,13 @@ install_centienc() {
         pip install "centient${EXTRAS} @ git+https://github.com/JoshuaMGoth/centienc.git" -q
     fi
 
+    # Optional: install the Pro plugin if a package URL/path was supplied
+    if [[ -n "$PRO_PACKAGE" ]]; then
+        info "Installing CentienC Pro plugin..."
+        pip install "${PRO_PACKAGE}" -q
+        ok "CentienC Pro installed"
+    fi
+
     deactivate
 
     # Set ownership (Linux — run as service user)
@@ -308,6 +321,7 @@ Group=${SERVICE_USER}
 WorkingDirectory=${DATA_DIR}
 Environment=CENTIENT_DATA_DIR=${DATA_DIR}
 Environment=HOME=${DATA_DIR}
+$(  [[ -n "$LICENSE_SECRET" ]] && echo "Environment=CENTIENT_LICENSE_SECRET=${LICENSE_SECRET}" )
 ExecStart=${VENV_DIR}/bin/centient --service --host 0.0.0.0 --port ${PORT}
 Restart=always
 RestartSec=5
@@ -386,7 +400,7 @@ EOF
     <key>EnvironmentVariables</key>
     <dict>
         <key>CENTIENT_DATA_DIR</key>
-        <string>${INSTALL_DIR}</string>
+        <string>${INSTALL_DIR}</string>$(  [[ -n "$LICENSE_SECRET" ]] && printf '\n        <key>CENTIENT_LICENSE_SECRET</key>\n        <string>%s</string>' "$LICENSE_SECRET" )
     </dict>
 
     <key>StandardOutPath</key>

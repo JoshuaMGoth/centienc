@@ -492,31 +492,6 @@ pre {
     color: var(--blue);
 }
 
-/* ─── Feature Badges (Free / Pro) ─── */
-.card-badge {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    padding: 3px 10px;
-    border-radius: 6px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
-.card-badge.free {
-    background: rgba(52, 199, 89, 0.15);
-    color: var(--green);
-    border: 1px solid rgba(52, 199, 89, 0.3);
-}
-
-.card-badge.pro {
-    background: rgba(45, 127, 249, 0.15);
-    color: var(--blue);
-    border: 1px solid rgba(45, 127, 249, 0.3);
-}
-
 .feature-list,
 .download-list,
 .docs-list {
@@ -662,147 +637,9 @@ pre {
     color: var(--text-soft);
 }
 
-/* ═══ Pricing Section ═══ */
-.pricing-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    max-width: 840px;
-    margin: 0 auto;
-}
-
-.pricing-card {
-    background: linear-gradient(180deg, rgba(21, 32, 56, 0.95), rgba(21, 32, 56, 0.88));
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 32px 28px;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-}
-
-.pricing-featured {
-    border-color: rgba(45, 127, 249, 0.5);
-    box-shadow: 0 0 60px rgba(45, 127, 249, 0.12), var(--shadow);
-}
-
-.pricing-featured-panel {
+.highlight-featured-panel {
     border-color: rgba(45, 127, 249, 0.35);
     box-shadow: 0 0 40px rgba(45, 127, 249, 0.08);
-}
-
-.pricing-popular {
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--blue);
-    color: #fff;
-    padding: 4px 18px;
-    border-radius: var(--radius-pill);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.pricing-tier {
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-    margin-bottom: 8px;
-}
-
-.pricing-price {
-    font-size: 3.2rem;
-    font-weight: 800;
-    color: var(--text);
-    line-height: 1;
-    margin-bottom: 4px;
-}
-
-.pricing-unit {
-    font-size: 0.45em;
-    font-weight: 500;
-    color: var(--text-soft);
-}
-
-.pricing-period {
-    font-size: 0.82rem;
-    color: var(--text-dim);
-    margin-bottom: 24px;
-}
-
-.pricing-features {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex-grow: 1;
-}
-
-.pricing-features li {
-    position: relative;
-    padding-left: 24px;
-    font-size: 0.88rem;
-    line-height: 1.6;
-    color: var(--text-soft);
-}
-
-.pricing-features li.included::before {
-    content: "✓";
-    position: absolute;
-    left: 0;
-    color: var(--green);
-    font-weight: 700;
-}
-
-.pricing-features li.excluded::before {
-    content: "—";
-    position: absolute;
-    left: 2px;
-    color: var(--text-dim);
-}
-
-.pricing-features li.excluded {
-    color: var(--text-dim);
-}
-
-.pricing-features li strong {
-    color: var(--text);
-}
-
-.pricing-note {
-    font-size: 0.78rem;
-    color: var(--text-dim);
-    text-align: center;
-    margin-top: 12px;
-}
-
-.pricing-note-block {
-    max-width: 700px;
-    margin: 28px auto 0;
-    text-align: center;
-    padding: 20px 28px;
-    background: rgba(45, 127, 249, 0.06);
-    border: 1px solid rgba(45, 127, 249, 0.18);
-    border-radius: var(--radius-sm);
-}
-
-.pricing-note-block p {
-    color: var(--text-soft);
-    font-size: 0.88rem;
-    line-height: 1.7;
-    margin: 0;
-}
-
-.pricing-note-block strong {
-    color: var(--text);
 }
 
 .cta-section {
@@ -1017,8 +854,7 @@ pre {
     .cards-grid-3,
     .screens-grid,
     .iphone-layout,
-    .docs-grid,
-    .pricing-grid {
+    .docs-grid {
         grid-template-columns: 1fr;
     }
 

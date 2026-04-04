@@ -4,9 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "centienc-pro"
-version = "0.1.0"
-description = "CentienC Pro private plugin (sample skeleton)"
+version = "1.8.0"
+description = "CentienC Pro plugin — analytics, reports, and advanced features"
 authors = [
   {name = "Joshua M. Goth"}
 ]
-dependencies = []
+requires-python = ">=3.10"
+# Pin to the centient minor version this plugin was built for.
+# Bump the lower bound when centient makes breaking API changes.
+dependencies = [
+  "centient>=1.8.0,<2.0",
+  "fastapi>=0.135.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["centienc_pro*"]

@@ -159,65 +159,87 @@ def _validate_key(key: str) -> dict:
 
 # ─── Email ─────────────────────────────────────────────────────────────────────
 
+# Load the email HTML template once at import time.
+_EMAIL_TEMPLATE_PATH = Path(__file__).parent / "email_template.html"
+_EMAIL_TEMPLATE: str | None = None
+
+def _load_email_template() -> str:
+    global _EMAIL_TEMPLATE
+    if _EMAIL_TEMPLATE is None:
+        if _EMAIL_TEMPLATE_PATH.exists():
+            _EMAIL_TEMPLATE = _EMAIL_TEMPLATE_PATH.read_text(encoding="utf-8")
+        else:
+            logger.warning("email_template.html not found — falling back to plain-text only")
+            _EMAIL_TEMPLATE = ""
+    return _EMAIL_TEMPLATE
+
+
+def _render_email_html(key: str, tier: str, expires: str | None, download_token: str | None) -> str:
+    """Fill placeholders in email_template.html and return the final HTML."""
+    tmpl = _load_email_template()
+    if not tmpl:
+        return ""
+
+    expires_display = expires if expires else "Lifetime"
+    year = str(date.today().year)
+
+    # Build the optional download section (a full <tr> so it slots into the table)
+    if download_token and PRO_DOWNLOAD_BASE:
+        dl_url = f"{PRO_DOWNLOAD_BASE.rstrip('/')}/download-pro/{download_token}"
+        download_section = f"""
+          <!-- Download section -->
+          <tr>
+            <td bgcolor="#0F1E35" style="background-color:#0F1E35;padding:0 40px 24px;border-left:1px solid #1D2F4A;border-right:1px solid #1D2F4A;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#0A1628" style="background-color:#0A1628;border:1px solid #1D2F4A;border-left:3px solid #2FBF71;border-radius:8px;padding:16px 20px;">
+                    <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#2FBF71;text-transform:uppercase;letter-spacing:0.08em;">&#8594; Download CentienC Pro</p>
+                    <p style="margin:0;font-size:13px;color:#8899B4;">Your one-time download link (valid 7 days):</p>
+                    <a href="{dl_url}" style="display:inline-block;margin-top:8px;font-size:13px;color:#2D7FF9;word-break:break-all;">{dl_url}</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>"""
+    else:
+        download_section = ""
+
+    return (
+        tmpl
+        .replace("{{KEY}}", key)
+        .replace("{{TIER}}", tier.upper())
+        .replace("{{EXPIRES_DISPLAY}}", expires_display)
+        .replace("{{DOWNLOAD_SECTION}}", download_section)
+        .replace("{{YEAR}}", year)
+    )
+
+
 def _send_license_email(to_email: str, key: str, tier: str, expires: str | None, download_token: str | None = None) -> None:
-    if not SMTP_HOST or not SMTP_USER:
+    smtp_configured = bool(SMTP_HOST and SMTP_USER and SMTP_PASS
+                          and SMTP_HOST != "smtp.example.com"
+                          and SMTP_USER != "licenses@example.com")
+    if not smtp_configured:
         logger.warning("SMTP not configured — skipping email to %s", to_email)
         return
 
-    expires_line = f"Expires: {expires}" if expires else "Expires: Never (lifetime license)"
-
-    download_html = ""
+    expires_line = f"Expires: {expires}" if expires else "Expires: Lifetime"
     download_text = ""
     if download_token and PRO_DOWNLOAD_BASE:
-        dl = f"{PRO_DOWNLOAD_BASE.rstrip('/')}/download-pro/{download_token}"
-        download_html = f"<p style=\"color: #8899B4; font-size: 0.9rem; margin: 0 0 28px;\">Download CentienC Pro: <a href=\"{dl}\">{dl}</a></p>"
-        download_text = f"\nDownload CentienC Pro: {dl}\n"
+        dl_url = f"{PRO_DOWNLOAD_BASE.rstrip('/')}/download-pro/{download_token}"
+        download_text = f"\nDownload CentienC Pro (7-day link): {dl_url}\n"
 
-    body_html = f"""
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family: Inter, system-ui, sans-serif; background: #0A1628; color: #F0F4FA; margin: 0; padding: 0;">
-  <div style="max-width: 560px; margin: 40px auto; background: #152038; border: 1px solid #1E3055; border-radius: 16px; padding: 40px;">
-    <img src="https://centienc.joshuagoth.com/assets/centienc-logo.png" width="48" height="48" style="border-radius: 10px; margin-bottom: 20px;" alt="CentienC">
-    <h1 style="margin: 0 0 8px; font-size: 1.4rem; color: #F0F4FA;">Your CentienC Pro License</h1>
-    <p style="color: #8899B4; margin: 0 0 28px;">Thank you for purchasing CentienC Pro. Your license key is below.</p>
-
-    <div style="background: #0A1628; border: 1px solid #1E3055; border-radius: 12px; padding: 20px; font-family: monospace; font-size: 1rem; letter-spacing: 0.04em; color: #2D7FF9; word-break: break-all; margin-bottom: 28px;">
-      {key}
-    </div>
-        {download_html}
-
-    <p style="color: #8899B4; font-size: 0.9rem; margin: 0 0 8px;">Tier: <strong style="color: #F0F4FA;">{tier.upper()}</strong></p>
-    <p style="color: #8899B4; font-size: 0.9rem; margin: 0 0 28px;">{expires_line}</p>
-
-    <h2 style="font-size: 1rem; margin: 0 0 12px;">How to activate</h2>
-    <ol style="color: #8899B4; font-size: 0.9rem; padding-left: 20px; margin: 0 0 28px;">
-      <li>Open your CentienC dashboard</li>
-      <li>Go to <strong style="color: #F0F4FA;">Admin → Settings → License</strong></li>
-      <li>Paste the key above and click <strong style="color: #F0F4FA;">Activate</strong></li>
-    </ol>
-
-    <p style="color: #8899B4; font-size: 0.85rem; margin: 0 0 4px;">Questions? Reply to this email or open an issue on GitHub.</p>
-    <p style="color: #5A6B85; font-size: 0.8rem; margin: 0;">
-      <a href="https://centienc.joshuagoth.com" style="color: #2D7FF9;">centienc.joshuagoth.com</a> ·
-      <a href="https://github.com/JoshuaMGoth/centienc" style="color: #2D7FF9;">github.com/JoshuaMGoth/centienc</a>
-    </p>
-  </div>
-</body>
-</html>
-"""
+    body_html = _render_email_html(key, tier, expires, download_token)
     body_text = f"""Your CentienC Pro License Key
 ==============================
 {key}
 
 Tier: {tier.upper()}
 {expires_line}
-
+{download_text}
 How to activate:
-1. Open your CentienC dashboard
-2. Go to Admin → Settings → License
-3. Paste the key above and click Activate
+  1. Open your CentienC dashboard
+  2. Go to Admin > Settings > License
+  3. Paste the key above and click Activate
 
 Questions? Reply to this email.
 https://centienc.joshuagoth.com
@@ -225,13 +247,17 @@ https://centienc.joshuagoth.com
     msg = MIMEMultipart("alternative")
     msg["Subject"] = "Your CentienC Pro License Key"
     msg["From"] = SMTP_FROM
+    msg["Reply-To"] = SMTP_FROM
     msg["To"] = to_email
     msg.attach(MIMEText(body_text, "plain"))
-    msg.attach(MIMEText(body_html, "html"))
+    if body_html:
+        msg.attach(MIMEText(body_html, "html"))
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_FROM, [to_email], msg.as_string())
         logger.info("License email sent to %s", to_email)
@@ -290,6 +316,61 @@ async def validate_license(key: str):
     """Public endpoint — validate a license key."""
     result = _validate_key(key)
     return {"ok": True, **result}
+
+
+class TestEmailRequest(BaseModel):
+    email: str
+    tier: str = "pro"
+    expires_days: int | None = 30
+
+
+@app.post("/admin/test-email")
+async def test_email(
+    body: TestEmailRequest,
+    x_admin_token: str = Header(default=""),
+):
+    """Admin endpoint — send a test license email without storing anything in the DB.
+
+    Useful for verifying SMTP config and previewing the email template.
+    Requires X-Admin-Token header.
+    """
+    if not ADMIN_TOKEN or not hmac.compare_digest(x_admin_token, ADMIN_TOKEN):
+        raise HTTPException(403, "Invalid admin token")
+
+    expires: str | None = None
+    if body.expires_days is not None:
+        expires = (date.today() + timedelta(days=body.expires_days)).isoformat()
+
+    # Generate a real (but unsaved) key so the template renders correctly
+    key = _generate_key(tier=body.tier, expires=expires)
+
+    smtp_ready = bool(
+        SMTP_HOST and SMTP_USER and SMTP_PASS
+        and SMTP_HOST != "smtp.example.com"
+        and SMTP_USER != "licenses@example.com"
+    )
+
+    if smtp_ready:
+        _send_license_email(body.email, key, body.tier, expires, download_token=None)
+        return {
+            "ok": True,
+            "sent": True,
+            "to": body.email,
+            "key_preview": key[:20] + "…",
+            "expires": expires,
+        }
+    else:
+        # Return rendered HTML for browser preview when SMTP is not yet configured
+        rendered_html = _render_email_html(key, body.tier, expires, download_token=None)
+        return {
+            "ok": True,
+            "sent": False,
+            "reason": "SMTP not configured — set SMTP_HOST/SMTP_USER/SMTP_PASS in .env",
+            "to": body.email,
+            "key_preview": key[:20] + "…",
+            "expires": expires,
+            "html_preview": rendered_html,
+        }
 
 
 @app.post("/stripe-webhook")

@@ -1,39 +1,3 @@
-// ── Stripe Checkout ────────────────────────────────────────────────────────
-const STRIPE_PRICE_ID = 'price_1THpyUEN6PmKDCuGRd6aioyI';
-const LICENSE_API    = 'https://centienc.joshuagoth.com/license';
-
-async function upgradeToPro() {
-    const btn = document.getElementById('buyProBtn');
-    const msg = document.getElementById('checkoutMsg');
-    if (!btn) return;
-
-    btn.disabled = true;
-    btn.textContent = 'Redirecting to checkout…';
-    if (msg) msg.textContent = '';
-
-    try {
-        const res = await fetch(LICENSE_API + '/create-checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ price_id: STRIPE_PRICE_ID })
-        });
-        const data = await res.json();
-        if (data.ok && data.url) {
-            window.location.href = data.url;
-        } else {
-            throw new Error(data.detail || 'Checkout failed');
-        }
-    } catch (err) {
-        btn.disabled = false;
-        btn.textContent = 'Get Pro License \u2014 $69.99/yr';
-        if (msg) {
-            msg.textContent = 'Could not start checkout. Try again or email pro@centienc.com';
-            msg.style.color = '#e05c5c';
-        }
-        console.error('Checkout error:', err);
-    }
-}
-
 function initClock() {
     const heroClock = document.getElementById("heroClock");
     const formatTime = () => new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
