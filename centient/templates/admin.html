@@ -905,7 +905,7 @@ async function _wizRunTest(){
   if(!out)return;
   out.className='test-out'; out.textContent='Testing…'; btn.disabled=true;
   try{
-    _wizCollectSrvBasics(); _wizCollectSrvSSH();
+    // Data already collected from earlier steps into _wiz.data
     // Save temporarily to get a server id, then check
     const body={
       name:_wiz.data.name,hostname:_wiz.data.hostname,port:_wiz.data.port,
@@ -946,7 +946,7 @@ function _wizStepSrvDone(){
 }
 async function _wizSaveServer(){
   if(_wiz.data._saved_server_id){ closeWizard(); loadServers(); return; }
-  _wizCollectSrvBasics(); _wizCollectSrvSSH(); _wizCollectSrvFeatures();
+  // Data already collected from earlier steps into _wiz.data
   const body={
     name:_wiz.data.name,hostname:_wiz.data.hostname,port:_wiz.data.port,
     ssh_user:_wiz.data.ssh_user,ssh_port:_wiz.data.ssh_port,
