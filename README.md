@@ -115,6 +115,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/in
 | **macOS** | [`installers/macos/centienc-installer.command`](installers/macos/centienc-installer.command) | launchd agent |
 | **Windows** | [`installers/windows/centienc-installer.bat`](installers/windows/centienc-installer.bat) | Service or tray |
 | **Proxmox LXC** | [`installers/proxmox/create-centienc-lxc.sh`](installers/proxmox/create-centienc-lxc.sh) | LXC container |
+| **Target Prep** | [`installers/universal/prepare-target.sh`](installers/universal/prepare-target.sh) | SSH user setup |
 
 All installers are also available at **[joshuagoth.com/downloads/centienc](https://joshuagoth.com/downloads/centienc/)**.
 
@@ -161,6 +162,98 @@ On first install, a default admin account is created:
 Change both passwords after first login:
 - **Web admin:** Admin panel → Users
 - **LXC root:** `passwd` via SSH or `pct enter <CTID>`
+
+---
+
+## Preparing Target Servers for Monitoring
+
+CentienC connects to your servers via SSH to collect metrics. Rather than using root, we recommend creating a dedicated `centienc` monitoring user with **key-only SSH access** and **restricted sudo** (read-only commands only). A helper script automates this.
+
+### Automatic Setup (Recommended)
+
+On each server you want to monitor, run as root:
+
+```bash
+curl -sL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/universal/prepare-target.sh \
+  | sudo bash -s -- "<SSH_PUBLIC_KEY>"
+```
+
+Replace `<SSH_PUBLIC_KEY>` with the CentienC instance's public key. You can find it:
+
+- **Proxmox LXC install:** Displayed in the post-install summary, or run:
+  ```bash
+  pct exec <CTID> -- cat /var/lib/centienc/.ssh/id_ed25519.pub
+  ```
+- **Systemd install:** Check `/var/lib/centienc/.ssh/id_ed25519.pub` or `~/.centient/.ssh/id_ed25519.pub`
+- **Linux installers:** Printed at the end of the install script output
+
+### What the Script Does
+
+1. Creates a system user `centienc` with no password and no login shell
+2. Installs the SSH public key for key-only authentication
+3. Configures restricted sudo permissions — **read-only commands only**:
+   - `systemctl status`, `journalctl` (service & log viewing)
+   - `fail2ban-client status` (firewall stats)
+   - `docker ps`, `docker stats --no-stream` (container listing)
+   - `pm2 jlist` (Node.js process stats)
+   - `df -h` (disk usage)
+   - Package update checks (`apt list`, `dnf check-update`, `pacman -Qu`)
+4. Validates the sudoers file syntax
+5. Verifies `PubkeyAuthentication` is enabled in sshd
+
+### Manual Setup
+
+If you prefer to set it up yourself:
+
+```bash
+# 1. Create the user
+sudo useradd -r -m -d /var/lib/centienc -s /bin/bash centienc
+
+# 2. Install the SSH key
+sudo mkdir -p /var/lib/centienc/.ssh
+echo "<SSH_PUBLIC_KEY>" | sudo tee /var/lib/centienc/.ssh/authorized_keys
+sudo chmod 700 /var/lib/centienc/.ssh
+sudo chmod 600 /var/lib/centienc/.ssh/authorized_keys
+sudo chown -R centienc:centienc /var/lib/centienc/.ssh
+
+# 3. (Optional) Add sudo permissions for monitoring commands
+sudo visudo -f /etc/sudoers.d/centienc
+# Add: centienc ALL=(ALL) NOPASSWD: /usr/bin/systemctl status *, /usr/bin/journalctl *, /usr/bin/df -h
+```
+
+### Proxmox Containers
+
+The Proxmox LXC installer (`create-centienc-lxc.sh`) runs an interactive wizard that offers to automatically configure all other containers on the host. For each container you can:
+
+- **Auto-setup** — pushes and runs `prepare-target.sh` inside the container
+- **Manual** — enter SSH credentials (host, port, user, password or key)
+- **Skip** — configure later via the dashboard
+
+You can also run `prepare-target.sh` manually against any container from the Proxmox host:
+
+```bash
+pct push <CTID> prepare-target.sh /tmp/prepare-target.sh --perms 755
+pct exec <CTID> -- bash /tmp/prepare-target.sh "<SSH_PUBLIC_KEY>"
+```
+
+### Adding Servers in CentienC
+
+Once the target server is prepared:
+
+1. Open the CentienC dashboard → **Admin** → **Servers**
+2. Click **Add Server**
+3. Enter the server's IP address and set **SSH User** to `centienc`
+4. Leave **Auth Method** as "SSH Key" (the key is auto-detected)
+5. Save — CentienC will begin collecting metrics immediately
+
+### Revoking Access
+
+To remove CentienC's access from a target server:
+
+```bash
+sudo userdel -r centienc
+sudo rm -f /etc/sudoers.d/centienc
+```
 
 ---
 

@@ -1278,6 +1278,15 @@ async def list_incidents(request: Request):
     return {"ok": True, "incidents": incidents}
 
 
+@app.patch("/api/incidents/{incident_id}/resolve")
+async def resolve_incident_by_id(incident_id: int, request: Request):
+    await _require_auth_or_401(request)
+    resolved = await db.resolve_incident_by_id(incident_id)
+    if not resolved:
+        return JSONResponse({"ok": False, "error": "Incident not found or already resolved"}, status_code=404)
+    return {"ok": True}
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  Push Token Registration (Expo Push Notifications)
 # ═══════════════════════════════════════════════════════════════════

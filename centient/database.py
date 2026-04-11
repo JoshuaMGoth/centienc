@@ -574,6 +574,17 @@ class Database:
             await conn.commit()
             return cursor.rowcount > 0
 
+    async def resolve_incident_by_id(self, incident_id: int) -> bool:
+        async with aiosqlite.connect(self.path) as conn:
+            cursor = await conn.execute(
+                "UPDATE incidents SET status = 'resolved', resolved_at = datetime('now'), "
+                "duration = CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER) "
+                "WHERE id = ? AND status = 'open'",
+                (incident_id,),
+            )
+            await conn.commit()
+            return cursor.rowcount > 0
+
     async def get_recent_incidents(self, limit: int = 20) -> list[dict[str, Any]]:
         async with aiosqlite.connect(self.path) as conn:
             conn.row_factory = aiosqlite.Row

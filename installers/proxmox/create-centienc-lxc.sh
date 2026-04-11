@@ -478,6 +478,112 @@ fi
 # ── Get container IP ─────────────────────────────────────────
 CT_IP=$(pct exec "$CTID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "unknown")
 
+# ── Offer to configure SSH monitoring on other containers ────
+if [[ "$INTERACTIVE" == "true" ]]; then
+    header "Configure Monitored Containers"
+
+    # Gather all running LXC containers except the one we just created
+    mapfile -t OTHER_CTS < <(pct list 2>/dev/null | awk 'NR>1 && $1 != '"$CTID"' {print $1}')
+
+    if [[ ${#OTHER_CTS[@]} -gt 0 ]]; then
+        echo -e "\n  Found ${BOLD}${#OTHER_CTS[@]}${NC} other container(s) on this host.\n"
+        echo -e "  For each container you can:"
+        echo -e "    ${BOLD}a${NC} — Auto-setup (run prepare-target inside the container)"
+        echo -e "    ${BOLD}m${NC} — Enter SSH credentials manually"
+        echo -e "    ${BOLD}s${NC} — Skip this container\n"
+
+        CONFIGURED_TARGETS=()
+
+        for ct in "${OTHER_CTS[@]}"; do
+            ct_status=$(pct status "$ct" 2>/dev/null | awk '{print $2}')
+            ct_hostname=$(pct config "$ct" 2>/dev/null | awk '/^hostname:/ {print $2}')
+            ct_ip=$(pct exec "$ct" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "?")
+
+            echo -e "  ${CYAN}CT ${ct}${NC} — ${ct_hostname:-unnamed} (${ct_ip}) [${ct_status}]"
+            read -r -p "    Action [a/m/s] (default: s): " action
+            action="${action:-s}"
+
+            case "${action,,}" in
+                a|auto)
+                    if [[ "$ct_status" != "running" ]]; then
+                        warn "  Container ${ct} is not running — skipping auto-setup"
+                        continue
+                    fi
+                    info "  Setting up centienc monitoring user on CT ${ct}..."
+
+                    # Push prepare-target.sh and run it with the SSH pubkey
+                    if [[ -f "$PREP_SCRIPT" ]]; then
+                        pct push "$ct" "$PREP_SCRIPT" /tmp/prepare-target.sh --perms 755
+                        pct exec "$ct" -- bash /tmp/prepare-target.sh "$SSH_PUBKEY" 2>&1 | sed 's/^/    /'
+                        pct exec "$ct" -- rm -f /tmp/prepare-target.sh
+                        ok "  CT ${ct} (${ct_hostname}) configured for monitoring"
+                        CONFIGURED_TARGETS+=("${ct}:${ct_hostname}:${ct_ip}:auto")
+                    else
+                        warn "  prepare-target.sh not found — skipping auto-setup"
+                    fi
+                    ;;
+                m|manual)
+                    echo -e "    Enter SSH credentials for CT ${ct} (${ct_hostname:-unnamed}):"
+                    read -r -p "      SSH host/IP [$ct_ip]: " m_host
+                    m_host="${m_host:-$ct_ip}"
+                    read -r -p "      SSH port [22]: " m_port
+                    m_port="${m_port:-22}"
+                    read -r -p "      SSH username [root]: " m_user
+                    m_user="${m_user:-root}"
+                    echo -e "      Auth method: ${BOLD}k${NC}=key (default), ${BOLD}p${NC}=password"
+                    read -r -p "      Auth [k/p]: " m_auth
+                    m_auth="${m_auth:-k}"
+
+                    if [[ "${m_auth,,}" == "p" ]]; then
+                        read -r -s -p "      SSH password: " m_pass
+                        echo ""
+                        # Store credentials via the CentienC API
+                        pct exec "$CTID" -- bash -c "
+                            curl -s -X POST http://localhost:${PORT}/api/targets \
+                                -H 'Content-Type: application/json' \
+                                -d '{
+                                    \"name\": \"${ct_hostname:-CT-${ct}}\",
+                                    \"host\": \"${m_host}\",
+                                    \"port\": ${m_port},
+                                    \"ssh_user\": \"${m_user}\",
+                                    \"ssh_pass\": \"${m_pass}\",
+                                    \"auth_method\": \"password\"
+                                }' > /dev/null 2>&1
+                        " && ok "  CT ${ct} (${ct_hostname}) added with password auth" \
+                          || warn "  Could not add via API — add manually in the dashboard"
+                        CONFIGURED_TARGETS+=("${ct}:${ct_hostname}:${m_host}:password")
+                    else
+                        # Key auth — just copy the pubkey
+                        if [[ "$ct_status" == "running" ]]; then
+                            pct exec "$ct" -- bash -c "
+                                mkdir -p /home/${m_user}/.ssh ~/.ssh
+                                echo '${SSH_PUBKEY}' >> /home/${m_user}/.ssh/authorized_keys 2>/dev/null || \
+                                echo '${SSH_PUBKEY}' >> ~/.ssh/authorized_keys
+                            " 2>/dev/null && ok "  SSH key deployed to CT ${ct}" \
+                              || warn "  Could not deploy key — copy it manually"
+                        else
+                            warn "  Container not running — copy the SSH key manually after starting it"
+                        fi
+                        CONFIGURED_TARGETS+=("${ct}:${ct_hostname}:${m_host}:key")
+                    fi
+                    ;;
+                s|skip|*)
+                    info "  Skipped CT ${ct}"
+                    ;;
+            esac
+            echo ""
+        done
+
+        if [[ ${#CONFIGURED_TARGETS[@]} -gt 0 ]]; then
+            echo -e "  ${GREEN}Configured ${#CONFIGURED_TARGETS[@]} target(s) for monitoring.${NC}\n"
+        fi
+    else
+        info "No other containers found on this host."
+        echo -e "  You can add servers to monitor via the dashboard at ${BLUE}http://${CT_IP}:${PORT}${NC}"
+        echo ""
+    fi
+fi
+
 # ── Summary ──────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════╗${NC}"
@@ -506,6 +612,15 @@ echo ""
 echo -e "  Or manually authorize on each server:"
 echo -e "    ${BOLD}ssh USER@SERVER 'mkdir -p ~/.ssh && echo \"${SSH_PUBKEY}\" >> ~/.ssh/authorized_keys'${NC}"
 echo ""
+# Show configured targets if any were set up
+if [[ ${#CONFIGURED_TARGETS[@]:-0} -gt 0 ]]; then
+    echo -e "  ${BOLD}Configured Monitored Containers:${NC}"
+    for target in "${CONFIGURED_TARGETS[@]}"; do
+        IFS=':' read -r t_ctid t_name t_ip t_method <<< "$target"
+        echo -e "    CT ${CYAN}${t_ctid}${NC} — ${t_name} (${t_ip}) [${t_method} auth]"
+    done
+    echo ""
+fi
 echo -e "  ${BOLD}Management:${NC}"
 echo -e "    pct enter ${CTID}"
 echo -e "    pct exec ${CTID} -- systemctl status centienc"

@@ -422,7 +422,13 @@ class MonitorEngine:
             connect_kwargs["client_keys"] = []
             connect_kwargs["preferred_auth"] = "password,keyboard-interactive"
         else:
-            # No explicit credentials: allow SSH agent / default key files only
+            # Fall back to the service user's default SSH key
+            import pathlib
+            default_key = pathlib.Path.home() / ".ssh" / "id_ed25519"
+            if not default_key.exists():
+                default_key = pathlib.Path("/var/lib/centienc/.ssh/id_ed25519")
+            if default_key.exists():
+                connect_kwargs["client_keys"] = [str(default_key)]
             connect_kwargs["preferred_auth"] = "publickey"
 
         conn = await asyncssh.connect(**connect_kwargs)
@@ -2087,7 +2093,11 @@ class MonitorEngine:
                                     if ri.status_code == 200:
                                         iface_data = ri.json().get("data", [])
                                         for iface in iface_data:
-                                            for addr in iface.get("inet", []) or []:
+                                            # Proxmox returns inet as a plain string "x.x.x.x/prefix",
+                                            # not a list — normalise to list before iterating.
+                                            inet_raw = iface.get("inet") or []
+                                            inet_list = [inet_raw] if isinstance(inet_raw, str) else inet_raw
+                                            for addr in inet_list:
                                                 ip = str(addr).split("/")[0]
                                                 if ip and not ip.startswith("127."):
                                                     ipv4 = ip
