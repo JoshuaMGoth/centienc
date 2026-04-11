@@ -1770,11 +1770,24 @@ async def update_install(request: Request):
         _update_cache.clear()
 
         # 4. Schedule a graceful restart
-        #    Try systemd first, fall back to SIGHUP self-restart
+        #    Try PM2 first, then systemd, then SIGHUP self-restart
         async def _do_restart():
             await asyncio.sleep(1)  # give time for the response to be sent
+            # Try PM2 reload (most common deployment method)
             try:
-                # Try both service names (centienc is the deployed name; centient fallback)
+                for name in ("centienc", "centient"):
+                    r = subprocess.run(
+                        ["pm2", "reload", name, "--update-env"],
+                        capture_output=True, timeout=15,
+                    )
+                    if r.returncode == 0:
+                        return
+            except FileNotFoundError:
+                pass
+            except Exception:
+                pass
+            # Try systemd
+            try:
                 for svc in ("centienc", "centient"):
                     r = subprocess.run(
                         ["sudo", "systemctl", "restart", svc],
@@ -1784,7 +1797,7 @@ async def update_install(request: Request):
                         return
             except Exception:
                 pass
-            # Not running under systemd — send SIGHUP to ourselves
+            # Not running under PM2 or systemd — send SIGHUP to ourselves
             import signal
             os.kill(os.getpid(), signal.SIGHUP)
 
