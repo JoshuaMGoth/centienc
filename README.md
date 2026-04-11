@@ -40,7 +40,7 @@ There are no separate agents to install on your monitored machines. CentienC con
 - **Notifications** — Email (SMTP), webhooks, and Discord alerts on incidents
 - **Dark / Light Theme** — Toggle from the dashboard or admin settings
 - **Incident Tracking** — Automatic detection and duration tracking of outages
-- **Update Notifications** — Dashboard alerts you when a new version is available
+- **One-Click Updates** — Built-in Update Center with automatic version checks and in-app upgrades
 - **Cross-Platform** — Linux, macOS, Windows, Proxmox LXC
 - **Two Modes** — System tray icon (desktop) or headless service
 - **Ultra-Low Footprint** — Single process, SQLite database, ~30 MB RAM
@@ -266,6 +266,9 @@ All API routes return JSON. When auth is enabled, include a `Cookie: centient_to
 | `GET` | `/api/health` | Health check (no auth) |
 | `GET` | `/api/overview` | Dashboard overview with all stats |
 | `GET` | `/api/update-check` | Check for new versions |
+| `GET` | `/api/updates` | List all GitHub releases |
+| `POST` | `/api/update-install` | Download, install & restart (one-click update) |
+| `GET` | `/api/update-progress` | Poll update install progress |
 | `POST` | `/api/setup` | Complete the setup wizard |
 | `POST` | `/api/auth/login` | Login, returns JWT in cookie |
 | `POST` | `/api/auth/logout` | Clear auth cookie |
@@ -304,6 +307,7 @@ centient/
 ├── templates/
 │   ├── dashboard.html   # Main monitoring dashboard
 │   ├── admin.html       # Settings & administration panel
+│   ├── updates.html     # Update Center (one-click upgrades)
 │   ├── setup.html       # First-run setup wizard
 │   └── login.html       # Login page
 └── static/              # Icons, logos, and static assets
@@ -343,15 +347,45 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 
 ## Updates
 
-CentienC checks for updates automatically by comparing your installed version against the latest GitHub release. When a new version is available, a notification banner appears on your dashboard with a link to the release notes and upgrade instructions.
+CentienC includes a built-in **Update Center** that checks for new releases automatically. When an update is available:
+
+1. A banner appears on the dashboard with the new version number
+2. Click **"Update Now"** or visit the **Update Center** (`/updates`) for full release notes
+3. The updater downloads, installs, and restarts the service automatically
+
+The Update Center supports PM2, systemd, and standalone deployments.
+
+### One-Click Update (v1.8.2+)
+
+From the dashboard or the Update Center page, click the update button. CentienC will:
+- Download the latest release from GitHub via `pip install --upgrade`
+- Restart the service (PM2 → systemd → self-restart fallback)
+- Reload the dashboard automatically once the new version is running
+
+### Upgrading from v1.6.0 or Earlier
+
+Versions prior to v1.8.2 do not have the Update Center. To upgrade, re-run the installer — this upgrades in-place without losing your data:
+
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/JoshuaMGoth/centienc/main/installers/universal/install.sh)
+```
+
+After this one-time upgrade, all future updates are available via the built-in Update Center.
 
 ### Manual Update
 
 **Systemd installs (Linux):**
 ```bash
-cd /opt/centient && source venv/bin/activate
-pip install --upgrade centient
-systemctl restart centient
+cd /opt/centienc && source venv/bin/activate
+pip install --upgrade "centient @ git+https://github.com/JoshuaMGoth/centienc.git"
+systemctl restart centienc
+```
+
+**PM2 installs:**
+```bash
+cd /opt/centienc && source venv/bin/activate
+pip install --upgrade "centient @ git+https://github.com/JoshuaMGoth/centienc.git"
+pm2 reload centienc
 ```
 
 **Development installs:**
