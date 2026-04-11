@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "centient"
-version = "1.8.0"
+version = "1.8.1"
 description = "CentienC — Open-source server, service, and website monitoring dashboard"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
