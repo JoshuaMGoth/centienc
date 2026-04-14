@@ -519,10 +519,14 @@ function _wizCollectSrvFeatures(){
   };
 }
 function _wizCollectWebBasics(){
-  _wiz.data.wname = document.getElementById('wz_wname').value.trim();
-  _wiz.data.wurl = document.getElementById('wz_wurl').value.trim();
-  _wiz.data.wstatus = parseInt(document.getElementById('wz_wstatus').value)||200;
-  _wiz.data.wtimeout = parseInt(document.getElementById('wz_wtimeout').value)||15;
+  const nameEl = document.getElementById('wz_wname');
+  const urlEl = document.getElementById('wz_wurl');
+  const statusEl = document.getElementById('wz_wstatus');
+  const timeoutEl = document.getElementById('wz_wtimeout');
+  if(nameEl) _wiz.data.wname = nameEl.value.trim();
+  if(urlEl) _wiz.data.wurl = urlEl.value.trim();
+  if(statusEl) _wiz.data.wstatus = parseInt(statusEl.value)||200;
+  if(timeoutEl) _wiz.data.wtimeout = parseInt(timeoutEl.value)||15;
 }
 
 /* ── step validators (return error string or null) ── */
@@ -569,7 +573,6 @@ async function wizNext(){
   // Terminal steps → save & close
   if(s === 'srv_done'){ _wizSaveServer(); return; }
   if(s === 'web_done'){ closeWizard(); return; }
-  if(s === 'web_done'){ _wizSaveWebsite(); return; }
 
   // web_server: collect log path before advancing to save step
   if(s === 'web_server'){
