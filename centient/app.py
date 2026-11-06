@@ -2040,6 +2040,236 @@ async def va_cleanup(request: Request):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  Status Pages (public uptime pages + badges)
+# ═══════════════════════════════════════════════════════════════════
+
+_SP_TYPES = {"server", "service", "website"}
+
+
+def _sp_slugify(title: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40] or "status"
+    return f"{base}-{secrets.token_hex(3)}"
+
+
+async def _sp_resolve_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Resolve stored target refs into public-safe status entries."""
+    names: dict[str, dict[int, str]] = {}
+    for ttype, listing in (("server", db.list_servers), ("service", db.list_services), ("website", db.list_websites)):
+        try:
+            names[ttype] = {r["id"]: r.get("name") or r.get("url") or str(r["id"]) for r in await listing()}
+        except Exception:
+            names[ttype] = {}
+    out = []
+    for t in targets or []:
+        ttype = str(t.get("type", ""))
+        try:
+            tid = int(t.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if ttype not in _SP_TYPES:
+            continue
+        cache = (engine.status_cache.get(f"{ttype}:{tid}") or {}) if engine else {}
+        status = cache.get("status", "unknown")
+        entry = {
+            "type": ttype,
+            "id": tid,
+            "key": f"{ttype}-{tid}",
+            "name": names.get(ttype, {}).get(tid, f"{ttype} #{tid}"),
+            "status": status,
+            "response_time": cache.get("response_time"),
+            "status_code": cache.get("status_code"),
+            "last_check": cache.get("last_check"),
+            "ssl_days": cache.get("ssl_days"),
+        }
+        try:
+            entry["uptime_30d"] = round(await db.get_uptime(ttype, tid, hours=24 * 30), 2)
+            entry["uptime_90d"] = round(await db.get_uptime(ttype, tid, hours=24 * 90), 2)
+        except Exception:
+            entry["uptime_30d"] = None
+            entry["uptime_90d"] = None
+        try:
+            daily = await db.get_daily_summary(ttype, tid, days=90)
+            entry["daily"] = [
+                {"day": r["day"], "uptime": round(r["uptime_pct"], 1)} for r in daily
+            ]
+        except Exception:
+            entry["daily"] = []
+        out.append(entry)
+    return out
+
+
+@app.get("/api/status-pages")
+async def sp_list_api(request: Request):
+    await _require_auth_or_401(request)
+    return {"ok": True, "pages": await db.sp_list()}
+
+
+@app.post("/api/status-pages")
+async def sp_create_api(request: Request):
+    await _require_auth_or_401(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    title = str(body.get("title", "")).strip()[:120]
+    targets = body.get("targets") or []
+    if not title or not isinstance(targets, list):
+        raise HTTPException(400, "title and targets are required")
+    clean = [{"type": str(t.get("type")), "id": int(t.get("id"))}
+             for t in targets if isinstance(t, dict) and str(t.get("type")) in _SP_TYPES]
+    slug = _sp_slugify(title)
+    pid = await db.sp_add(slug, title, clean)
+    return {"ok": True, "id": pid, "slug": slug}
+
+
+@app.put("/api/status-pages/{pid}")
+async def sp_update_api(pid: int, request: Request):
+    await _require_auth_or_401(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    data: dict[str, Any] = {}
+    if "title" in body:
+        data["title"] = str(body["title"])[:120]
+    if "targets" in body and isinstance(body["targets"], list):
+        data["targets"] = [{"type": str(t.get("type")), "id": int(t.get("id"))}
+                           for t in body["targets"]
+                           if isinstance(t, dict) and str(t.get("type")) in _SP_TYPES]
+    if not data:
+        raise HTTPException(400, "Nothing to update")
+    await db.sp_update(pid, data)
+    return {"ok": True}
+
+
+@app.delete("/api/status-pages/{pid}")
+async def sp_delete_api(pid: int, request: Request):
+    await _require_auth_or_401(request)
+    await db.sp_delete(pid)
+    return {"ok": True}
+
+
+@app.get("/status/{slug}", response_class=HTMLResponse)
+async def status_page(slug: str, request: Request):
+    page = await db.sp_get_by_slug(slug)
+    if not page:
+        raise HTTPException(404, "Status page not found")
+    return _serve_template("status.html")
+
+
+@app.get("/api/status/{slug}")
+async def status_data(slug: str):
+    """Public status feed — uptime only, no analytics."""
+    page = await db.sp_get_by_slug(slug)
+    if not page:
+        raise HTTPException(404, "Status page not found")
+    targets = await _sp_resolve_targets(page.get("targets") or [])
+    states = {t["status"] for t in targets}
+    if not targets:
+        overall = "nodata"
+    elif "down" in states:
+        overall = "down"
+    elif "warning" in states or "unknown" in states:
+        overall = "degraded"
+    else:
+        overall = "operational"
+    return {
+        "ok": True,
+        "title": page["title"],
+        "overall": overall,
+        "generated_at": int(time.time()),
+        "targets": targets,
+    }
+
+
+def _badge_svg(left: str, right: str, color: str) -> str:
+    """Shields.io-style flat badge."""
+    lw = len(left) * 7 + 12
+    rw = len(right) * 7 + 12
+    w = lw + rw
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="20" '
+        f'role="img" aria-label="{left}: {right}">'
+        f'<linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/>'
+        f'<stop offset="1" stop-opacity=".1"/></linearGradient>'
+        f'<clipPath id="r"><rect width="{w}" height="20" rx="3" fill="#fff"/></clipPath>'
+        f'<g clip-path="url(#r)"><rect width="{lw}" height="20" fill="#555"/>'
+        f'<rect x="{lw}" width="{rw}" height="20" fill="{color}"/>'
+        f'<rect width="{w}" height="20" fill="url(#s)"/></g>'
+        f'<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,sans-serif" font-size="11">'
+        f'<text x="{lw/2:.0f}" y="15" fill="#fff">{left}</text>'
+        f'<text x="{lw + rw/2:.0f}" y="15">{right}</text></g></svg>'
+    )
+
+
+_BADGE_COLORS = {"operational": "#4c1", "up": "#4c1", "degraded": "#dfb317",
+                 "warning": "#dfb317", "down": "#e05d44", "unknown": "#9f9f9f",
+                 "nodata": "#9f9f9f"}
+
+
+@app.get("/badge/{slug}.svg")
+async def badge_overall(slug: str):
+    from fastapi.responses import Response
+    page = await db.sp_get_by_slug(slug)
+    if not page:
+        raise HTTPException(404)
+    targets = await _sp_resolve_targets(page.get("targets") or [])
+    states = {t["status"] for t in targets}
+    if not targets:
+        overall = "nodata"
+    elif "down" in states:
+        overall = "down"
+    elif "warning" in states or "unknown" in states:
+        overall = "degraded"
+    else:
+        overall = "operational"
+    label = {"operational": "up", "down": "down", "degraded": "degraded",
+             "nodata": "no data"}[overall]
+    svg = _badge_svg("status", label, _BADGE_COLORS.get(overall, "#9f9f9f"))
+    return Response(svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=60"})
+
+
+@app.get("/badge/{slug}/{target_key}.svg")
+async def badge_target(slug: str, target_key: str):
+    from fastapi.responses import Response
+    page = await db.sp_get_by_slug(slug)
+    if not page:
+        raise HTTPException(404)
+    targets = await _sp_resolve_targets(page.get("targets") or [])
+    t = next((x for x in targets if x["key"] == target_key), None)
+    if not t:
+        raise HTTPException(404)
+    st = t["status"] if t["status"] in ("up", "down", "warning") else "unknown"
+    label = {"up": "up", "down": "down", "warning": "warn", "unknown": "unknown"}[st]
+    name = t["name"][:18]
+    svg = _badge_svg(name, label, _BADGE_COLORS.get(st, "#9f9f9f"))
+    return Response(svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=60"})
+
+
+@app.get("/api/ai-insight")
+async def ai_insight(request: Request):
+    """Latest AI-generated infrastructure insight (empty until generated)."""
+    await _require_auth_or_401(request)
+    text = await db.get_setting("ai_insight", "")
+    ts = await db.get_setting("ai_insight_ts", "0")
+    configured = bool(os.environ.get("CENTIENT_DEEPSEEK_API_KEY"))
+    return {"ok": True, "text": text, "ts": float(ts or 0), "configured": configured}
+
+
+@app.post("/api/ai-insight/refresh")
+async def ai_insight_refresh(request: Request):
+    """Force-regenerate the AI insight now."""
+    await _require_auth_or_401(request)
+    if not os.environ.get("CENTIENT_DEEPSEEK_API_KEY"):
+        raise HTTPException(400, "CENTIENT_DEEPSEEK_API_KEY is not configured")
+    await db.set_setting("ai_insight_ts", "0")
+    await engine._maybe_generate_insight()
+    return {"ok": True, "text": await db.get_setting("ai_insight", "")}
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  Health check (no auth)
 # ═══════════════════════════════════════════════════════════════════
 

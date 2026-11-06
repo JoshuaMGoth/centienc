@@ -514,6 +514,12 @@ function render(d){
       <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
     </div>
   </div>
+  <div class="grid-2" style="margin-top:12px">
+    <div class="card">
+      <h3><span class="icon">🚫</span> Top 404 Pages — fix these broken links</h3>
+      ${simpleTable(d.top_404s||[],'Missing Page')}
+    </div>
+  </div>
 
 </div>`;
 

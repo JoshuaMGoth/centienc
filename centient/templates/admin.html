@@ -93,6 +93,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <a href="#" onclick="showPage('general')" class="active" data-page="general">🔧 General</a>
       <a href="#" onclick="showPage('servers')" data-page="servers">🖥 Servers</a>
       <a href="#" onclick="showPage('websites')" data-page="websites">🌐 Websites</a>
+      <a href="#" onclick="showPage('statuspages')" data-page="statuspages">📄 Status Pages</a>
       <a href="#" onclick="showPage('users')" data-page="users">👤 Users</a>
       <a href="#" onclick="showPage('notifications')" data-page="notifications">🔔 Notifications</a>
       <a href="#" onclick="showPage('data')" data-page="data">🗄 Data</a>
@@ -117,6 +118,19 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <h3>🔒 Authentication</h3>
         <div class="row"><label>Require Login</label><div class="toggle" id="sAuthToggle" onclick="toggleAuth()"></div></div>
         <div class="hint" style="margin-left:146px">When disabled, the dashboard is open to anyone with the URL.</div>
+      </div>
+      <div class="panel">
+        <h3>📬 Weekly Digest</h3>
+        <div class="row"><label>Enabled</label><div class="toggle" id="sDigestToggle" onclick="toggleDigest()"></div></div>
+        <div class="row"><label>Send on day</label><select id="sDigestDay"><option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option><option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option></select></div>
+        <div class="row"><label>Send at hour</label><input id="sDigestHour" type="number" min="0" max="23" value="8" style="width:80px"></div>
+        <div class="hint" style="margin-left:146px">Emailed to all enabled email notification channels: uptime summary, incidents, SSL expiry warnings.</div>
+      </div>
+      <div class="panel">
+        <h3>🤖 AI Insights</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Weekly AI-written analysis of your infrastructure (risks, anomalies, quick wins) via DeepSeek. Configure the key on the server:</p>
+        <code style="font-size:12px;background:var(--surface2);padding:6px 10px;border-radius:6px;display:block">CENTIENT_DEEPSEEK_API_KEY=sk-... pm2 restart centienc --update-env</code>
+        <div id="aiInsightStatus" style="font-size:12px;color:var(--text2);margin-top:8px">—</div>
       </div>
       <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
     </div>
@@ -215,6 +229,39 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <p style="font-size:12px;color:var(--text2)"><strong>Tip:</strong> For passwordless access, ensure your SSH public key (<code>~/.ssh/id_rsa.pub</code>) is in <code>~/.ssh/authorized_keys</code> on your monitored servers.</p>
       </div>
     </div>
+    <!-- STATUS PAGES -->
+    <div class="page" id="page-statuspages">
+      <h2>Status Pages</h2>
+      <div class="panel" style="border-color:#58a6ff22;background:rgba(88,166,255,.05)">
+        <h3 style="margin-top:0">📄 Public Status Pages & Uptime Badges</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:8px">Create a public, read-only status page showing uptime for selected targets — no analytics data is exposed. Each page also gets a shields.io-style badge you can embed in READMEs.</p>
+        <p style="font-size:12px;color:var(--text2)"><strong>Embed badge:</strong> <code>![status](https://YOUR-HOST/badge/SLUG.svg)</code> or per-target <code>/badge/SLUG/website-3.svg</code></p>
+      </div>
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">🌐 Pages</h3>
+          <button class="btn btn-primary" onclick="openSpModal()">+ New Status Page</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Title</th><th>Slug</th><th>Targets</th><th>Public URL</th><th>Actions</th></tr></thead>
+          <tbody id="spTableBody"></tbody>
+        </table>
+      </div>
+      <!-- Create modal -->
+      <div id="spModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center">
+        <div class="panel" style="width:min(560px,92vw);max-height:85vh;overflow-y:auto">
+          <h3 style="margin-top:0">New Status Page</h3>
+          <div class="row"><label>Title</label><input id="spTitle" placeholder="e.g. JoshuaGoth Status" style="flex:1"></div>
+          <h4 style="margin:14px 0 8px;font-size:13px;color:var(--text2)">Include targets:</h4>
+          <div id="spTargets" style="max-height:300px;overflow-y:auto"></div>
+          <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+            <button class="btn" onclick="closeSpModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="createStatusPage()">Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- DATA -->
     <div class="page" id="page-data">
       <h2>Data Management</h2>
@@ -1021,7 +1068,62 @@ function showPage(p){
   if(p==='servers')loadServers();
   if(p==='websites')loadWebsites();
   if(p==='proxmox')loadPveNodes();
+  if(p==='statuspages')loadStatusPages();
   if(p==='about')loadAbout();
+}
+
+/* ── Status Pages ── */
+let spAllTargets=[];
+async function loadStatusPages(){
+  try{
+    const [sp,web,srv,svc]=await Promise.all([
+      api('/api/status-pages'),api('/api/websites'),api('/api/servers'),api('/api/services')]);
+    if(!sp)return;
+    const pages=sp.pages||[];
+    const tb=document.getElementById('spTableBody');
+    tb.innerHTML=pages.map(p=>{
+      const names=(p.targets||[]).map(t=>esc(t.type)+':'+esc(t.id)).join(', ')||'—';
+      const url=location.origin+'/status/'+p.slug;
+      const badge=location.origin+'/badge/'+p.slug+'.svg';
+      return `<tr><td><b>${esc(p.title)}</b></td><td style="font-family:monospace;font-size:12px">${esc(p.slug)}</td>
+        <td style="font-size:12px">${names}</td>
+        <td style="font-size:12px"><a href="${url}" target="_blank" style="color:var(--accent)">${url}</a><br>
+        <span style="color:var(--text3)">badge: <code>${badge}</code></span></td>
+        <td><button class="btn" style="padding:4px 10px;font-size:12px" onclick="navigator.clipboard.writeText('${badge}').then(()=>toast('Badge URL copied','success'))">Copy Badge</button>
+        <button class="btn" style="padding:4px 10px;font-size:12px;color:#f44336" onclick="deleteStatusPage(${p.id})">Delete</button></td></tr>`;
+    }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text2)">No status pages yet.</td></tr>';
+    // cache target list for the modal
+    spAllTargets=[];
+    (web?.websites||[]).forEach(w=>spAllTargets.push({type:'website',id:w.id,label:'🌐 '+(w.name||w.url)}));
+    (srv?.servers||[]).forEach(s=>spAllTargets.push({type:'server',id:s.id,label:'🖥 '+(s.name||s.hostname||s.id)}));
+    (svc?.services||[]).forEach(s=>spAllTargets.push({type:'service',id:s.id,label:'🔌 '+(s.name||s.host+':'+s.port)}));
+  }catch(e){toast(e.message,'error')}
+}
+async function openSpModal(){
+  document.getElementById('spTitle').value='';
+  document.getElementById('spTargets').innerHTML=spAllTargets.length?spAllTargets.map((t,i)=>
+    `<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)">
+      <input type="checkbox" class="sp-cb" value="${i}"> ${esc(t.label)}</label>`).join('')
+    :'<div style="color:var(--text2);font-size:13px;padding:10px">No monitored targets found — add websites/servers/services first.</div>';
+  document.getElementById('spModal').style.display='flex';
+}
+function closeSpModal(){document.getElementById('spModal').style.display='none'}
+async function createStatusPage(){
+  const title=document.getElementById('spTitle').value.trim();
+  if(!title){toast('Title required','error');return}
+  const targets=[...document.querySelectorAll('.sp-cb:checked')].map(c=>{
+    const t=spAllTargets[+c.value];return{type:t.type,id:t.id}});
+  if(!targets.length){toast('Select at least one target','error');return}
+  try{
+    const d=await api('/api/status-pages',{method:'POST',body:JSON.stringify({title,targets})});
+    if(!d)return;
+    toast('Status page created: '+location.origin+'/status/'+d.slug,'success');
+    closeSpModal();loadStatusPages();
+  }catch(e){toast(e.message,'error')}
+}
+async function deleteStatusPage(id){
+  if(!confirm('Delete this status page? The public URL will stop working.'))return;
+  try{await api('/api/status-pages/'+id,{method:'DELETE'});toast('Deleted','success');loadStatusPages()}catch(e){toast(e.message,'error')}
 }
 
 /* Settings */
@@ -1037,11 +1139,22 @@ async function loadSettings(){
     if(settings.auth_enabled==='true')at.classList.add('on');else at.classList.remove('on');
     const nt=document.getElementById('sNotifyToggle');
     if(settings.notifications_enabled==='true')nt.classList.add('on');else nt.classList.remove('on');
+    const dt=document.getElementById('sDigestToggle');
+    if(settings.digest_enabled==='true')dt.classList.add('on');else dt.classList.remove('on');
+    document.getElementById('sDigestDay').value=settings.digest_day||'0';
+    document.getElementById('sDigestHour').value=settings.digest_hour||'8';
+    try{
+      const ai=await api('/api/ai-insight');
+      document.getElementById('aiInsightStatus').textContent=ai.configured
+        ?(ai.text?('Last generated: '+new Date(ai.ts*1000).toLocaleString()):'Configured — generates weekly')
+        :'Not configured — set CENTIENT_DEEPSEEK_API_KEY';
+    }catch(e){}
     document.documentElement.setAttribute('data-theme',localStorage.getItem('centient_theme')||settings.theme||'dark');
   }catch(e){toast(e.message,'error')}
 }
 function toggleAuth(){document.getElementById('sAuthToggle').classList.toggle('on')}
 function toggleNotify(){document.getElementById('sNotifyToggle').classList.toggle('on')}
+function toggleDigest(){document.getElementById('sDigestToggle').classList.toggle('on')}
 async function saveSettings(){
   const body={
     app_title:document.getElementById('sTitle').value,
@@ -1050,6 +1163,9 @@ async function saveSettings(){
     retention_days:document.getElementById('sRetention').value,
     auth_enabled:document.getElementById('sAuthToggle').classList.contains('on')?'true':'false',
     notifications_enabled:document.getElementById('sNotifyToggle').classList.contains('on')?'true':'false',
+    digest_enabled:document.getElementById('sDigestToggle').classList.contains('on')?'true':'false',
+    digest_day:document.getElementById('sDigestDay').value,
+    digest_hour:document.getElementById('sDigestHour').value,
   };
   try{await api('/api/settings',{method:'PUT',body:JSON.stringify(body)});toast('Settings saved','success');localStorage.setItem('centient_theme',body.theme)}catch(e){toast(e.message,'error')}
 }

@@ -55,10 +55,23 @@ async def _send_email(
     status: str,
     details: str | None,
 ) -> None:
-    config = channel.get("config", {})
+    subject = f"[CentienC] {emoji} {target_type.title()} {status.upper()}: {target_name}"
+
+    body = (
+        f"Target: {target_name}\n"
+        f"Type:   {target_type}\n"
+        f"Status: {status.upper()}\n"
+    )
+    if details:
+        body += f"Detail: {details}\n"
+
+    await _smtp_deliver(config, subject, body)
+
+
+async def _smtp_deliver(config: dict[str, Any], subject: str, body: str) -> None:
+    """Send a plain-text email through an email channel's SMTP config."""
     if isinstance(config, str):
         config = json.loads(config)
-
     smtp_host = config.get("smtp_host", "localhost")
     smtp_port = int(config.get("smtp_port", 25))
     from_addr = config.get("from_address", "centient@localhost")
@@ -69,17 +82,6 @@ async def _send_email(
 
     if not to_addr:
         return
-
-    emoji = {"up": "✅", "down": "🔴", "warning": "⚠️"}.get(status, "ℹ️")
-    subject = f"[CentienC] {emoji} {target_type.title()} {status.upper()}: {target_name}"
-
-    body = (
-        f"Target: {target_name}\n"
-        f"Type:   {target_type}\n"
-        f"Status: {status.upper()}\n"
-    )
-    if details:
-        body += f"Detail: {details}\n"
 
     msg = MIMEMultipart()
     msg["Subject"] = subject
@@ -106,6 +108,20 @@ async def _send_email(
     except Exception as e:
         logger.error("Email send failed: %s", e)
         raise
+
+
+async def send_digest(db: Database, subject: str, body: str) -> int:
+    """Send a free-form digest email to every enabled email channel."""
+    sent = 0
+    for ch in await db.list_channels():
+        if ch.get("type") != "email" or not ch.get("enabled", 1):
+            continue
+        try:
+            await _smtp_deliver(ch.get("config", {}), subject, body)
+            sent += 1
+        except Exception as exc:
+            logger.warning("Digest send failed on channel %s: %s", ch.get("id"), exc)
+    return sent
 
 
 async def _send_webhook(

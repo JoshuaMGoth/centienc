@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Status — CentienC</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh}
+.wrap{max-width:760px;margin:0 auto;padding:40px 20px 60px}
+.brand{text-align:center;margin-bottom:28px;color:rgba(255,255,255,.4);font-size:.8em;letter-spacing:.08em;text-transform:uppercase}
+.brand img{width:28px;height:28px;border-radius:6px;vertical-align:middle;margin-right:8px}
+h1{text-align:center;font-size:1.6em;font-weight:600;margin-bottom:20px}
+.banner{text-align:center;padding:18px;border-radius:14px;font-size:1.15em;font-weight:600;margin-bottom:26px;border:1px solid}
+.banner.op{background:rgba(76,175,80,.1);border-color:rgba(76,175,80,.3);color:#66bb6a}
+.banner.degraded{background:rgba(223,179,23,.1);border-color:rgba(223,179,23,.3);color:#ffd54f}
+.banner.down{background:rgba(224,93,68,.12);border-color:rgba(224,93,68,.35);color:#ef5350}
+.banner.nodata{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.5)}
+.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+.t-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.dot.up{background:#4caf50;box-shadow:0 0 8px rgba(76,175,80,.6)}
+.dot.down{background:#f44336;box-shadow:0 0 8px rgba(244,67,54,.6)}
+.dot.warning{background:#ffca28;box-shadow:0 0 8px rgba(255,202,40,.5)}
+.dot.unknown{background:#666}
+.t-name{font-weight:600;font-size:1.02em;word-break:break-all}
+.t-type{font-size:.7em;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:2px 8px}
+.t-meta{margin-left:auto;text-align:right;font-size:.78em;color:rgba(255,255,255,.5);line-height:1.5}
+.t-meta b{color:#58a6ff;font-weight:600}
+.uptime-bar{display:flex;gap:2px;margin-top:14px;height:22px}
+.uptime-bar .day{flex:1;border-radius:2px;background:rgba(255,255,255,.06);position:relative}
+.uptime-bar .day.full{background:rgba(76,175,80,.55)}
+.uptime-bar .day.part{background:rgba(255,202,40,.55)}
+.uptime-bar .day.down{background:rgba(244,67,54,.6)}
+.uptime-bar .day:hover::after{content:attr(data-tip);position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:#1c2128;border:1px solid rgba(255,255,255,.15);color:#fff;font-size:.68em;padding:3px 7px;border-radius:5px;white-space:nowrap;z-index:5}
+.uptime-labels{display:flex;justify-content:space-between;font-size:.68em;color:rgba(255,255,255,.3);margin-top:5px}
+.ssl-warn{font-size:.72em;color:#ffca28;margin-top:8px}
+.updated{text-align:center;font-size:.72em;color:rgba(255,255,255,.3);margin-top:26px}
+.err{text-align:center;padding:60px 20px;color:rgba(255,255,255,.5)}
+@media(max-width:520px){.t-meta{margin-left:0;text-align:left;width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><img src="/static/centienc-logo.png" alt="" onerror="this.style.display='none'"> CentienC</div>
+  <h1 id="pageTitle">Status</h1>
+  <div id="banner" class="banner nodata">Loading…</div>
+  <div id="targets"></div>
+  <div class="updated" id="updated"></div>
+</div>
+<script>
+const slug=location.pathname.split('/').filter(Boolean).pop();
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtAgo(ts){if(!ts)return'—';const s=Math.max(0,Math.floor(Date.now()/1000-ts));if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago'}
+function uptimeColor(u){if(u==null)return'#666';if(u>=99.5)return'#4caf50';if(u>=95)return'#ffca28';return'#f44336'}
+function dayCell(u){if(u==null)return'class="day"';if(u>=99.9)return'class="day full" data-tip="'+u+'%"';if(u>=95)return'class="day part" data-tip="'+u+'%"';return'class="day down" data-tip="'+u+'%"'}
+
+async function load(){
+  try{
+    const r=await fetch('/api/status/'+encodeURIComponent(slug));
+    const d=await r.json();
+    if(!d.ok)throw new Error('not found');
+    document.getElementById('pageTitle').textContent=d.title||'Status';
+    document.title=(d.title||'Status')+' — Status';
+    const b=document.getElementById('banner');
+    b.className='banner '+d.overall;
+    b.textContent={operational:'✅ All systems operational',degraded:'⚠️ Degraded performance',down:'🔴 Partial outage',nodata:'No monitored targets'}[d.overall]||d.overall;
+    const wrap=document.getElementById('targets');
+    wrap.innerHTML=(d.targets||[]).map(t=>{
+      const stMap={up:'up',down:'down',warning:'warning',unknown:'unknown'};
+      const dotCls=stMap[t.status]||'unknown';
+      const stLabel={up:'Operational',down:'Down',warning:'Warning',unknown:'Unknown'}[dotCls];
+      // Build 90-day uptime strip
+      const byDay={};(t.daily||[]).forEach(r=>byDay[r.day]=r.uptime);
+      const cells=[];const today=new Date();
+      for(let i=89;i>=0;i--){
+        const dt=new Date(today.getTime()-i*86400000);
+        const key=dt.toISOString().slice(0,10);
+        const u=byDay[key];
+        cells.push(`<div ${dayCell(u)}></div>`);
+      }
+      const ssl=t.ssl_days!=null&&t.ssl_days<30?`<div class="ssl-warn">⚠️ SSL certificate expires in ${t.ssl_days} days</div>`:'';
+      return `<div class="card">
+        <div class="t-head">
+          <span class="dot ${dotCls}"></span>
+          <span class="t-name">${esc(t.name)}</span>
+          <span class="t-type">${esc(t.type)}</span>
+          <div class="t-meta">
+            <div><b>${stLabel}</b>${t.response_time!=null?' · '+Math.round(t.response_time)+'ms':''}</div>
+            <div>30d uptime: <b style="color:${uptimeColor(t.uptime_30d)}">${t.uptime_30d!=null?t.uptime_30d+'%':'—'}</b>
+            · 90d: <b style="color:${uptimeColor(t.uptime_90d)}">${t.uptime_90d!=null?t.uptime_90d+'%':'—'}</b></div>
+            <div>checked ${fmtAgo(t.last_check)}</div>
+          </div>
+        </div>
+        <div class="uptime-bar">${cells.join('')}</div>
+        <div class="uptime-labels"><span>90 days ago</span><span>today</span></div>
+        ${ssl}
+      </div>`;
+    }).join('')||'<div class="card" style="text-align:center;color:rgba(255,255,255,.4)">No targets on this status page.</div>';
+    document.getElementById('updated').textContent='Updated '+new Date().toLocaleTimeString()+' · refreshes every 30s';
+  }catch(e){
+    document.getElementById('banner').className='banner nodata';
+    document.getElementById('banner').textContent='Status page not found';
+  }
+}
+load();setInterval(load,30000);
+</script>
+</body>
+</html>

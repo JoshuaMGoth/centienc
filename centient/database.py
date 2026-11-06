@@ -251,6 +251,15 @@ CREATE TABLE IF NOT EXISTS va_geo_cache (
     org        TEXT DEFAULT '',
     fetched_at TEXT NOT NULL
 );
+
+-- Public status pages (read-only uptime views, no analytics data)
+CREATE TABLE IF NOT EXISTS status_pages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug       TEXT UNIQUE NOT NULL,
+    title      TEXT NOT NULL,
+    targets    TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -1140,6 +1149,53 @@ class Database:
                 (site_id, cutoff, limit),
             )
             return [dict(r) for r in await cursor.fetchall()]
+
+    # ── Status Pages ──────────────────────────────────────────────
+
+    async def sp_add(self, slug: str, title: str, targets: list[dict[str, Any]]) -> int:
+        return await self._insert("status_pages", {
+            "slug": slug, "title": title, "targets": json.dumps(targets),
+        })
+
+    async def sp_update(self, pid: int, data: dict[str, Any]) -> bool:
+        if "targets" in data and not isinstance(data["targets"], str):
+            data["targets"] = json.dumps(data["targets"])
+        return await self._update("status_pages", pid, data)
+
+    async def sp_delete(self, pid: int) -> bool:
+        return await self._delete("status_pages", pid)
+
+    async def sp_get(self, pid: int) -> dict[str, Any] | None:
+        row = await self._get("status_pages", pid)
+        if row:
+            try:
+                row["targets"] = json.loads(row.get("targets") or "[]")
+            except (json.JSONDecodeError, TypeError):
+                row["targets"] = []
+        return row
+
+    async def sp_get_by_slug(self, slug: str) -> dict[str, Any] | None:
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute("SELECT * FROM status_pages WHERE slug = ?", (slug,))
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            try:
+                d["targets"] = json.loads(d.get("targets") or "[]")
+            except (json.JSONDecodeError, TypeError):
+                d["targets"] = []
+            return d
+
+    async def sp_list(self) -> list[dict[str, Any]]:
+        rows = await self._list("status_pages")
+        for r in rows:
+            try:
+                r["targets"] = json.loads(r.get("targets") or "[]")
+            except (json.JSONDecodeError, TypeError):
+                r["targets"] = []
+        return rows
 
     async def va_cleanup(self, days: int = 90) -> int:
         """Delete visitor-analytics rows older than the retention window."""

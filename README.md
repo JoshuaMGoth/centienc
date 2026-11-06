@@ -33,6 +33,13 @@ There are no separate agents to install on your monitored machines. CentienC con
 - **Proxmox Integration** — Container and VM metrics via API token
 - **Nginx Live Feed** — Real-time request log with per-site traffic breakdown
 - **Visitor Analytics** — JS beacon tracker with live visitors, per-page engagement (time on page, scroll depth), device/browser/OS breakdowns, geo-IP (country/city via cached ipinfo.io lookups), UTM source tracking, custom events, and session journeys
+- **No-Code Analytics** — Session reconstruction, countries, OS breakdowns, and top-404 reports derived automatically from existing nginx/apache/Caddy access logs over SSH — no JavaScript required
+- **Public Status Pages** — Shareable read-only uptime pages (`/status/your-slug`) showing per-target status, 90-day uptime bars, and incident history — analytics are never exposed
+- **Uptime Badges** — Shields.io-style SVG badges (`/badge/your-slug.svg`, per-target variants) embeddable in READMEs and websites
+- **SSL Expiry Monitoring** — Automatic TLS certificate checks for HTTPS sites with warning alerts before expiry
+- **Anomaly Alerts** — Response-time spike detection against your trailing baseline
+- **Weekly Digest** — Configurable scheduled email summary of uptime, incidents, and SSL status
+- **AI Insights** — Optional DeepSeek-powered weekly analysis of your infrastructure (set `CENTIENT_DEEPSEEK_API_KEY`)
 - **IP Geolocation** — Click any IP in the feed to see a map with city, ISP, and org data
 - **Fail2ban & Firewall** — View banned IPs and active jail stats
 - **PM2 Process Monitoring** — See all PM2 processes across your servers

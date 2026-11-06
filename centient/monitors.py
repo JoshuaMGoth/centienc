@@ -57,6 +57,7 @@ class MonitorEngine:
             asyncio.create_task(self._ssh_loop()),
             asyncio.create_task(self._proxmox_loop()),
             asyncio.create_task(self._cleanup_loop()),
+            asyncio.create_task(self._digest_loop()),
         ]
         logger.info("Monitor engine started (%d workers)", len(self._tasks))
 
@@ -74,6 +75,130 @@ class MonitorEngine:
                 pass
         self._ssh_conns.clear()
         logger.info("Monitor engine stopped")
+
+    # ══════════════════════════════════════════════════════════════
+    #  Weekly digest + AI insights
+    # ══════════════════════════════════════════════════════════════
+
+    async def _digest_loop(self) -> None:
+        """Hourly check: send weekly digest and refresh AI insight when due."""
+        while self._running:
+            try:
+                await asyncio.sleep(3600)
+                await self._maybe_send_digest()
+                await self._maybe_generate_insight()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug("Digest/insight loop error: %s", e)
+
+    async def _weekly_stats_text(self) -> str:
+        """Compact plain-text summary of the last 7 days for digests/AI."""
+        from datetime import datetime, timedelta, timezone
+        overview = self.get_overview()
+        lines = []
+        total = up = down = warn = 0
+        for group in ("servers", "services", "websites"):
+            for t in overview.get(group, []):
+                total += 1
+                st = t.get("status")
+                if st == "up":
+                    up += 1
+                elif st == "down":
+                    down += 1
+                else:
+                    warn += 1
+        lines.append(f"Targets: {total} total — {up} up, {down} down, {warn} warning/unknown")
+        for group, label in (("websites", "Website"), ("servers", "Server"), ("services", "Service")):
+            for t in overview.get(group, []):
+                name = t.get("name") or t.get("url") or f"{label} #{t.get('id')}"
+                rt = t.get("response_time")
+                rt_s = f", {rt:.0f}ms" if isinstance(rt, (int, float)) else ""
+                ssl = f", SSL {t['ssl_days']}d left" if t.get("ssl_days") is not None else ""
+                lines.append(f"- {label}: {name} [{t.get('status','?')}]{rt_s}{ssl}")
+        try:
+            incidents = [i for i in await self.db.get_recent_incidents(100)
+                         if i.get("started_at", "") >= (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")]
+            if incidents:
+                lines.append(f"Incidents (7d): {len(incidents)}")
+                for i in incidents[:10]:
+                    lines.append(f"  - {i.get('target_type')} #{i.get('target_id')}: {i.get('status')} since {i.get('started_at')}")
+        except Exception:
+            pass
+        return "\n".join(lines)
+
+    async def _maybe_send_digest(self) -> None:
+        if await self.db.get_setting("digest_enabled", "false") != "true":
+            return
+        from datetime import datetime
+        now = datetime.now()
+        try:
+            day = int(await self.db.get_setting("digest_day", "0"))
+            hour = int(await self.db.get_setting("digest_hour", "8"))
+        except ValueError:
+            day, hour = 0, 8
+        today = now.strftime("%Y-%m-%d")
+        if now.weekday() != day or now.hour < hour:
+            return
+        if await self.db.get_setting("digest_last_sent", "") == today:
+            return
+        from .notifications import send_digest
+        body = (
+            f"CentienC weekly digest — {today}\n\n"
+            + await self._weekly_stats_text()
+            + "\n\n— Sent by CentienC"
+        )
+        sent = await send_digest(self.db, f"[CentienC] Weekly digest — {today}", body)
+        if sent:
+            await self.db.set_setting("digest_last_sent", today)
+            logger.info("Weekly digest sent to %d channel(s)", sent)
+
+    def _deepseek_key(self) -> str:
+        import os
+        return os.environ.get("CENTIENT_DEEPSEEK_API_KEY", "")
+
+    async def _maybe_generate_insight(self) -> None:
+        key = self._deepseek_key()
+        if not key:
+            return
+        from datetime import datetime, timezone
+        try:
+            ts = float(await self.db.get_setting("ai_insight_ts", "0") or 0)
+        except ValueError:
+            ts = 0
+        if time.time() - ts < 6 * 86400:
+            return
+        stats = await self._weekly_stats_text()
+        prompt = (
+            "You are a concise infrastructure analyst. Given this monitoring summary, "
+            "write a 3-5 sentence plain-text insight for the site owner: highlight risks "
+            "(downtime, SSL expiry, slow responses, anomalies) and one quick win. "
+            "No markdown, no headers, under 700 characters.\n\n" + stats
+        )
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                r = await client.post(
+                    "https://api.deepseek.com/chat/completions",
+                    headers={"Authorization": f"Bearer {key}"},
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": [
+                            {"role": "system", "content": "You write terse infra status insights."},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "max_tokens": 300,
+                        "temperature": 0.4,
+                    },
+                )
+                if r.status_code != 200:
+                    logger.warning("DeepSeek insight failed: %s", r.status_code)
+                    return
+                text = r.json()["choices"][0]["message"]["content"].strip()[:1200]
+            await self.db.set_setting("ai_insight", text)
+            await self.db.set_setting("ai_insight_ts", str(time.time()))
+            logger.info("AI insight refreshed")
+        except Exception as exc:
+            logger.debug("AI insight generation failed: %s", exc)
 
     # ══════════════════════════════════════════════════════════════
     #  Server monitoring (ICMP ping)
@@ -330,8 +455,43 @@ class MonitorEngine:
 
         elapsed = round((time.monotonic() - start) * 1000, 2)
         cache_key = f"website:{website['id']}"
+        prev_cache = self.status_cache.get(cache_key, {})
 
-        prev = self.status_cache.get(cache_key, {}).get("status")
+        # SSL certificate expiry — checked at most every 6 hours per site
+        ssl_days = prev_cache.get("ssl_days")
+        ssl_checked = prev_cache.get("ssl_checked", 0)
+        ssl_alerted = prev_cache.get("ssl_alerted", False)
+        if url.lower().startswith("https://") and time.time() - ssl_checked > 6 * 3600:
+            ssl_days = await self._ssl_days_remaining(url)
+            ssl_checked = time.time()
+            if ssl_days is not None and ssl_days <= 14 and not ssl_alerted:
+                await send_notification(
+                    self.db, "website", website["name"], "warning",
+                    f"SSL certificate for {url} expires in {ssl_days} days",
+                )
+                ssl_alerted = True
+            elif ssl_days is not None and ssl_days > 14:
+                ssl_alerted = False
+
+        # Response-time anomaly: current check vs trailing daily baseline
+        rt_anomaly = prev_cache.get("rt_anomaly", False)
+        if status == "up" and elapsed:
+            try:
+                daily = await self.db.get_daily_summary("website", website["id"], days=8)
+                vals = [r["avg_response"] for r in daily[:-1] if r.get("avg_response")]
+                baseline = sum(vals) / len(vals) if vals else 0
+                if baseline and elapsed > baseline * 3 and elapsed - baseline > 200 and not rt_anomaly:
+                    await send_notification(
+                        self.db, "website", website["name"], "warning",
+                        f"Response time spiked to {elapsed:.0f}ms (baseline ~{baseline:.0f}ms)",
+                    )
+                    rt_anomaly = True
+                elif baseline and elapsed < baseline * 2:
+                    rt_anomaly = False
+            except Exception:
+                pass
+
+        prev = prev_cache.get("status")
         if status in ("down", "warning") and prev not in ("down", "warning"):
             await self.db.open_incident("website", website["id"])
             await send_notification(
@@ -353,10 +513,46 @@ class MonitorEngine:
             # Preserve website linkage metadata so dashboard cards can enable drill-down.
             "server_id": website.get("server_id"),
             "log_path": website.get("log_path"),
+            "ssl_days": ssl_days,
+            "ssl_checked": ssl_checked,
+            "ssl_alerted": ssl_alerted if url.lower().startswith("https://") else False,
+            "rt_anomaly": rt_anomaly,
         }
         await self.db.record_check(
             "website", website["id"], status, elapsed, status_code, details
         )
+
+    async def _ssl_days_remaining(self, url: str, timeout: int = 8) -> int | None:
+        """Return days until the TLS certificate expires, or None on failure."""
+        import ssl as ssl_mod
+        from datetime import datetime, timezone
+        from urllib.parse import urlparse
+        try:
+            p = urlparse(url)
+            host = p.hostname
+            if not host:
+                return None
+            port = p.port or 443
+            ctx = ssl_mod.create_default_context()
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port, ssl=ctx, server_hostname=host),
+                timeout=timeout,
+            )
+            try:
+                ssl_obj = writer.get_extra_info("ssl_object")
+                cert = ssl_obj.getpeercert() if ssl_obj else None
+            finally:
+                writer.close()
+                try:
+                    await writer.wait_closed()
+                except Exception:
+                    pass
+            if not cert or "notAfter" not in cert:
+                return None
+            expiry = datetime.strptime(cert["notAfter"], "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+            return max(0, (expiry - datetime.now(timezone.utc)).days)
+        except Exception:
+            return None
 
     # ══════════════════════════════════════════════════════════════
     #  SSH-based remote metrics collection (agentless)
@@ -1395,7 +1591,7 @@ class MonitorEngine:
             "trending_pages": [], "page_timelines": {}, "unique_by_day": [],
             "error_breakdown": {}, "hack_attempts": [], "attacking_ips": [],
             "scanner_uas": [], "bot_categories": {}, "method_distribution": {},
-            "http_versions": {}, "os": [], "countries": [],
+            "http_versions": {}, "os": [], "countries": [], "top_404s": [],
             "sessions": {"count": 0, "pageviews": 0, "avg_pages": 0,
                          "avg_duration": 0, "bounce_rate": 0},
             "error": None,
@@ -1523,6 +1719,7 @@ class MonitorEngine:
         )
 
         page_counts: dict[str, int] = {}
+        not_found_counts: dict[str, int] = {}
         section_counts: dict[str, int] = {}
         topic_counts: dict[str, int] = {}
         day_counts: dict[str, int] = {}
@@ -1724,6 +1921,8 @@ class MonitorEngine:
                 clean_path = "/"
 
             page_counts[clean_path] = page_counts.get(clean_path, 0) + 1
+            if status_int == 404 and method in ("GET", "HEAD"):
+                not_found_counts[clean_path] = not_found_counts.get(clean_path, 0) + 1
 
             # Per-page daily tracking (for timelines + trends)
             if clean_path not in page_day_counts:
@@ -1891,6 +2090,7 @@ class MonitorEngine:
             "os": os_list,
             "countries": countries_list,
             "sessions": sessions_block,
+            "top_404s": top_n(not_found_counts, 15),
             "totals": {
                 "views": total_views,
                 "unique_visitors": len(unique_ips),
