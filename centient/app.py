@@ -2157,19 +2157,23 @@ async def update_install(request: Request):
         _update_progress = {"status": "downloading", "step": f"Downloading CentienC v{latest}…",
                             "latest_version": latest}
 
-        # 2. pip install --upgrade from GitHub
-        pip_exe = os.path.join(os.path.dirname(sys.executable), "pip")
-        if not os.path.exists(pip_exe):
-            pip_exe = sys.executable + " -m pip"
-        cmd = [
-            sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir",
-            "centient @ git+https://github.com/JoshuaMGoth/centienc.git",
+        # 2. Uninstall then install from GitHub.
+        #    pip treats an already-installed direct-URL requirement as
+        #    "satisfied" and silently skips the upgrade, so we must
+        #    uninstall first. Pin to the release tag when we have one.
+        ref = f"@v{latest}" if re.fullmatch(r"\d+\.\d+\.\d+", str(latest)) else ""
+        url = f"git+https://github.com/JoshuaMGoth/centienc.git{ref}"
+        uninstall = [sys.executable, "-m", "pip", "uninstall", "-y", "centient"]
+        install = [
+            sys.executable, "-m", "pip", "install", "--no-cache-dir",
+            f"centient @ {url}",
         ]
-        logger.info("Update: running %s", " ".join(cmd))
+        logger.info("Update: running %s then %s", " ".join(uninstall), " ".join(install))
 
         try:
+            subprocess.run(uninstall, capture_output=True, text=True, timeout=120)
             proc = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=300,
+                install, capture_output=True, text=True, timeout=300,
             )
             if proc.returncode != 0:
                 logger.error("pip upgrade failed: %s", proc.stderr)
