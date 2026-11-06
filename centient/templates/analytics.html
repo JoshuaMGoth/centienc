@@ -259,6 +259,8 @@ function fmt(n){
   return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n);
 }
 function fmtPct(n){return (n||0).toFixed(1)+'%'}
+function fmtDur(sec){sec=Math.round(sec||0);if(sec<60)return sec+'s';if(sec<3600)return Math.floor(sec/60)+'m';if(sec<86400)return Math.floor(sec/3600)+'h '+Math.floor((sec%3600)/60)+'m';return Math.floor(sec/86400)+'d'}
+function flag(cc){if(!cc||cc.length!==2)return '';return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0)))}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function hourLabel(h){const s=h%12||12,ap=h<12?'am':'pm';return s+ap}
 function weekdayLabel(i){return['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]}
@@ -456,6 +458,24 @@ function render(d){
     <div class="card">
       <h3><span class="icon">🌍</span> Browsers</h3>
       <div class="chart-wrap" style="margin-top:6px"><canvas id="chartBrowsers"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Sessions + Geography + OS (estimated from logs — no tracking code) ── -->
+  <div class="slabel">👥 Sessions &amp; geography — estimated from server logs</div>
+  <div class="grid-3">
+    <div class="card">
+      <h3><span class="icon">👥</span> Visitor Sessions</h3>
+      ${renderSessionCard(d.sessions)}
+      <div style="font-size:.72em;color:var(--text3);margin-top:10px">Estimated by grouping requests per IP+browser within 30-minute windows. Install the tracking snippet for exact time-on-page.</div>
+    </div>
+    <div class="card">
+      <h3><span class="icon">🌍</span> Countries</h3>
+      ${geoTable(d.countries||[])}
+    </div>
+    <div class="card">
+      <h3><span class="icon">💻</span> Operating Systems</h3>
+      ${osTable(d.os||[])}
     </div>
   </div>
 
@@ -734,6 +754,46 @@ function simpleTable(rows, colLabel){
   });
   html+='</tbody></table>';
   return html;
+}
+
+// ── Sessions / Geo / OS cards ──────────────────────────────────
+function renderSessionCard(sess){
+  if(!sess||!sess.count) return '<div class="nodata">No session data yet.</div>';
+  const items=[
+    ['Sessions', fmt(sess.count)],
+    ['Pages / session', sess.avg_pages||0],
+    ['Avg. duration', fmtDur(sess.avg_duration||0)],
+    ['Bounce rate', (sess.bounce_rate||0)+'%'],
+  ];
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+    items.map(([l,v])=>`<div style="background:rgba(255,255,255,.04);border-radius:8px;padding:10px 12px">
+      <div style="font-size:.68em;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">${l}</div>
+      <div style="font-size:1.3em;font-weight:700;color:var(--blue);margin-top:2px">${v}</div></div>`).join('')+
+    '</div>';
+}
+
+function geoTable(rows){
+  if(!rows||!rows.length) return '<div class="nodata">Geo data fills in as visitors arrive (cached ipinfo.io lookups).</div>';
+  const max=rows[0].count||1;
+  let html=`<table class="stbl"><thead><tr><th>#</th><th>Country</th><th style="text-align:right">Visitors</th></tr></thead><tbody>`;
+  rows.slice(0,12).forEach((r,i)=>{
+    html+=`<tr><td class="srank">${i+1}</td>
+      <td class="sname">${flag(r.name)} ${esc(r.name)}<div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.count/max*100)}%"></div></div></td>
+      <td class="scount">${fmt(r.count)}</td></tr>`;
+  });
+  return html+'</tbody></table>';
+}
+
+function osTable(rows){
+  if(!rows||!rows.length) return '<div class="nodata">No data yet.</div>';
+  const max=rows[0].count||1;
+  let html=`<table class="stbl"><thead><tr><th>#</th><th>OS</th><th style="text-align:right">Requests</th></tr></thead><tbody>`;
+  rows.slice(0,10).forEach((r,i)=>{
+    html+=`<tr><td class="srank">${i+1}</td>
+      <td class="sname">${esc(r.name)}<div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.count/max*100)}%"></div></div></td>
+      <td class="scount">${fmt(r.count)}</td></tr>`;
+  });
+  return html+'</tbody></table>';
 }
 
 // ── Build Charts ───────────────────────────────────────────────

@@ -309,7 +309,11 @@ function setupCard(site){
   return `<div class="setup-card">
     <h3>👥 Visitor Analytics — Setup</h3>
     <p>CentienC collects <strong>anonymous</strong> visitor data: pages viewed, time on page, scroll depth, device/browser/OS, approximate geography (IP → country/city via ipinfo.io, cached), traffic sources, and live presence. No cookies for identity, no fingerprints, honours DNT and skips bots. Sessions expire after 30 minutes of inactivity.</p>
-    <p><strong>To activate:</strong> add the snippet below to every page of your site (before <code>&lt;/body&gt;</code>). It weighs ~6 KB and sends batched beacons — no performance impact.</p>
+    <p><strong>To activate:</strong> add the snippet below to every page of your site (before <code>&lt;/body&gt;</code>). For Hugo/Jekyll/WordPress it's a <em>single template edit</em> — every page inherits it and it survives rebuilds. It weighs ~6 KB and sends batched beacons — no performance impact.</p>
+    <p style="font-size:.8em"><strong>No site changes at all?</strong> Two alternatives: (1) the <a href="/analytics" style="color:#58a6ff">📊 Analytics</a> page already estimates sessions, devices, and countries from your nginx logs over SSH — no snippet needed. (2) Let nginx inject the tracker for you — add this inside your server/http block (one-time, covers every site on that server):</p>
+    <div class="snippet" style="font-size:.72em"><button class="copy-btn" onclick="copySnippet(this)">Copy</button>sub_filter '&lt;/body&gt;' '&lt;script src="${origin}/centience-track.js?site=${site?site.site_key:'SITE_KEY'}" defer&gt;&lt;/script&gt;&lt;/body&gt;';
+sub_filter_once off;
+sub_filter_types text/html;</div>
     <div class="snippet"><button class="copy-btn" onclick="copySnippet(this)">Copy</button>${esc(snippet)}</div>
     ${rows?`<div style="margin-top:12px;font-size:.78em;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.05em">Tracked sites</div>${rows}`:''}
     <div class="add-site-form">

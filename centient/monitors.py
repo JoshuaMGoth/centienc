@@ -1331,6 +1331,18 @@ class MonitorEngine:
             return "Suspicious Method"
         return None
 
+    _OS_PATTERNS = [
+        ("Windows", "Windows"), ("Android", "Android"), ("iPhone", "iOS"),
+        ("iPad", "iOS"), ("iPod", "iOS"), ("Mac OS X", "macOS"),
+        ("CrOS", "ChromeOS"), ("Linux", "Linux"),
+    ]
+
+    def _detect_os(self, ua: str) -> str:
+        for token, name in self._OS_PATTERNS:
+            if token in ua:
+                return name
+        return "Other"
+
     def _detect_browser(self, ua: str) -> str:
         if "Edg/" in ua or "Edge/" in ua:
             return "Edge"
@@ -1383,7 +1395,10 @@ class MonitorEngine:
             "trending_pages": [], "page_timelines": {}, "unique_by_day": [],
             "error_breakdown": {}, "hack_attempts": [], "attacking_ips": [],
             "scanner_uas": [], "bot_categories": {}, "method_distribution": {},
-            "http_versions": {}, "error": None,
+            "http_versions": {}, "os": [], "countries": [],
+            "sessions": {"count": 0, "pageviews": 0, "avg_pages": 0,
+                         "avg_duration": 0, "bounce_rate": 0},
+            "error": None,
         }
         try:
             conn = await self._get_ssh_conn(server)
@@ -1520,6 +1535,17 @@ class MonitorEngine:
         weekday_counts: list[int] = [0] * 7  # Mon=0 .. Sun=6
         heatmap: list[list[int]] = [[0] * 24 for _ in range(7)]
         browser_counts: dict[str, int] = {}
+        os_counts: dict[str, int] = {}
+        # Session reconstruction: group pageviews by IP+UA within 30-min windows
+        sess_map: dict[str, dict[str, Any]] = {}
+        sess_agg = {"sessions": 0, "pages": 0, "dur_sum": 0.0, "dur_n": 0, "bounces": 0}
+
+        def _close_session(st: dict[str, Any]) -> None:
+            sess_agg["dur_sum"] += max(0.0, st["last"] - st["start"])
+            sess_agg["dur_n"] += 1
+            if st["pages"] <= 1:
+                sess_agg["bounces"] += 1
+
         source_counts: dict[str, int] = {"search": 0, "social": 0, "direct": 0, "referral": 0}
         search_query_counts: dict[str, int] = {}
         ip_visit_count: dict[str, int] = {}
@@ -1647,9 +1673,11 @@ class MonitorEngine:
             # New vs returning (count visits per IP)
             ip_visit_count[ip] = ip_visit_count.get(ip, 0) + 1
 
-            # Browser
+            # Browser / OS
             browser = self._detect_browser(ua)
             browser_counts[browser] = browser_counts.get(browser, 0) + 1
+            os_name = self._detect_os(ua)
+            os_counts[os_name] = os_counts.get(os_name, 0) + 1
 
             # Traffic source
             source = self._classify_source(ref)
@@ -1675,6 +1703,20 @@ class MonitorEngine:
 
             if is_static:
                 continue
+
+            # Session tracking (human pageviews only)
+            if method in ("GET", "HEAD"):
+                skey = f"{ip}|{ua[:120]}"
+                st = sess_map.get(skey)
+                if st is None or ts - st["last"] > 1800:
+                    if st is not None:
+                        _close_session(st)
+                    st = {"start": ts, "last": ts, "pages": 0}
+                    sess_map[skey] = st
+                    sess_agg["sessions"] += 1
+                st["pages"] += 1
+                st["last"] = ts
+                sess_agg["pages"] += 1
 
             # Normalize path
             clean_path = path.rstrip("/") or "/"
@@ -1753,14 +1795,88 @@ class MonitorEngine:
             for p in top_pages_list
         }
 
+        # Close any still-open sessions
+        for st in sess_map.values():
+            _close_session(st)
+
+        sessions_block = {
+            "count": sess_agg["sessions"],
+            "pageviews": sess_agg["pages"],
+            "avg_pages": round(sess_agg["pages"] / max(sess_agg["sessions"], 1), 1),
+            "avg_duration": round(sess_agg["dur_sum"] / max(sess_agg["dur_n"], 1)),
+            "bounce_rate": round(sess_agg["bounces"] / max(sess_agg["dur_n"], 1) * 100, 1),
+        }
+
         # Browser list sorted
         browser_list = [
             {"name": k, "count": v}
             for k, v in sorted(browser_counts.items(), key=lambda x: -x[1])
         ]
 
+        os_list = [
+            {"name": k, "count": v}
+            for k, v in sorted(os_counts.items(), key=lambda x: -x[1])
+        ]
+
+        # ── Geo enrichment for top IPs (bounded, cached in va_geo_cache) ──
+        country_ip_counts: dict[str, int] = {}
+        geo_by_ip: dict[str, dict[str, str]] = {}
+        try:
+            import ipaddress as _ipaddr
+            ranked_ips = sorted(unique_ips, key=lambda i: -ip_counts.get(i, 0))[:60]
+            sem = asyncio.Semaphore(6)
+
+            async def _resolve_geo(ip: str) -> None:
+                try:
+                    addr = _ipaddr.ip_address(ip)
+                    if not addr.is_global:
+                        return
+                except ValueError:
+                    return
+                try:
+                    cached = await self.db.va_geo_get(ip)
+                    if cached is None:
+                        async with sem:
+                            async with httpx.AsyncClient(timeout=5) as client:
+                                r = await client.get(f"https://ipinfo.io/{ip}/json")
+                                data = r.json() if r.status_code == 200 else {}
+                            geo = {
+                                "country": (data.get("country") or "")[:8],
+                                "country_name": "",
+                                "region": (data.get("region") or "")[:80],
+                                "city": (data.get("city") or "")[:80],
+                                "org": (data.get("org") or "")[:120],
+                            }
+                            await self.db.va_geo_put(ip, geo)
+                            cached = geo
+                    if cached and (cached.get("country") or cached.get("city")):
+                        geo_by_ip[ip] = {
+                            "country": cached.get("country", ""),
+                            "city": cached.get("city", ""),
+                            "org": cached.get("org", ""),
+                        }
+                        cc = cached.get("country") or "??"
+                        country_ip_counts[cc] = country_ip_counts.get(cc, 0) + 1
+                except Exception:
+                    pass
+
+            await asyncio.gather(*[_resolve_geo(ip) for ip in ranked_ips])
+        except Exception as exc:
+            logger.debug("Analytics geo enrichment failed: %s", exc)
+
+        countries_list = [
+            {"name": k, "count": v}
+            for k, v in sorted(country_ip_counts.items(), key=lambda x: -x[1])
+        ]
+
         # Find peak publishing hour (hour with most traffic)
         peak_hour = hour_counts.index(max(hour_counts)) if hour_counts else 0
+
+        top_ips_list = top_n(ip_counts, 15)
+        for entry in top_ips_list:
+            geo = geo_by_ip.get(entry["name"])
+            if geo:
+                entry["geo"] = geo
 
         return {
             "pages": top_n(page_counts, 25),
@@ -1769,9 +1885,12 @@ class MonitorEngine:
             "traffic_by_day": traffic_by_day,
             "traffic_by_hour": hour_counts,
             "status_codes": status_codes,
-            "top_ips": top_n(ip_counts, 15),
+            "top_ips": top_ips_list,
             "referrers": top_n(referrer_counts, 15),
             "devices": devices,
+            "os": os_list,
+            "countries": countries_list,
+            "sessions": sessions_block,
             "totals": {
                 "views": total_views,
                 "unique_visitors": len(unique_ips),
