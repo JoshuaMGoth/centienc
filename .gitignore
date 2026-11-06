@@ -12,3 +12,4 @@ __pycache__/
 # The pro package lives in a separate PRIVATE repository.
 # Never commit it to the public open-source repo.
 centienc-pro/
+centient.egg-info/

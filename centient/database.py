@@ -151,6 +151,106 @@ CREATE TABLE IF NOT EXISTS push_tokens (
     platform   TEXT DEFAULT 'ios',
     created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- ═══════════════════════════════════════════════════════════════════
+--  Visitor Analytics (Centience tracker)
+-- ═══════════════════════════════════════════════════════════════════
+
+-- Tracked sites (each gets a public site_key for the JS beacon)
+CREATE TABLE IF NOT EXISTS va_sites (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    domain     TEXT NOT NULL,
+    site_key   TEXT UNIQUE NOT NULL,
+    enabled    INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Anonymous visitors (no PII — keyed by client-generated UUID)
+CREATE TABLE IF NOT EXISTS va_visitors (
+    id          TEXT PRIMARY KEY,
+    site_id     INTEGER NOT NULL,
+    first_seen  TEXT NOT NULL,
+    last_seen   TEXT NOT NULL,
+    country     TEXT DEFAULT '',
+    region      TEXT DEFAULT '',
+    city        TEXT DEFAULT '',
+    org         TEXT DEFAULT '',
+    device      TEXT DEFAULT '',
+    browser     TEXT DEFAULT '',
+    os          TEXT DEFAULT '',
+    visits      INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_va_visitors_site ON va_visitors(site_id, last_seen);
+
+-- Sessions (30 min inactivity window, managed by the tracker)
+CREATE TABLE IF NOT EXISTS va_sessions (
+    id               TEXT PRIMARY KEY,
+    site_id          INTEGER NOT NULL,
+    visitor_id       TEXT NOT NULL,
+    started_at       TEXT NOT NULL,
+    last_seen_at     TEXT NOT NULL,
+    entry_path       TEXT DEFAULT '',
+    current_path     TEXT DEFAULT '',
+    exit_path        TEXT DEFAULT '',
+    page_count       INTEGER DEFAULT 0,
+    engaged_seconds  REAL DEFAULT 0,
+    max_scroll       INTEGER DEFAULT 0,
+    referrer         TEXT DEFAULT '',
+    source           TEXT DEFAULT '',
+    medium           TEXT DEFAULT '',
+    campaign         TEXT DEFAULT '',
+    country          TEXT DEFAULT '',
+    city             TEXT DEFAULT '',
+    device           TEXT DEFAULT '',
+    browser          TEXT DEFAULT '',
+    os               TEXT DEFAULT '',
+    screen           TEXT DEFAULT '',
+    lang             TEXT DEFAULT '',
+    ended            INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_va_sessions_site ON va_sessions(site_id, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_va_sessions_visitor ON va_sessions(visitor_id);
+
+-- Individual page views
+CREATE TABLE IF NOT EXISTS va_pageviews (
+    id              TEXT PRIMARY KEY,
+    session_id      TEXT NOT NULL,
+    visitor_id      TEXT NOT NULL,
+    site_id         INTEGER NOT NULL,
+    path            TEXT NOT NULL,
+    title           TEXT DEFAULT '',
+    ts              TEXT NOT NULL,
+    load_ms         INTEGER,
+    engaged_seconds REAL DEFAULT 0,
+    scroll_depth    INTEGER DEFAULT 0,
+    exited          INTEGER DEFAULT 0,
+    referrer        TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_va_pv_site_ts ON va_pageviews(site_id, ts);
+CREATE INDEX IF NOT EXISTS idx_va_pv_session ON va_pageviews(session_id);
+
+-- Custom events fired by sites via the tracker
+CREATE TABLE IF NOT EXISTS va_events (
+    id         TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    site_id    INTEGER NOT NULL,
+    name       TEXT NOT NULL,
+    value      TEXT DEFAULT '',
+    ts         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_va_events_site ON va_events(site_id, ts);
+
+-- IP → geo cache (ipinfo.io lookups are cached here to stay within rate limits)
+CREATE TABLE IF NOT EXISTS va_geo_cache (
+    ip         TEXT PRIMARY KEY,
+    country    TEXT DEFAULT '',
+    country_name TEXT DEFAULT '',
+    region     TEXT DEFAULT '',
+    city       TEXT DEFAULT '',
+    org        TEXT DEFAULT '',
+    fetched_at TEXT NOT NULL
+);
 """
 
 
@@ -740,3 +840,317 @@ class Database:
                     changes.append(r)
                     prev_status = r["status"]
             return changes
+    # ══════════════════════════════════════════════════════════════
+    #  Visitor Analytics
+    # ══════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _va_ts(dt: datetime | None = None) -> str:
+        """UTC ISO-8601 timestamp that sorts correctly as a string."""
+        dt = dt or datetime.now(timezone.utc)
+        return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+
+    # ── Tracked sites ─────────────────────────────────────────────
+
+    async def va_add_site(self, name: str, domain: str, site_key: str) -> int:
+        return await self._insert("va_sites", {
+            "name": name, "domain": domain, "site_key": site_key,
+        })
+
+    async def va_update_site(self, sid: int, data: dict[str, Any]) -> bool:
+        return await self._update("va_sites", sid, data)
+
+    async def va_delete_site(self, sid: int) -> bool:
+        return await self._delete("va_sites", sid)
+
+    async def va_get_site(self, sid: int) -> dict[str, Any] | None:
+        return await self._get("va_sites", sid)
+
+    async def va_list_sites(self) -> list[dict[str, Any]]:
+        return await self._list("va_sites")
+
+    async def va_get_site_by_key(self, site_key: str) -> dict[str, Any] | None:
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT * FROM va_sites WHERE site_key = ? AND enabled = 1", (site_key,)
+            )
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    # ── Ingestion ─────────────────────────────────────────────────
+
+    async def va_upsert_visitor(self, vid: str, site_id: int, info: dict[str, Any]) -> None:
+        now = self._va_ts()
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "INSERT INTO va_visitors(id, site_id, first_seen, last_seen, device, browser, os) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET last_seen = excluded.last_seen, "
+                "device = COALESCE(NULLIF(excluded.device, ''), va_visitors.device), "
+                "browser = COALESCE(NULLIF(excluded.browser, ''), va_visitors.browser), "
+                "os = COALESCE(NULLIF(excluded.os, ''), va_visitors.os)",
+                (vid, site_id, now, now,
+                 info.get("device", ""), info.get("browser", ""), info.get("os", "")),
+            )
+            await conn.commit()
+
+    async def va_touch_visitor(self, vid: str, site_id: int) -> None:
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "UPDATE va_visitors SET last_seen = ?, visits = visits + 1 "
+                "WHERE id = ? AND site_id = ?",
+                (self._va_ts(), vid, site_id),
+            )
+            await conn.commit()
+
+    async def va_upsert_session(self, sid: str, site_id: int, visitor_id: str,
+                                info: dict[str, Any]) -> None:
+        now = self._va_ts()
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "INSERT INTO va_sessions(id, site_id, visitor_id, started_at, last_seen_at, "
+                "entry_path, current_path, page_count, referrer, source, medium, campaign, "
+                "device, browser, os, screen, lang) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET last_seen_at = excluded.last_seen_at, "
+                "current_path = COALESCE(NULLIF(excluded.current_path, ''), va_sessions.current_path)",
+                (sid, site_id, visitor_id, now, now,
+                 info.get("path", ""), info.get("path", ""), 0,
+                 info.get("referrer", "")[:500], info.get("source", "")[:120],
+                 info.get("medium", "")[:120], info.get("campaign", "")[:120],
+                 info.get("device", ""), info.get("browser", ""), info.get("os", ""),
+                 info.get("screen", "")[:20], info.get("lang", "")[:20]),
+            )
+            # Inherit geo from the visitor record if enrichment already ran
+            await conn.execute(
+                "UPDATE va_sessions SET country = (SELECT country FROM va_visitors WHERE id = ?), "
+                "city = (SELECT city FROM va_visitors WHERE id = ?) "
+                "WHERE id = ? AND country = ''",
+                (visitor_id, visitor_id, sid),
+            )
+            await conn.commit()
+
+    async def va_update_session_activity(self, sid: str, site_id: int,
+                                         engaged: float, scroll: int,
+                                         path: str = "", exited: bool = False,
+                                         exit_path: str = "") -> None:
+        now = self._va_ts()
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "UPDATE va_sessions SET last_seen_at = ?, "
+                "engaged_seconds = MAX(engaged_seconds, ?), "
+                "max_scroll = MAX(max_scroll, ?), "
+                "current_path = CASE WHEN ? != '' THEN ? ELSE current_path END, "
+                "ended = CASE WHEN ? THEN 1 ELSE ended END, "
+                "exit_path = CASE WHEN ? != '' THEN ? ELSE exit_path END "
+                "WHERE id = ? AND site_id = ?",
+                (now, engaged, scroll, path, path, int(exited), exit_path, exit_path,
+                 sid, site_id),
+            )
+            await conn.commit()
+
+    async def va_add_pageview(self, pv_id: str, session_id: str, visitor_id: str,
+                              site_id: int, path: str, title: str, load_ms: int | None,
+                              engaged: float, scroll: int, exited: bool,
+                              referrer: str) -> None:
+        now = self._va_ts()
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "INSERT OR IGNORE INTO va_pageviews(id, session_id, visitor_id, site_id, "
+                "path, title, ts, load_ms, engaged_seconds, scroll_depth, exited, referrer) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (pv_id, session_id, visitor_id, site_id, path[:1024], title[:240], now,
+                 load_ms, engaged, scroll, int(exited), referrer[:500]),
+            )
+            await conn.execute(
+                "UPDATE va_sessions SET page_count = page_count + 1 WHERE id = ? AND site_id = ?",
+                (session_id, site_id),
+            )
+            await conn.commit()
+
+    async def va_update_pageview_engagement(self, session_id: str, site_id: int,
+                                            path: str, engaged: float,
+                                            scroll: int, exited: bool) -> None:
+        """Update the most recent pageview for a session+path with live engagement."""
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "UPDATE va_pageviews SET engaged_seconds = MAX(engaged_seconds, ?), "
+                "scroll_depth = MAX(scroll_depth, ?), exited = MAX(exited, ?) "
+                "WHERE id = (SELECT id FROM va_pageviews WHERE session_id = ? AND site_id = ? "
+                "AND path = ? ORDER BY ts DESC LIMIT 1)",
+                (engaged, scroll, int(exited), session_id, site_id, path[:1024]),
+            )
+            await conn.commit()
+
+    async def va_add_event(self, ev_id: str, session_id: str, site_id: int,
+                           name: str, value: str) -> None:
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "INSERT OR IGNORE INTO va_events(id, session_id, site_id, name, value, ts) "
+                "VALUES(?, ?, ?, ?, ?, ?)",
+                (ev_id, session_id, site_id, name[:80], value[:253], self._va_ts()),
+            )
+            await conn.commit()
+
+    # ── Geo cache ─────────────────────────────────────────────────
+
+    async def va_geo_get(self, ip: str) -> dict[str, Any] | None:
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute("SELECT * FROM va_geo_cache WHERE ip = ?", (ip,))
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    async def va_geo_put(self, ip: str, data: dict[str, Any]) -> None:
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "INSERT INTO va_geo_cache(ip, country, country_name, region, city, org, fetched_at) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(ip) DO UPDATE SET country=excluded.country, "
+                "country_name=excluded.country_name, region=excluded.region, "
+                "city=excluded.city, org=excluded.org, fetched_at=excluded.fetched_at",
+                (ip, data.get("country", ""), data.get("country_name", ""),
+                 data.get("region", ""), data.get("city", ""), data.get("org", ""),
+                 self._va_ts()),
+            )
+            await conn.commit()
+
+    async def va_set_visitor_geo(self, vid: str, site_id: int, geo: dict[str, Any]) -> None:
+        async with aiosqlite.connect(self.path) as conn:
+            await conn.execute(
+                "UPDATE va_visitors SET country=?, region=?, city=?, org=? WHERE id=? AND site_id=?",
+                (geo.get("country", ""), geo.get("region", ""), geo.get("city", ""),
+                 geo.get("org", ""), vid, site_id),
+            )
+            await conn.execute(
+                "UPDATE va_sessions SET country=?, city=? WHERE visitor_id=? AND site_id=? "
+                "AND country = ''",
+                (geo.get("country", ""), geo.get("city", ""), vid, site_id),
+            )
+            await conn.commit()
+
+    # ── Dashboard queries ─────────────────────────────────────────
+
+    async def va_live_sessions(self, site_id: int, within_seconds: int = 90,
+                               limit: int = 100) -> list[dict[str, Any]]:
+        """Sessions seen within the last N seconds (active visitors)."""
+        cutoff = self._va_ts(datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - within_seconds,
+            tz=timezone.utc))
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT * FROM va_sessions "
+                "WHERE site_id = ? AND last_seen_at >= ? "
+                "ORDER BY last_seen_at DESC LIMIT ?",
+                (site_id, cutoff, limit),
+            )
+            return [dict(r) for r in await cursor.fetchall()]
+
+    async def va_minute_counts(self, site_id: int, minutes: int = 60) -> list[dict[str, Any]]:
+        """Pageviews per minute for the real-time chart."""
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT substr(ts, 1, 16) AS minute, COUNT(*) AS count "
+                "FROM va_pageviews WHERE site_id = ? "
+                "AND ts >= ? GROUP BY minute ORDER BY minute",
+                (site_id, self._va_ts(datetime.fromtimestamp(
+                    datetime.now(timezone.utc).timestamp() - minutes * 60,
+                    tz=timezone.utc))),
+            )
+            return [dict(r) for r in await cursor.fetchall()]
+
+    async def va_summary(self, site_id: int, hours: int) -> dict[str, Any]:
+        cutoff = self._va_ts(datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - hours * 3600, tz=timezone.utc))
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            totals = await (await conn.execute(
+                "SELECT COUNT(DISTINCT visitor_id) AS visitors, COUNT(*) AS pageviews "
+                "FROM va_pageviews WHERE site_id = ? AND ts >= ?",
+                (site_id, cutoff))).fetchone()
+            sess = await (await conn.execute(
+                "SELECT COUNT(*) AS n, AVG(engaged_seconds) AS avg_engaged, "
+                "AVG(CAST(max_scroll AS REAL)) AS avg_scroll, "
+                "SUM(CASE WHEN page_count <= 1 THEN 1 ELSE 0 END) AS bounces "
+                "FROM va_sessions WHERE site_id = ? AND started_at >= ?",
+                (site_id, cutoff))).fetchone()
+            hourly = await (await conn.execute(
+                "SELECT substr(ts, 12, 2) AS hour, COUNT(*) AS count "
+                "FROM va_pageviews WHERE site_id = ? AND ts >= ? GROUP BY hour",
+                (site_id, cutoff))).fetchall()
+            daily = await (await conn.execute(
+                "SELECT substr(ts, 1, 10) AS day, COUNT(*) AS count "
+                "FROM va_pageviews WHERE site_id = ? AND ts >= ? GROUP BY day ORDER BY day",
+                (site_id, cutoff))).fetchall()
+            return {
+                "visitors": totals["visitors"] or 0,
+                "sessions": sess["n"] or 0,
+                "pageviews": totals["pageviews"] or 0,
+                "avg_engaged_seconds": round(sess["avg_engaged"] or 0, 1),
+                "avg_scroll": round(sess["avg_scroll"] or 0, 1),
+                "bounce_rate": round((sess["bounces"] or 0) / max(sess["n"] or 1, 1) * 100, 1),
+                "hourly": {r["hour"]: r["count"] for r in hourly},
+                "daily": [dict(r) for r in daily],
+            }
+
+    async def va_page_stats(self, site_id: int, hours: int, limit: int = 50) -> list[dict[str, Any]]:
+        cutoff = self._va_ts(datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - hours * 3600, tz=timezone.utc))
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT path, COUNT(*) AS views, COUNT(DISTINCT visitor_id) AS visitors, "
+                "AVG(engaged_seconds) AS avg_engaged, AVG(CAST(scroll_depth AS REAL)) AS avg_scroll, "
+                "SUM(CASE WHEN exited = 1 THEN 1 ELSE 0 END) AS exits, "
+                "AVG(load_ms) AS avg_load_ms "
+                "FROM va_pageviews WHERE site_id = ? AND ts >= ? "
+                "GROUP BY path ORDER BY views DESC LIMIT ?",
+                (site_id, cutoff, limit),
+            )
+            return [dict(r) for r in await cursor.fetchall()]
+
+    async def va_breakdown(self, site_id: int, hours: int, column: str) -> list[dict[str, Any]]:
+        """Top values for a session column (device/browser/os/country/city/source...)."""
+        allowed = {"device", "browser", "os", "country", "city", "source", "medium", "campaign"}
+        if column not in allowed:
+            return []
+        cutoff = self._va_ts(datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - hours * 3600, tz=timezone.utc))
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                f"SELECT COALESCE(NULLIF({column}, ''), 'unknown') AS name, COUNT(*) AS count "
+                f"FROM va_sessions WHERE site_id = ? AND started_at >= ? "
+                f"GROUP BY name ORDER BY count DESC LIMIT 20",
+                (site_id, cutoff),
+            )
+            return [dict(r) for r in await cursor.fetchall()]
+
+    async def va_session_list(self, site_id: int, hours: int, limit: int = 100) -> list[dict[str, Any]]:
+        cutoff = self._va_ts(datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - hours * 3600, tz=timezone.utc))
+        async with aiosqlite.connect(self.path) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT * FROM va_sessions WHERE site_id = ? AND started_at >= ? "
+                "ORDER BY started_at DESC LIMIT ?",
+                (site_id, cutoff, limit),
+            )
+            return [dict(r) for r in await cursor.fetchall()]
+
+    async def va_cleanup(self, days: int = 90) -> int:
+        """Delete visitor-analytics rows older than the retention window."""
+        cutoff = self._va_ts(datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - days * 86400, tz=timezone.utc))
+        async with aiosqlite.connect(self.path) as conn:
+            total = 0
+            for table, col in (("va_pageviews", "ts"), ("va_events", "ts"),
+                               ("va_sessions", "started_at"), ("va_visitors", "last_seen")):
+                cursor = await conn.execute(
+                    f"DELETE FROM {table} WHERE {col} < ?", (cutoff,))
+                total += cursor.rowcount or 0
+            await conn.commit()
+            return total

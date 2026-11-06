@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CentienC — Visitor Analytics</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="shortcut icon" href="/static/favicon.ico">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#0d1117;color:#fff;min-height:100vh;overflow-x:hidden}
+.header{background:rgba(0,0,0,.4);padding:18px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid rgba(255,255,255,.07)}
+.header h1{font-size:1.5em;font-weight:600;display:flex;align-items:center;gap:10px}
+.header .logo{width:32px;height:32px;border-radius:8px;object-fit:cover;display:block;flex-shrink:0}
+.header-right{display:flex;align-items:center;gap:16px;font-size:.82em;color:rgba(255,255,255,.65)}
+.header-links{display:flex;gap:10px;flex-wrap:wrap}
+.header-links a{background:rgba(255,255,255,.05);padding:4px 12px;border-radius:8px;font-size:.82em;border:1px solid rgba(255,255,255,.07);text-decoration:none;color:rgba(255,255,255,.75);transition:.2s}
+.header-links a:hover,.header-links a.active{background:rgba(255,255,255,.07);border-color:rgba(88,166,255,.4);color:#fff}
+.controls{background:rgba(0,0,0,.3);padding:12px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.04)}
+.controls label{font-size:.82em;color:rgba(255,255,255,.55);margin-right:4px}
+.controls select,.controls button,.controls input{border:1px solid rgba(255,255,255,.2);border-radius:8px;background:rgba(255,255,255,.05);color:#fff;padding:6px 14px;font-size:.85em;cursor:pointer;outline:none;transition:.2s}
+.controls input{cursor:text}
+.controls select:hover,.controls button:hover,.controls input:focus{background:rgba(255,255,255,.07);border-color:rgba(88,166,255,.4)}
+.controls select option{background:#0d1117;color:#e6edf3}
+.controls .refresh-btn{background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4)}
+.days-pills{display:flex;gap:6px}
+.days-pill{border:1px solid rgba(255,255,255,.07);border-radius:20px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);padding:4px 14px;font-size:.82em;cursor:pointer;transition:.2s}
+.days-pill:hover{background:rgba(255,255,255,.08)}
+.days-pill.active{background:rgba(88,166,255,.22);border-color:rgba(88,166,255,.5);color:#fff;font-weight:600}
+.state-overlay{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;opacity:.7}
+.spinner{width:42px;height:42px;border:4px solid rgba(255,255,255,.07);border-top-color:#58a6ff;border-radius:50%;animation:spin .85s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-box{background:rgba(244,67,54,.12);border:1px solid rgba(244,67,54,.3);border-radius:12px;padding:20px 28px;max-width:560px;text-align:center;color:#ef9a9a;line-height:1.6}
+.section-title{padding:14px 24px 8px;max-width:1500px;margin:10px auto 0;color:rgba(255,255,255,.45);font-size:.78em;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:10px}
+.live-dot{width:9px;height:9px;border-radius:50%;background:#66bb6a;box-shadow:0 0 8px #66bb6a;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.metrics-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:14px 24px;max-width:1500px;margin:0 auto}
+.mc{background:rgba(255,255,255,.05);border-radius:10px;padding:14px 16px;text-align:center;border:1px solid rgba(255,255,255,.07);transition:transform .2s}
+.mc:hover{transform:translateY(-2px)}
+.mc-label{font-size:.7em;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.mc-val{font-size:1.9em;font-weight:700}
+.mc-sub{font-size:.68em;color:rgba(255,255,255,.4);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-blue{color:#58a6ff}.c-green{color:#66bb6a}.c-orange{color:#ffa726}.c-purple{color:#ab47bc}.c-teal{color:#26c6da}.c-red{color:#ef5350}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
+.chart-card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
+.chart-card h3{margin-bottom:14px;color:#58a6ff;font-size:1em;font-weight:600;display:flex;align-items:center;gap:7px}
+.chart-card h3 .icon{font-size:1.1em}
+.chart-card.full{grid-column:1/-1}
+.chart-wrap{position:relative;max-height:280px}
+.chart-wrap-tall{position:relative;max-height:340px}
+.tables-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
+.table-card{background:rgba(255,255,255,.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,.07)}
+.table-card h3{margin-bottom:12px;color:#58a6ff;font-size:1em;font-weight:600;display:flex;align-items:center;gap:7px}
+.tbl{width:100%;border-collapse:collapse;font-size:.82em}
+.tbl th{color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase;font-size:.72em;letter-spacing:.04em;padding:4px 6px;text-align:left}
+.tbl td{padding:5px 6px;border-top:1px solid rgba(255,255,255,.04);vertical-align:middle}
+.tbl tr:hover td{background:rgba(255,255,255,.04)}
+.tbl .rank{color:rgba(255,255,255,.3);font-size:.8em;width:24px}
+.tbl .name{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:.9em}
+.tbl .name-plain{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl .count{text-align:right;font-variant-numeric:tabular-nums;color:#58a6ff;font-weight:600}
+.tbl .sub{font-size:.72em;color:rgba(255,255,255,.4)}
+.bar-mini{height:4px;border-radius:2px;background:rgba(88,166,255,.25);margin-top:3px;overflow:hidden}
+.bar-fill{height:100%;background:#58a6ff;border-radius:2px;transition:width .6s ease}
+/* Live visitors */
+.live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;padding:0 24px 14px;max-width:1500px;margin:0 auto}
+.visitor-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
+.visitor-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#66bb6a}
+.visitor-card .vc-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.visitor-card .vc-flag{font-size:1.2em}
+.visitor-card .vc-page{font-family:monospace;font-size:.85em;color:#58a6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.visitor-card .vc-meta{font-size:.75em;color:rgba(255,255,255,.5);display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.visitor-card .vc-time{font-size:.72em;color:#66bb6a;font-weight:600}
+.visitor-card .vc-badge{font-size:.65em;background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.3);border-radius:10px;padding:1px 8px;color:#58a6ff}
+.empty-state{padding:30px;text-align:center;color:rgba(255,255,255,.35);font-size:.85em;grid-column:1/-1}
+/* Setup card */
+.setup-card{background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.2);border-radius:12px;padding:18px;margin:0 24px 14px;max-width:1500px}
+.setup-card h3{color:#58a6ff;font-size:1em;margin-bottom:10px}
+.setup-card p{font-size:.85em;color:rgba(255,255,255,.6);line-height:1.6;margin-bottom:10px}
+.snippet{background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:12px 14px;font-family:monospace;font-size:.8em;color:#a5d6ff;overflow-x:auto;white-space:pre;margin:8px 0;position:relative}
+.snippet .copy-btn{position:absolute;top:8px;right:8px;background:rgba(88,166,255,.2);border:1px solid rgba(88,166,255,.4);color:#fff;border-radius:6px;padding:3px 10px;font-size:.75em;cursor:pointer}
+.snippet .copy-btn:hover{background:rgba(88,166,255,.35)}
+.site-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);font-size:.85em;flex-wrap:wrap}
+.site-row .key{font-family:monospace;font-size:.75em;color:rgba(255,255,255,.4)}
+.site-row button{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);border-radius:6px;padding:3px 10px;font-size:.75em;cursor:pointer}
+.site-row button:hover{background:rgba(255,255,255,.12);color:#fff}
+.site-row button.danger:hover{background:rgba(244,67,54,.2);border-color:rgba(244,67,54,.4);color:#ef9a9a}
+.add-site-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.add-site-form input{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;padding:7px 12px;font-size:.85em;flex:1;min-width:140px}
+.add-site-form button{background:rgba(102,187,106,.2);border:1px solid rgba(102,187,106,.4);color:#fff;border-radius:8px;padding:7px 16px;font-size:.85em;cursor:pointer}
+.toast{position:fixed;bottom:24px;right:24px;background:rgba(13,17,23,.95);border:1px solid rgba(88,166,255,.4);border-radius:10px;padding:12px 20px;font-size:.85em;z-index:999;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+@media(max-width:1100px){.charts-grid{grid-template-columns:1fr}.tables-grid{grid-template-columns:1fr 1fr}.chart-card.full{grid-column:1}}
+@media(max-width:700px){.header{flex-direction:column;gap:8px;text-align:center}.header-links{display:none}.tables-grid{grid-template-columns:1fr}.controls{flex-direction:column;align-items:flex-start}.mc-val{font-size:1.5em}.live-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>
+    <img src="/static/centienc-logo.png" alt="logo" class="logo" onerror="this.style.display='none'">
+    <span>CentienC</span>
+    <span style="font-weight:300;color:rgba(255,255,255,.55)">/ Visitor Analytics</span>
+  </h1>
+  <div class="header-right">
+    <div class="header-links">
+      <a href="/">🏠 Dashboard</a>
+      <a href="/map">🗺️ Map</a>
+      <a href="/tv">📺 TV</a>
+      <a href="/analytics">📊 Analytics</a>
+      <a href="/visitors" class="active">👥 Visitors</a>
+      <a href="/admin">⚙️ Admin</a>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <div>
+    <label for="siteSel">Tracked Site:</label>
+    <select id="siteSel"><option value="">— loading —</option></select>
+  </div>
+  <div>
+    <label>Period:</label>
+    <div class="days-pills" id="hoursPills">
+      <span class="days-pill" data-hours="24">24h</span>
+      <span class="days-pill active" data-hours="168">7d</span>
+      <span class="days-pill" data-hours="720">30d</span>
+    </div>
+  </div>
+  <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+  <span id="lastUpdated" style="font-size:.78em;color:rgba(255,255,255,.35);margin-left:auto"></span>
+</div>
+
+<div id="mainContent">
+  <div class="state-overlay">
+    <div class="spinner"></div>
+    <span style="color:rgba(255,255,255,.5)">Loading tracked sites…</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let charts = {};
+let activeHours = 168;
+let vaSites = [];
+let liveTimer = null;
+
+// ── Utilities ──────────────────────────────────────────────────
+function fmt(n){n=Number(n)||0;return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n)}
+function fmtDur(sec){sec=Math.round(sec||0);if(sec<60)return sec+'s';if(sec<3600)return Math.floor(sec/60)+'m '+(sec%60)+'s';return Math.floor(sec/3600)+'h '+Math.floor((sec%3600)/60)+'m'}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function flag(cc){if(!cc||cc.length!==2)return '🏳️';return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0)))}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
+function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={}}
+function deviceIcon(d){return {Mobile:'📱',Tablet:'📟',Desktop:'💻'}[d]||'🖥️'}
+function geoLabel(s){return [flag(s.country),s.city,s.country].filter(Boolean).join(' ')||'unknown'}
+
+// ── Sites ──────────────────────────────────────────────────────
+async function loadSites(){
+  try{
+    const r=await fetch('/api/va/sites');const d=await r.json();
+    vaSites=d.sites||[];
+    const sel=document.getElementById('siteSel');
+    if(!vaSites.length){
+      sel.innerHTML='<option value="">No tracked sites</option>';
+      renderSetupOnly();
+      return;
+    }
+    sel.innerHTML=vaSites.map(s=>`<option value="${s.id}" ${s.enabled?'':'disabled'}>${esc(s.name)}${s.enabled?'':' (disabled)'}</option>`).join('');
+    sel.addEventListener('change',()=>{stopLive();loadAll()});
+    loadAll();
+  }catch(e){showError('Could not load tracked sites: '+e.message)}
+}
+
+function currentSite(){return vaSites.find(s=>s.id==document.getElementById('siteSel').value)}
+
+// ── Main load ──────────────────────────────────────────────────
+async function loadAll(){
+  const siteId=document.getElementById('siteSel').value;
+  if(!siteId){renderSetupOnly();return}
+  document.getElementById('mainContent').innerHTML=
+    `<div class="state-overlay"><div class="spinner"></div><span style="color:rgba(255,255,255,.5)">Loading visitor analytics…</span></div>`;
+  destroyCharts();
+  try{
+    const [liveR,dataR]=await Promise.all([
+      fetch(`/api/va/live?site_id=${siteId}`),
+      fetch(`/api/va/data?site_id=${siteId}&hours=${activeHours}`),
+    ]);
+    const live=await liveR.json(), data=await dataR.json();
+    if(!data.ok)throw new Error(data.detail||'API error');
+    render(data,live);
+    document.getElementById('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString();
+    startLive();
+  }catch(e){showError(e.message||'Unknown error')}
+}
+
+function showError(msg){
+  destroyCharts();stopLive();
+  document.getElementById('mainContent').innerHTML=
+    `<div class="state-overlay"><div class="error-box">⚠️ ${esc(msg)}</div></div>`;
+}
+
+function stopLive(){if(liveTimer){clearInterval(liveTimer);liveTimer=null}}
+function startLive(){
+  stopLive();
+  liveTimer=setInterval(async()=>{
+    const siteId=document.getElementById('siteSel').value;if(!siteId)return;
+    try{
+      const r=await fetch(`/api/va/live?site_id=${siteId}`);const d=await r.json();
+      if(d.ok)renderLive(d.live||[]);
+    }catch(e){}
+  },10000);
+}
+
+// ── Render ─────────────────────────────────────────────────────
+function render(d,live){
+  const s=d.summary||{};
+  const site=currentSite();
+  const b=d.breakdowns||{};
+
+  document.getElementById('mainContent').innerHTML=`
+  ${setupCard(site)}
+
+  <div class="section-title"><span class="live-dot"></span> Live Now — ${live.count||0} visitor${(live.count||0)===1?'':'s'} on site</div>
+  <div class="live-grid" id="liveGrid"></div>
+
+  <div class="section-title">📈 Real-Time — Pageviews per Minute (last 60 min)</div>
+  <div class="charts-grid">
+    <div class="chart-card full"><h3><span class="icon">📊</span> Live traffic</h3><div class="chart-wrap"><canvas id="chartLive"></canvas></div></div>
+  </div>
+
+  <div class="section-title">Summary — last ${activeHours>=720?'30 days':activeHours>=168?'7 days':'24 hours'}</div>
+  <div class="metrics-strip">
+    <div class="mc"><div class="mc-label">Visitors</div><div class="mc-val c-blue">${fmt(s.visitors||0)}</div><div class="mc-sub">unique people</div></div>
+    <div class="mc"><div class="mc-label">Sessions</div><div class="mc-val c-green">${fmt(s.sessions||0)}</div><div class="mc-sub">visits</div></div>
+    <div class="mc"><div class="mc-label">Pageviews</div><div class="mc-val c-orange">${fmt(s.pageviews||0)}</div><div class="mc-sub">total views</div></div>
+    <div class="mc"><div class="mc-label">Avg. Engagement</div><div class="mc-val c-purple">${fmtDur(s.avg_engaged_seconds||0)}</div><div class="mc-sub">per session</div></div>
+    <div class="mc"><div class="mc-label">Avg. Scroll</div><div class="mc-val c-teal">${Math.round(s.avg_scroll||0)}%</div><div class="mc-sub">page depth</div></div>
+    <div class="mc"><div class="mc-label">Bounce Rate</div><div class="mc-val c-red">${s.bounce_rate||0}%</div><div class="mc-sub">single-page sessions</div></div>
+  </div>
+
+  <div class="section-title">Audience</div>
+  <div class="charts-grid">
+    <div class="chart-card"><h3><span class="icon">📱</span> Devices</h3><div class="chart-wrap"><canvas id="chartDevice"></canvas></div></div>
+    <div class="chart-card"><h3><span class="icon">🌐</span> Top Countries</h3><div class="chart-wrap"><canvas id="chartCountry"></canvas></div></div>
+    <div class="chart-card"><h3><span class="icon">🧭</span> Browsers</h3><div class="chart-wrap"><canvas id="chartBrowser"></canvas></div></div>
+    <div class="chart-card"><h3><span class="icon">💻</span> Operating Systems</h3><div class="chart-wrap"><canvas id="chartOs"></canvas></div></div>
+  </div>
+
+  <div class="section-title">Traffic Patterns</div>
+  <div class="charts-grid">
+    <div class="chart-card"><h3><span class="icon">🕐</span> Traffic by Hour (UTC)</h3><div class="chart-wrap"><canvas id="chartHour"></canvas></div></div>
+    <div class="chart-card full"><h3><span class="icon">📈</span> Daily Pageviews</h3><div class="chart-wrap"><canvas id="chartDaily"></canvas></div></div>
+  </div>
+
+  <div class="section-title">Content & Engagement</div>
+  <div class="tables-grid">
+    <div class="table-card" style="grid-column:1/-1">
+      <h3><span>📄</span> Pages — views, time spent & depth</h3>
+      ${pagesTable(d.pages||[])}
+    </div>
+    <div class="table-card">
+      <h3><span>🔗</span> Traffic Sources (UTM)</h3>
+      ${sourceTable(b.source||[],b.medium||[])}
+    </div>
+    <div class="table-card">
+      <h3><span>🏆</span> Top Countries</h3>
+      ${geoTable(b.country||[],b.city||[])}
+    </div>
+  </div>
+
+  <div class="section-title">Recent Sessions</div>
+  <div class="tables-grid">
+    <div class="table-card" style="grid-column:1/-1">${sessionsTable(d.sessions||[])}</div>
+  </div>
+  `;
+
+  renderLive(live.live||[]);
+  buildCharts(d,s);
+}
+
+function renderSetupOnly(){
+  destroyCharts();stopLive();
+  document.getElementById('mainContent').innerHTML=setupCard(null)+
+    `<div class="state-overlay"><span style="color:rgba(255,255,255,.5)">Add a tracked site above to start collecting visitor analytics.</span></div>`;
+}
+
+function setupCard(site){
+  const origin=location.origin;
+  const rows=(vaSites||[]).map(s=>`
+    <div class="site-row">
+      <strong>${esc(s.name)}</strong>
+      <span class="key">${esc(s.domain)}</span>
+      ${s.enabled?'':'<span style="color:#ffa726;font-size:.75em">disabled</span>'}
+      <span style="margin-left:auto"></span>
+      <button onclick="rotateKey(${s.id})" title="Generate a new tracking key">⟳ Key</button>
+      <button onclick="toggleSite(${s.id},${s.enabled?0:1})">${s.enabled?'Disable':'Enable'}</button>
+      <button class="danger" onclick="deleteSite(${s.id})">Delete</button>
+    </div>`).join('');
+  const snippet=site?`<!-- CentienC Visitor Analytics — paste before </body> on every page of ${esc(site.domain)} -->
+<script src="${origin}/centience-track.js?site=${site.site_key}" defer><\/script>`
+    :`<!-- Add a tracked site below, then paste the generated snippet before </body> on every page -->
+<script src="${origin}/centience-track.js?site=SITE_KEY" defer><\/script>`;
+  return `<div class="setup-card">
+    <h3>👥 Visitor Analytics — Setup</h3>
+    <p>CentienC collects <strong>anonymous</strong> visitor data: pages viewed, time on page, scroll depth, device/browser/OS, approximate geography (IP → country/city via ipinfo.io, cached), traffic sources, and live presence. No cookies for identity, no fingerprints, honours DNT and skips bots. Sessions expire after 30 minutes of inactivity.</p>
+    <p><strong>To activate:</strong> add the snippet below to every page of your site (before <code>&lt;/body&gt;</code>). It weighs ~6 KB and sends batched beacons — no performance impact.</p>
+    <div class="snippet"><button class="copy-btn" onclick="copySnippet(this)">Copy</button>${esc(snippet)}</div>
+    ${rows?`<div style="margin-top:12px;font-size:.78em;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.05em">Tracked sites</div>${rows}`:''}
+    <div class="add-site-form">
+      <input id="newSiteName" placeholder="Site name (e.g. My Blog)">
+      <input id="newSiteDomain" placeholder="Domain (e.g. example.com)">
+      <button onclick="addSite()">+ Add Site</button>
+    </div>
+  </div>`;
+}
+
+function copySnippet(btn){
+  const text=btn.parentElement.textContent.replace('Copy','').trim();
+  navigator.clipboard.writeText(text).then(()=>toast('Snippet copied')).catch(()=>toast('Copy failed — select manually'));
+}
+
+async function addSite(){
+  const name=document.getElementById('newSiteName').value.trim();
+  const domain=document.getElementById('newSiteDomain').value.trim();
+  if(!name||!domain){toast('Name and domain required');return}
+  try{
+    const r=await fetch('/api/va/sites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,domain})});
+    const d=await r.json();
+    if(!d.ok&&d.detail){toast(d.detail);return}
+    toast('Site added — copy the snippet above');
+    await loadSites();
+  }catch(e){toast(e.message)}
+}
+async function deleteSite(id){
+  if(!confirm('Delete this tracked site and stop collecting? Historical data is kept.'))return;
+  try{await fetch('/api/va/sites/'+id,{method:'DELETE'});toast('Site deleted');await loadSites()}catch(e){toast(e.message)}
+}
+async function toggleSite(id,en){
+  try{await fetch('/api/va/sites/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!!en})});await loadSites()}catch(e){toast(e.message)}
+}
+async function rotateKey(id){
+  if(!confirm('Rotate the tracking key? The old snippet will stop working until you update your site.'))return;
+  try{await fetch('/api/va/sites/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({rotate_key:true})});toast('Key rotated — update your snippet');await loadSites()}catch(e){toast(e.message)}
+}
+
+// ── Live visitors ──────────────────────────────────────────────
+function renderLive(live){
+  const el=document.getElementById('liveGrid');if(!el)return;
+  const title=document.querySelector('.section-title');
+  if(title)title.innerHTML=`<span class="live-dot"></span> Live Now — ${live.length} visitor${live.length===1?'':'s'} on site`;
+  if(!live.length){
+    el.innerHTML=`<div class="empty-state">No one is on the site right now. Visitors appear here within ~15 seconds of loading a page.</div>`;
+    return;
+  }
+  el.innerHTML=live.map(v=>`
+    <div class="visitor-card">
+      <div class="vc-top">
+        <span class="vc-flag">${flag(v.country)}</span>
+        <span class="vc-page" title="${esc(v.path)}">${esc(v.path)}</span>
+        <span class="vc-time">${v.seconds_ago<5?'now':v.seconds_ago+'s ago'}</span>
+      </div>
+      <div class="vc-meta">
+        <span>${deviceIcon(v.device)} ${esc(v.device||'unknown')}</span>
+        <span>${esc(v.browser||'')} ${esc(v.os||'')}</span>
+        <span title="${esc(v.city)} ${esc(v.country)}">${geoLabel(v)}</span>
+        ${v.screen?`<span>${esc(v.screen)}</span>`:''}
+        ${v.source?`<span class="vc-badge">${esc(v.source)}${v.medium?'/'+esc(v.medium):''}</span>`:''}
+        <span class="sub">${v.page_count} page${v.page_count===1?'':'s'} · engaged ${fmtDur(v.engaged_seconds)} · scroll ${v.max_scroll||0}%</span>
+      </div>
+    </div>`).join('');
+}
+
+// ── Tables ─────────────────────────────────────────────────────
+function pagesTable(rows){
+  if(!rows.length)return '<p style="color:rgba(255,255,255,.35);font-size:.82em;padding:8px">No pageview data yet — add the tracking snippet to your site.</p>';
+  const max=rows[0].views||1;
+  return `<table class="tbl">
+    <tr><th>#</th><th>Page</th><th style="text-align:right">Views</th><th style="text-align:right">Visitors</th><th style="text-align:right">Avg. Time</th><th style="text-align:right">Avg. Scroll</th><th style="text-align:right">Exit %</th><th style="text-align:right">Load</th></tr>
+    ${rows.slice(0,25).map((r,i)=>`
+      <tr>
+        <td class="rank">${i+1}</td>
+        <td><div class="name-plain" title="${esc(r.path)}">${esc(r.path)}</div><div class="bar-mini"><div class="bar-fill" style="width:${Math.round(r.views/max*100)}%"></div></div></td>
+        <td class="count">${fmt(r.views)}</td>
+        <td class="count">${fmt(r.visitors)}</td>
+        <td class="count">${fmtDur(r.avg_engaged||0)}</td>
+        <td class="count">${Math.round(r.avg_scroll||0)}%</td>
+        <td class="count">${r.views?Math.round((r.exits||0)/r.views*100):0}%</td>
+        <td class="count sub">${r.avg_load_ms?Math.round(r.avg_load_ms)+'ms':'—'}</td>
+      </tr>`).join('')}
+  </table>`;
+}
+
+function sourceTable(sources,mediums){
+  // Merge source+medium pairs is complex; show sources ranked, mediums below
+  const srcRows=sources.filter(s=>s.name!=='unknown'&&s.name!=='direct'&&!s.name.startsWith('('));
+  const medRows=mediums.filter(m=>m.name!=='unknown'&&m.name!=='');
+  const maxS=Math.max(1,...srcRows.map(r=>r.count));
+  const maxM=Math.max(1,...medRows.map(r=>r.count));
+  return `<table class="tbl">
+    <tr><th colspan="3" style="color:rgba(255,255,255,.55)">UTM Sources</th></tr>
+    ${srcRows.slice(0,8).map((r,i)=>`<tr><td class="rank">${i+1}</td><td class="name-plain">${esc(r.name)}</td><td class="count">${fmt(r.count)}</td></tr>`).join('')||'<tr><td colspan="3" class="sub">No tagged traffic yet</td></tr>'}
+    <tr><th colspan="3" style="color:rgba(255,255,255,.55);padding-top:10px">UTM Mediums</th></tr>
+    ${medRows.slice(0,8).map((r,i)=>`<tr><td class="rank">${i+1}</td><td class="name-plain">${esc(r.name)}</td><td class="count">${fmt(r.count)}</td></tr>`).join('')||'<tr><td colspan="3" class="sub">—</td></tr>'}
+  </table>`;
+}
+
+function geoTable(countries,cities){
+  const cc=countries.filter(c=>c.name&&c.name!=='unknown'&&c.name!=='(not set)');
+  const max=Math.max(1,...cc.map(r=>r.count));
+  const cityRows=cities.filter(c=>c.name&&c.name!=='unknown'&&c.name!=='(not set)').slice(0,8);
+  const maxCity=Math.max(1,...cityRows.map(r=>r.count));
+  return `<table class="tbl">
+    <tr><th colspan="3" style="color:rgba(255,255,255,.55)">Countries</th></tr>
+    ${cc.slice(0,10).map((r,i)=>`<tr><td class="rank">${i+1}</td><td class="name-plain">${flag(r.name)} ${esc(r.name)}</td><td class="count">${fmt(r.count)}</td></tr>`).join('')||'<tr><td colspan="3" class="sub">Geo data fills in as visitors arrive</td></tr>'}
+    <tr><th colspan="3" style="color:rgba(255,255,255,.55);padding-top:10px">Cities</th></tr>
+    ${cityRows.map((r,i)=>`<tr><td class="rank">${i+1}</td><td class="name-plain">${esc(r.name)}</td><td class="count">${fmt(r.count)}</td></tr>`).join('')||'<tr><td colspan="3" class="sub">—</td></tr>'}
+  </table>`;
+}
+
+function sessionsTable(rows){
+  if(!rows.length)return '<p style="color:rgba(255,255,255,.35);font-size:.82em;padding:8px">No sessions recorded yet.</p>';
+  return `<table class="tbl">
+    <tr><th>Started (UTC)</th><th>Duration</th><th>Pages</th><th>Journey</th><th>Device</th><th>Location</th><th>Source</th><th>Engagement</th></tr>
+    ${rows.slice(0,50).map(s=>{
+      const dur=(new Date(s.last_seen_at)-new Date(s.started_at))/1000;
+      const journey=[s.entry_path,s.page_count>1?(s.exit_path||s.current_path):''].filter(Boolean).join(' → ');
+      return `<tr>
+        <td class="sub">${esc((s.started_at||'').slice(5,16).replace('T',' '))}</td>
+        <td class="count">${fmtDur(dur)}</td>
+        <td class="count">${s.page_count}</td>
+        <td class="name-plain" style="max-width:280px" title="${esc(journey)}">${esc(journey)||'—'}</td>
+        <td class="sub">${deviceIcon(s.device)} ${esc(s.device||'')} ${esc(s.browser||'')}</td>
+        <td class="sub">${geoLabel(s)}</td>
+        <td class="sub">${esc([s.source,s.medium].filter(Boolean).join('/')||s.referrer||'direct')}</td>
+        <td class="sub">${fmtDur(s.engaged_seconds)} · ${s.max_scroll||0}%</td>
+      </tr>`}).join('')}
+  </table>`;
+}
+
+// ── Charts ─────────────────────────────────────────────────────
+function buildCharts(d,s){
+  const gridColor='rgba(255,255,255,.04)';
+  const textColor='rgba(255,255,255,.55)';
+  Chart.defaults.color=textColor;
+  Chart.defaults.borderColor=gridColor;
+
+  // Real-time: pageviews per minute, last 60 minutes
+  const mins=(d.minutes||[]);
+  const nowMin=new Date();nowMin.setUTCSeconds(0,0);
+  const labels=[],data=[];
+  for(let i=59;i>=0;i--){
+    const t=new Date(nowMin.getTime()-i*60000);
+    const key=t.toISOString().slice(0,16);
+    labels.push(t.toISOString().slice(11,16));
+    const hit=mins.find(m=>m.minute===key);
+    data.push(hit?hit.count:0);
+  }
+  charts.live=new Chart(document.getElementById('chartLive'),{
+    type:'bar',
+    data:{labels,datasets:[{label:'Pageviews',data,backgroundColor:data.map(v=>v>0?'rgba(102,187,106,.7)':'rgba(255,255,255,.08)'),borderColor:'rgba(102,187,106,.9)',borderWidth:1,borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:it=>'UTC '+labels[it[0].dataIndex]}}},scales:{x:{grid:{color:gridColor},ticks:{color:textColor,maxTicksLimit:15}},y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true}}}
+  });
+
+  // Period: daily pageviews
+  const daily=s.daily||[];
+  charts.daily=new Chart(document.getElementById('chartDaily'),{
+    type:'line',
+    data:{labels:daily.map(x=>x.day),datasets:[{label:'Pageviews',data:daily.map(x=>x.count),fill:true,backgroundColor:'rgba(88,166,255,.12)',borderColor:'#58a6ff',borderWidth:2,pointRadius:daily.length>60?0:2,tension:.35}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{color:textColor,maxTicksLimit:12}},y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true}}}
+  });
+
+  // Donuts
+  const b=d.breakdowns||{};
+  const palette=['#58a6ff','#66bb6a','#ffa726','#ab47bc','#26c6da','#ef5350','#ffca28','#8d6e63','#90a4ae','#f06292'];
+  function donut(canvasId,rows){
+    const el=document.getElementById(canvasId);if(!el)return;
+    const top=(rows||[]).filter(r=>r.name&&r.name!=='unknown').slice(0,8);
+    if(!top.length){el.parentElement.innerHTML='<p style="color:rgba(255,255,255,.35);font-size:.82em;padding:20px;text-align:center">No data yet</p>';return}
+    charts[canvasId]=new Chart(el,{type:'doughnut',data:{labels:top.map(r=>r.name),datasets:[{data:top.map(r=>r.count),backgroundColor:palette.slice(0,top.length),borderColor:'rgba(0,0,0,.4)',borderWidth:2,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:10,color:textColor}}}}});
+  }
+  donut('chartDevice',b.device);
+  donut('chartBrowser',b.browser);
+  donut('chartOs',b.os);
+  donut('chartCountry',b.country);
+
+  // Hourly traffic
+  const hours=s.hourly||{};
+  charts.hour=new Chart(document.getElementById('chartHour'),{
+    type:'bar',
+    data:{labels:[...Array(24).keys()].map(h=>String(h).padStart(2,'0')+':00'),datasets:[{label:'Pageviews',data:[...Array(24).keys()].map(h=>hours[String(h).padStart(2,'0')]||hours[h]||0),backgroundColor:'rgba(171,71,188,.55)',borderColor:'rgba(171,71,188,.85)',borderWidth:1,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:gridColor},ticks:{color:textColor,maxRotation:0}},y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true}}}
+  });
+}
+
+// ── Controls ───────────────────────────────────────────────────
+document.getElementById('hoursPills').addEventListener('click',e=>{
+  const pill=e.target.closest('[data-hours]');if(!pill)return;
+  activeHours=parseInt(pill.dataset.hours,10);
+  document.querySelectorAll('#hoursPills .days-pill').forEach(p=>p.classList.toggle('active',p===pill));
+  loadAll();
+});
+
+loadSites();
+</script>
+</body>
+</html>

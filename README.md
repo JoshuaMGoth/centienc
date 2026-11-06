@@ -32,6 +32,7 @@ There are no separate agents to install on your monitored machines. CentienC con
 - **Service Monitoring** — TCP port connectivity checks (SSH, databases, mail, etc.)
 - **Proxmox Integration** — Container and VM metrics via API token
 - **Nginx Live Feed** — Real-time request log with per-site traffic breakdown
+- **Visitor Analytics** — JS beacon tracker with live visitors, per-page engagement (time on page, scroll depth), device/browser/OS breakdowns, geo-IP (country/city via cached ipinfo.io lookups), UTM source tracking, custom events, and session journeys
 - **IP Geolocation** — Click any IP in the feed to see a map with city, ISP, and org data
 - **Fail2ban & Firewall** — View banned IPs and active jail stats
 - **PM2 Process Monitoring** — See all PM2 processes across your servers
@@ -314,6 +315,26 @@ centient/
 ```
 
 ---
+
+## Visitor Analytics
+
+CentienC includes a privacy-first web analytics tracker — no cookies for identity, no fingerprints, honours DNT/GPC, and skips bots. Each tracked site gets a unique key; paste one snippet before `</body>`:
+
+```html
+<script src="https://YOUR-CENTIENC:9099/centience-track.js?site=SITE_KEY" defer></script>
+```
+
+Manage tracked sites and copy ready-made snippets from **👥 Visitors** in the dashboard. The tracker records:
+
+- **Live visitors** — who's on the site right now, which page, for how long (auto-refreshes)
+- **Page engagement** — views, unique visitors, average time on page, scroll depth, exit rate, load time per page
+- **Audience** — device (desktop/mobile/tablet), browser, OS, screen size, language, timezone
+- **Geography** — country/city from IP via ipinfo.io, cached in SQLite (no per-request API calls)
+- **Sources** — UTM parameters captured on landing plus HTTP referrer
+- **Sessions** — full journeys: entry → pages → exit, duration, engagement, bounce rate
+- **Custom events** — call `centience.track('signup_click', 'hero')` from your own JS
+
+Data is stored in SQLite (`va_*` tables), retained for 90 days, rate-limited per IP, and geo lookups only run for public IPs. Because the tracker is first-party to your CentienC instance, you own all the data.
 
 ## Reporting Issues
 

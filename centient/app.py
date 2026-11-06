@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+import ipaddress
 import json
 import logging
 import os
+import re
+import secrets
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -51,6 +55,7 @@ engine: MonitorEngine | None = None
 # WebSocket connection manager
 _ws_clients: set[WebSocket] = set()
 _ws_broadcast_task: asyncio.Task | None = None
+_va_cleanup_task: asyncio.Task | None = None
 
 
 async def _build_overview_payload() -> dict[str, Any]:
@@ -121,6 +126,21 @@ async def _build_overview_payload() -> dict[str, Any]:
     }
 
 
+async def _va_cleanup_loop() -> None:
+    """Purge visitor-analytics data older than the retention window, hourly."""
+    while True:
+        try:
+            await asyncio.sleep(3600)
+            if db is not None:
+                removed = await db.va_cleanup(90)
+                if removed:
+                    logger.info("VA cleanup removed %d rows", removed)
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.debug("VA cleanup error: %s", exc)
+
+
 async def _ws_broadcast_loop() -> None:
     """Periodically push overview data to all connected WebSocket clients."""
     while True:
@@ -179,13 +199,16 @@ async def lifespan(application: FastAPI):
     engine = MonitorEngine(db)
     await engine.start()
 
-    global _ws_broadcast_task
+    global _ws_broadcast_task, _va_cleanup_task
     _ws_broadcast_task = asyncio.create_task(_ws_broadcast_loop())
+    _va_cleanup_task = asyncio.create_task(_va_cleanup_loop())
 
     logger.info("CentienC v%s started", __version__)
     yield
     if _ws_broadcast_task:
         _ws_broadcast_task.cancel()
+    if _va_cleanup_task:
+        _va_cleanup_task.cancel()
     await engine.stop()
     logger.info("CentienC shut down")
 
@@ -421,6 +444,19 @@ async def updates_page(request: Request):
         if user is None:
             return RedirectResponse("/login")
     return _serve_template("updates.html")
+
+
+@app.get("/visitors", response_class=HTMLResponse)
+async def visitors_page(request: Request):
+    setup_done = await db.get_setting("setup_complete", "false")
+    if setup_done != "true":
+        return RedirectResponse("/setup")
+    auth_enabled = await db.get_setting("auth_enabled", "false")
+    if auth_enabled == "true":
+        user = await _require_auth(request)
+        if user is None:
+            return RedirectResponse("/login")
+    return _serve_template("visitors.html")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1203,7 +1239,7 @@ async def update_user(user_id: int, request: Request):
 @app.delete("/api/users/{user_id}")
 async def delete_user(user_id: int, request: Request):
     cur = await _require_auth_or_401(request)
-    if cur["sub"] == user_id:
+    if str(cur["sub"]) == str(user_id):
         raise HTTPException(400, "Cannot delete yourself")
     ok = await db.delete_user(user_id)
     if not ok:
@@ -1418,6 +1454,18 @@ async def api_analytics(request: Request):
     logger.info("ANALYTICS: server=%s log_path=%r website=%s",
                 server.get("name"), log_path, website.get("name") if website else None)
     result = await engine.get_analytics(server, days=days, log_path=log_path)
+    # Annotate top IPs with cached geo data (non-blocking; misses stay bare)
+    for entry in result.get("top_ips", []):
+        try:
+            geo = await db.va_geo_get(entry["name"])
+            if geo and geo.get("country"):
+                entry["geo"] = {
+                    "country": geo.get("country", ""),
+                    "city": geo.get("city", ""),
+                    "org": geo.get("org", ""),
+                }
+        except Exception:
+            pass
     return {"ok": True, **result}
 
 
@@ -1619,6 +1667,376 @@ async def api_updates():
         return result
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Visitor Analytics — JS beacon tracker + live visitor data
+# ═══════════════════════════════════════════════════════════════════
+
+_TRACK_KINDS = {"pv", "beat", "exit", "evt"}
+_track_rate: dict[str, list[float]] = {}
+_geo_inflight: set[str] = set()
+
+_VA_UA_BROWSER = [
+    ("Edg/", "Edge"), ("OPR/", "Opera"), ("Firefox/", "Firefox"),
+    ("Chrome/", "Chrome"), ("Safari/", "Safari"),
+]
+_VA_UA_OS = [
+    ("Windows", "Windows"), ("Android", "Android"), ("iPhone", "iOS"),
+    ("iPad", "iOS"), ("Mac OS X", "macOS"), ("Linux", "Linux"),
+    ("CrOS", "ChromeOS"),
+]
+_VA_BOT_RE = re.compile(
+    r"bot|spider|crawler|slurp|facebookexternal|preview|headless|phantom|"
+    r"selenium|lighthouse|pingdom|uptime|monitor|curl|wget|python-requests|"
+    r"go-http|java/|perl/|libwww|nmap|masscan|zgrab|semrush|ahrefs|mj12bot|"
+    r"dotbot|blexbot|yandex|baiduspider|facebot|twitterbot|applebot|"
+    r"linkedinbot|scaninfo|nuclei|nikto|sqlmap",
+    re.IGNORECASE,
+)
+_VA_MOBILE_RE = re.compile(r"Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini", re.IGNORECASE)
+_VA_TABLET_RE = re.compile(r"iPad|Tablet|PlayBook|Silk", re.IGNORECASE)
+
+
+def _va_parse_ua(ua: str) -> tuple[str, str, str]:
+    """Return (device, browser, os) from a User-Agent string."""
+    ua = (ua or "")[:1024]
+    if _VA_TABLET_RE.search(ua):
+        device = "Tablet"
+    elif _VA_MOBILE_RE.search(ua):
+        device = "Mobile"
+    else:
+        device = "Desktop"
+    browser = next((name for token, name in _VA_UA_BROWSER if token in ua), "Other")
+    os_name = next((name for token, name in _VA_UA_OS if token in ua), "Other")
+    return device, browser, os_name
+
+
+def _va_client_ip(request: Request) -> str:
+    """Client IP. Only trusts forwarding headers from loopback proxies."""
+    host = request.client.host if request.client else ""
+    if host in ("127.0.0.1", "::1"):
+        fwd = request.headers.get("x-forwarded-for", "")
+        if fwd:
+            return fwd.split(",")[0].strip()[:45]
+    return host
+
+
+def _va_rate_ok(ip: str) -> bool:
+    now = time.time()
+    hits = [t for t in _track_rate.get(ip, []) if now - t < 60]
+    if len(hits) >= 240:
+        _track_rate[ip] = hits
+        return False
+    hits.append(now)
+    _track_rate[ip] = hits
+    if len(_track_rate) > 10000:
+        for k in [k for k, v in _track_rate.items() if not v or now - v[-1] > 300]:
+            _track_rate.pop(k, None)
+    return True
+
+
+def _va_public_ip(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+        return addr.is_global
+    except ValueError:
+        return False
+
+
+async def _va_geo_enrich(ip: str, visitor_id: str, site_id: int) -> None:
+    """Fetch + cache geo data for an IP, then stamp it on the visitor/session."""
+    if ip in _geo_inflight or not _va_public_ip(ip):
+        return
+    _geo_inflight.add(ip)
+    try:
+        cached = await db.va_geo_get(ip)
+        if cached is None or not cached.get("fetched_at"):
+            try:
+                async with httpx.AsyncClient(timeout=5) as client:
+                    r = await client.get(f"https://ipinfo.io/{ip}/json")
+                    data = r.json() if r.status_code == 200 else {}
+            except Exception:
+                data = {}
+            geo = {
+                "country": (data.get("country") or "")[:8],
+                "country_name": (data.get("country_name") or "")[:80],
+                "region": (data.get("region") or "")[:80],
+                "city": (data.get("city") or "")[:80],
+                "org": (data.get("org") or "")[:120],
+            }
+            await db.va_geo_put(ip, geo)
+            cached = geo
+        if cached.get("country") or cached.get("city"):
+            await db.va_set_visitor_geo(visitor_id, site_id, cached)
+    except Exception as exc:
+        logger.debug("VA geo enrich failed for %s: %s", ip, exc)
+    finally:
+        _geo_inflight.discard(ip)
+
+
+@app.get("/centience-track.js")
+async def tracker_js():
+    from fastapi.responses import FileResponse
+    return FileResponse(STATIC_DIR / "centience-track.js", media_type="application/javascript")
+
+
+@app.post("/api/track/{site_key}")
+async def track_ingest(site_key: str, request: Request):
+    """Public beacon endpoint — receives events from centience-track.js."""
+    cl = request.headers.get("content-length")
+    if cl is not None:
+        try:
+            if int(cl) > 16384:
+                raise HTTPException(413, "Payload too large")
+        except ValueError:
+            pass
+    site = await db.va_get_site_by_key(site_key[:64])
+    if not site:
+        raise HTTPException(404, "Unknown tracking site")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Invalid payload")
+
+    kind = str(body.get("k", ""))[:8]
+    if kind not in _TRACK_KINDS:
+        raise HTTPException(400, "Unknown event kind")
+
+    ip = _va_client_ip(request)
+    if not _va_rate_ok(ip):
+        return {"ok": True}  # silently drop — never punish real visitors
+
+    ua = request.headers.get("user-agent", "")
+    if _VA_BOT_RE.search(ua):
+        return {"ok": True}
+
+    vid = str(body.get("v", ""))[:64]
+    sid = str(body.get("s", ""))[:64]
+    if not vid or not sid:
+        raise HTTPException(400, "Missing visitor/session id")
+
+    device, browser, os_name = _va_parse_ua(ua)
+    site_id = site["id"]
+    raw_path = str(body.get("path", "/"))[:1024]
+    if not raw_path.startswith("/"):
+        raw_path = "/" + raw_path.lstrip("/")
+    # Group pages without query strings (UTMs are captured separately)
+    path = raw_path.split("?", 1)[0] or "/"
+
+    def _f(key: str, default: float = 0.0) -> float:
+        try:
+            v = float(body.get(key, default) or 0)
+            return max(0.0, min(v, 86400 * 7))
+        except (TypeError, ValueError):
+            return default
+
+    def _i(key: str) -> int | None:
+        try:
+            v = int(float(body.get(key, 0) or 0))
+            return max(0, min(v, 600000))
+        except (TypeError, ValueError):
+            return None
+
+    client_ts = body.get("ts")
+    try:
+        client_ms = float(client_ts)
+        if client_ms <= 0 or abs(time.time() * 1000 - client_ms) > 86400000:
+            client_ms = 0
+    except (TypeError, ValueError):
+        client_ms = 0
+
+    visitor_info = {
+        "device": device, "browser": browser, "os": os_name,
+    }
+    await db.va_upsert_visitor(vid, site_id, visitor_info)
+
+    if kind == "pv":
+        await db.va_touch_visitor(vid, site_id)
+        session_info = {
+            "path": path.split("?")[0] or "/",
+            "referrer": str(body.get("ref", ""))[:500],
+            "source": str(body.get("utm_source", ""))[:120],
+            "medium": str(body.get("utm_medium", ""))[:120],
+            "campaign": str(body.get("utm_campaign", ""))[:120],
+            "device": device, "browser": browser, "os": os_name,
+            "screen": str(body.get("screen", ""))[:20],
+            "lang": str(body.get("lang", ""))[:20],
+        }
+        await db.va_upsert_session(sid, site_id, vid, session_info)
+        await db.va_add_pageview(
+            str(body.get("id") or secrets.token_hex(16)), sid, vid, site_id,
+            path, str(body.get("title", ""))[:240], _i("load"),
+            _f("eng"), int(_f("scroll")), False,
+            str(body.get("ref", ""))[:500],
+        )
+        # Kick off geo enrichment in the background (cached per-IP)
+        asyncio.create_task(_va_geo_enrich(ip, vid, site_id))
+    elif kind in ("beat", "exit"):
+        eng = _f("eng")
+        seng = _f("seng") or eng
+        scroll = int(_f("scroll"))
+        exited = kind == "exit"
+        await db.va_update_session_activity(
+            sid, site_id, seng, scroll, path.split("?")[0] or "/", exited,
+            path.split("?")[0] or "/" if exited else "",
+        )
+        await db.va_update_pageview_engagement(
+            sid, site_id, path.split("?")[0] or "/", eng, scroll, exited,
+        )
+    elif kind == "evt":
+        name = re.sub(r"[^a-zA-Z0-9_.:-]", "", str(body.get("name", "")))[:80]
+        if name:
+            await db.va_add_event(
+                str(body.get("id") or secrets.token_hex(16)), sid, site_id,
+                name, str(body.get("value", ""))[:253],
+            )
+
+    return {"ok": True}
+
+
+def _va_hours(request: Request, default: int = 168) -> int:
+    try:
+        return max(1, min(int(request.query_params.get("hours", default)), 24 * 365))
+    except ValueError:
+        return default
+
+
+def _va_site_param(request: Request) -> int:
+    try:
+        return int(request.query_params.get("site_id", "0"))
+    except ValueError:
+        return 0
+
+
+@app.get("/api/va/sites")
+async def va_sites_list(request: Request):
+    await _require_auth_or_401(request)
+    return {"ok": True, "sites": await db.va_list_sites()}
+
+
+@app.post("/api/va/sites")
+async def va_sites_create(request: Request):
+    await _require_auth_or_401(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    name = str(body.get("name", "")).strip()[:120]
+    domain = str(body.get("domain", "")).strip()[:253]
+    if not name or not domain:
+        raise HTTPException(400, "name and domain are required")
+    site_key = secrets.token_urlsafe(18)
+    sid = await db.va_add_site(name, domain, site_key)
+    return {"ok": True, "id": sid, "site_key": site_key}
+
+
+@app.put("/api/va/sites/{site_id}")
+async def va_sites_update(site_id: int, request: Request):
+    await _require_auth_or_401(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    data: dict[str, Any] = {}
+    if "name" in body:
+        data["name"] = str(body["name"])[:120]
+    if "domain" in body:
+        data["domain"] = str(body["domain"])[:253]
+    if "enabled" in body:
+        data["enabled"] = 1 if body["enabled"] else 0
+    if "rotate_key" in body and body["rotate_key"]:
+        data["site_key"] = secrets.token_urlsafe(18)
+    if not data:
+        raise HTTPException(400, "Nothing to update")
+    await db.va_update_site(site_id, data)
+    site = await db.va_get_site(site_id)
+    return {"ok": True, "site": site}
+
+
+@app.delete("/api/va/sites/{site_id}")
+async def va_sites_delete(site_id: int, request: Request):
+    await _require_auth_or_401(request)
+    await db.va_delete_site(site_id)
+    return {"ok": True}
+
+
+@app.get("/api/va/live")
+async def va_live(request: Request):
+    """Currently-active visitors (heartbeat within the last 90 seconds)."""
+    await _require_auth_or_401(request)
+    site_id = _va_site_param(request)
+    if not site_id:
+        raise HTTPException(400, "site_id is required")
+    sessions = await db.va_live_sessions(site_id)
+    now = time.time()
+    out = []
+    for s in sessions:
+        try:
+            from datetime import datetime, timezone
+            last = datetime.strptime(
+                s["last_seen_at"], "%Y-%m-%dT%H:%M:%S.%fZ"
+            ).replace(tzinfo=timezone.utc).timestamp()
+        except Exception:
+            last = now - 30
+        out.append({
+            "id": s["id"], "visitor_id": s["visitor_id"],
+            "path": s.get("current_path") or s.get("entry_path") or "/",
+            "entry_path": s.get("entry_path", ""),
+            "started_at": s.get("started_at", ""),
+            "last_seen_at": s.get("last_seen_at", ""),
+            "seconds_ago": max(0, int(now - last)),
+            "page_count": s.get("page_count", 0),
+            "engaged_seconds": s.get("engaged_seconds", 0),
+            "max_scroll": s.get("max_scroll", 0),
+            "country": s.get("country", ""), "city": s.get("city", ""),
+            "device": s.get("device", ""), "browser": s.get("browser", ""),
+            "os": s.get("os", ""), "screen": s.get("screen", ""),
+            "source": s.get("source", ""), "medium": s.get("medium", ""),
+            "campaign": s.get("campaign", ""), "referrer": s.get("referrer", ""),
+        })
+    return {"ok": True, "live": out, "count": len(out)}
+
+
+@app.get("/api/va/data")
+async def va_data(request: Request):
+    """Aggregated visitor analytics for a tracked site and period."""
+    await _require_auth_or_401(request)
+    site_id = _va_site_param(request)
+    if not site_id:
+        raise HTTPException(400, "site_id is required")
+    hours = _va_hours(request)
+    summary, pages, sessions = await asyncio.gather(
+        db.va_summary(site_id, hours),
+        db.va_page_stats(site_id, hours),
+        db.va_session_list(site_id, hours, limit=100),
+    )
+    breakdowns = await asyncio.gather(*[
+        db.va_breakdown(site_id, hours, col)
+        for col in ("device", "browser", "os", "country", "city", "source", "medium")
+    ])
+    keys = ("device", "browser", "os", "country", "city", "source", "medium")
+    breakdown = dict(zip(keys, breakdowns))
+    minutes = await db.va_minute_counts(site_id, minutes=60)
+    return {
+        "ok": True, "hours": hours, "summary": summary, "pages": pages,
+        "sessions": sessions, "breakdowns": breakdown, "minutes": minutes,
+    }
+
+
+@app.post("/api/va/cleanup")
+async def va_cleanup(request: Request):
+    await _require_auth_or_401(request)
+    try:
+        body = await request.json()
+        days = int(body.get("days", 90))
+    except Exception:
+        days = 90
+    days = max(7, min(days, 365))
+    removed = await db.va_cleanup(days)
+    return {"ok": True, "removed": removed}
 
 
 # ═══════════════════════════════════════════════════════════════════
