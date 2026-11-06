@@ -1054,6 +1054,8 @@ async function _wizSaveWebsite(){
 <script>
 let settings={},editUserId=null,editChannelId=null,editServerId=null,editWebsiteId=null;
 
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
 async function api(p,o={}){const r=await fetch(p,{headers:{'Content-Type':'application/json'},...o});if(r.status===401){location.href='/login';return null}const d=await r.json();if(!r.ok)throw new Error(d.detail||'Failed');return d}
 function toast(m,t='info'){const e=document.createElement('div');e.className='toast '+t;e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(()=>e.remove(),3500)}
 
